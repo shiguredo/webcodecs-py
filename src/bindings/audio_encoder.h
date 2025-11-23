@@ -17,6 +17,10 @@
 #include <opus.h>
 #include "webcodecs_types.h"
 
+#if defined(__APPLE__)
+#include <AudioToolbox/AudioToolbox.h>
+#endif
+
 namespace nb = nanobind;
 
 class AudioData;
@@ -61,9 +65,23 @@ class AudioEncoder {
   static AudioEncoderSupport is_config_supported(
       const AudioEncoderConfig& config);
 
+ public:
+#if defined(__APPLE__)
+  // AAC エンコーダーのコールバック用
+  OSStatus aac_provide_input_data(UInt32* number_data_packets,
+                                  AudioBufferList* data);
+#endif
+
  private:
   OpusEncoder* opus_encoder_;
   FLAC__StreamEncoder* flac_encoder_;
+
+#if defined(__APPLE__)
+  AudioConverterRef aac_converter_ = nullptr;
+  std::vector<float> aac_input_buffer_;
+  int64_t aac_current_timestamp_ = 0;
+  uint64_t aac_samples_encoded_ = 0;
+#endif
 
   AudioEncoderConfig config_;  // 内部で保持する設定
   CodecState state_;
@@ -100,6 +118,14 @@ class AudioEncoder {
   void init_flac_encoder();
   void encode_frame_flac(const AudioData& data);
   void finalize_flac_encoder();
+
+#if defined(__APPLE__)
+  void init_aac_encoder();
+  void encode_frame_aac(const AudioData& data);
+  void encode_aac_frame_internal();
+  void finalize_aac_encoder();
+  void cleanup_aac_encoder();
+#endif
   // FLAC コールバック用の静的メソッド
   static FLAC__StreamEncoderWriteStatus flac_write_callback(
       const FLAC__StreamEncoder* encoder,

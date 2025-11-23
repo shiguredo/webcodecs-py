@@ -5,6 +5,19 @@
 #include "audio_data.h"
 #include "encoded_audio_chunk.h"
 
+namespace {
+// AAC コーデック文字列かどうかを判定するヘルパー関数
+bool is_aac_codec(const std::string& codec) {
+  // AAC-LC
+  // mp4a.40.2 - MPEG-4 AAC LC
+  // mp4a.40.02 - MPEG-4 AAC LC (leading 0 for Aud-OTI compatibility)
+  // mp4a.67 - MPEG-2 AAC LC
+  // aac - 簡略表記
+  return codec == "mp4a.40.2" || codec == "mp4a.40.02" || codec == "mp4a.67" ||
+         codec == "aac";
+}
+}  // namespace
+
 AudioEncoder::AudioEncoder(nb::object output, nb::object error)
     : output_callback_(output),
       error_callback_(error),
@@ -13,6 +26,11 @@ AudioEncoder::AudioEncoder(nb::object output, nb::object error)
   opus_encoder_ = nullptr;
   flac_encoder_ = nullptr;
   flac_current_timestamp_ = 0;
+#if defined(__APPLE__)
+  aac_converter_ = nullptr;
+  aac_current_timestamp_ = 0;
+  aac_samples_encoded_ = 0;
+#endif
   // コールバックフラグを設定
   has_output_callback_ = !output_callback_.is_none();
   has_error_callback_ = !error_callback_.is_none();
@@ -101,6 +119,10 @@ void AudioEncoder::configure(nb::dict config_dict) {
     init_opus_encoder();
   } else if (config_.codec == "flac") {
     init_flac_encoder();
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config_.codec)) {
+    init_aac_encoder();
+#endif
   } else {
     throw std::runtime_error("Unsupported codec: " + config_.codec);
   }
@@ -180,6 +202,15 @@ void AudioEncoder::flush() {
     flac_encoder_ = nullptr;
     init_flac_encoder();
   }
+#if defined(__APPLE__)
+  // AAC エンコーダーは残りのデータをフラッシュする必要がある
+  if (is_aac_codec(config_.codec) && aac_converter_) {
+    finalize_aac_encoder();
+    // エンコーダーを再初期化して再利用可能にする
+    cleanup_aac_encoder();
+    init_aac_encoder();
+  }
+#endif
   // Opus エンコーダーは明示的なフラッシュが不要
   // フレームを即座に処理する
 }
@@ -237,6 +268,13 @@ void AudioEncoder::close() {
     flac_encoder_ = nullptr;
   }
 
+#if defined(__APPLE__)
+  if (aac_converter_) {
+    finalize_aac_encoder();
+    cleanup_aac_encoder();
+  }
+#endif
+
   state_ = CodecState::CLOSED;
 }
 
@@ -263,6 +301,16 @@ AudioEncoderSupport AudioEncoder::is_config_supported(
         supported = true;
       }
     }
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config.codec)) {
+    // AAC-LC は一般的なサンプルレートをサポート
+    if (config.sample_rate >= 8000 && config.sample_rate <= 96000) {
+      // チャンネル数の確認 (AAC は 1-2 チャンネルをサポート)
+      if (config.number_of_channels >= 1 && config.number_of_channels <= 2) {
+        supported = true;
+      }
+    }
+#endif
   }
 
   return AudioEncoderSupport(supported, config);
@@ -333,6 +381,10 @@ void AudioEncoder::process_encode_task(const EncodeTask& task) {
     encode_frame_opus(*task.data);
   } else if (config_.codec == "flac") {
     encode_frame_flac(*task.data);
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config_.codec)) {
+    encode_frame_aac(*task.data);
+#endif
   }
 }
 

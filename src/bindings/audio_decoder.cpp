@@ -6,6 +6,19 @@
 #include "audio_data.h"
 #include "encoded_audio_chunk.h"
 
+namespace {
+// AAC コーデック文字列かどうかを判定するヘルパー関数
+bool is_aac_codec(const std::string& codec) {
+  // AAC-LC
+  // mp4a.40.2 - MPEG-4 AAC LC
+  // mp4a.40.02 - MPEG-4 AAC LC (leading 0 for Aud-OTI compatibility)
+  // mp4a.67 - MPEG-2 AAC LC
+  // aac - 簡略表記
+  return codec == "mp4a.40.2" || codec == "mp4a.40.02" || codec == "mp4a.67" ||
+         codec == "aac";
+}
+}  // namespace
+
 AudioDecoder::AudioDecoder(nb::object output, nb::object error)
     : output_callback_(output),
       error_callback_(error),
@@ -15,6 +28,9 @@ AudioDecoder::AudioDecoder(nb::object output, nb::object error)
   flac_decoder_ = nullptr;
   flac_input_position_ = 0;
   flac_current_timestamp_ = 0;
+#if defined(__APPLE__)
+  aac_converter_ = nullptr;
+#endif
   // コールバックフラグを設定
   has_output_callback_ = !output_callback_.is_none();
   has_error_callback_ = !error_callback_.is_none();
@@ -59,6 +75,10 @@ void AudioDecoder::configure(nb::dict config_dict) {
     init_opus_decoder();
   } else if (config_.codec == "flac") {
     init_flac_decoder();
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config_.codec)) {
+    init_aac_decoder();
+#endif
   } else {
     throw std::runtime_error("Unsupported codec: " + config_.codec);
   }
@@ -169,6 +189,12 @@ void AudioDecoder::close() {
     flac_decoder_ = nullptr;
   }
 
+#if defined(__APPLE__)
+  if (aac_converter_) {
+    cleanup_aac_decoder();
+  }
+#endif
+
   state_ = CodecState::CLOSED;
 }
 
@@ -195,6 +221,16 @@ AudioDecoderSupport AudioDecoder::is_config_supported(
         supported = true;
       }
     }
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config.codec)) {
+    // AAC-LC は一般的なサンプルレートをサポート
+    if (config.sample_rate >= 8000 && config.sample_rate <= 96000) {
+      // チャンネル数の確認 (AAC は 1-2 チャンネルをサポート)
+      if (config.number_of_channels >= 1 && config.number_of_channels <= 2) {
+        supported = true;
+      }
+    }
+#endif
   }
 
   return AudioDecoderSupport(supported, config);
@@ -265,6 +301,10 @@ void AudioDecoder::process_decode_task(const DecodeTask& task) {
     decode_frame_opus(*task.chunk);
   } else if (config_.codec == "flac") {
     decode_frame_flac(*task.chunk);
+#if defined(__APPLE__)
+  } else if (is_aac_codec(config_.codec)) {
+    decode_frame_aac(*task.chunk);
+#endif
   }
 }
 

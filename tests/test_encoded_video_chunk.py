@@ -6,11 +6,13 @@ from webcodecs import EncodedVideoChunk, EncodedVideoChunkType
 def test_encoded_video_chunk_creation():
     """EncodedVideoChunk の作成をテスト"""
     data = b"video_data_12345"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.KEY,
-        "timestamp": 1000,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.KEY,
+            "timestamp": 1000,
+            "data": data,
+        }
+    )
 
     assert chunk.type == EncodedVideoChunkType.KEY
     assert chunk.timestamp == 1000
@@ -21,12 +23,14 @@ def test_encoded_video_chunk_creation():
 def test_encoded_video_chunk_with_duration():
     """duration を指定した EncodedVideoChunk の作成をテスト"""
     data = b"video_data_with_duration"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.DELTA,
-        "timestamp": 2000,
-        "duration": 33000,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.DELTA,
+            "timestamp": 2000,
+            "duration": 33000,
+            "data": data,
+        }
+    )
 
     assert chunk.type == EncodedVideoChunkType.DELTA
     assert chunk.timestamp == 2000
@@ -37,11 +41,13 @@ def test_encoded_video_chunk_with_duration():
 def test_encoded_video_chunk_copy_to():
     """copy_to() メソッドをテスト (WebCodecs API 準拠)"""
     data = b"original_video_data"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.KEY,
-        "timestamp": 0,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.KEY,
+            "timestamp": 0,
+            "data": data,
+        }
+    )
 
     # destination バッファを確保
     destination = np.zeros(chunk.byte_length, dtype=np.uint8)
@@ -54,11 +60,13 @@ def test_encoded_video_chunk_copy_to():
 def test_encoded_video_chunk_get_data():
     """get_data() メソッドをテスト"""
     data = b"test_video_chunk_data"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.DELTA,
-        "timestamp": 5000,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.DELTA,
+            "timestamp": 5000,
+            "data": data,
+        }
+    )
 
     # copy_to() を使用してデータを取得
     destination = np.zeros(chunk.byte_length, dtype=np.uint8)
@@ -71,11 +79,13 @@ def test_encoded_video_chunk_get_data():
 def test_encoded_video_chunk_empty_data():
     """空のデータで EncodedVideoChunk を作成"""
     data = b""
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.KEY,
-        "timestamp": 0,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.KEY,
+            "timestamp": 0,
+            "data": data,
+        }
+    )
 
     assert chunk.byte_length == 0
     # 空のデータの場合、サイズ 0 のバッファを渡して copy_to() を呼び出す
@@ -88,11 +98,13 @@ def test_encoded_video_chunk_empty_data():
 def test_encoded_video_chunk_large_data():
     """大きなデータで EncodedVideoChunk を作成"""
     data = b"x" * 1000000  # 1MB
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.KEY,
-        "timestamp": 0,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.KEY,
+            "timestamp": 0,
+            "data": data,
+        }
+    )
 
     assert chunk.byte_length == 1000000
     # copy_to() を使用してデータを取得
@@ -105,11 +117,13 @@ def test_encoded_video_chunk_large_data():
 def test_encoded_video_chunk_type_key():
     """KEY タイプの EncodedVideoChunk をテスト"""
     data = b"key_frame_data"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.KEY,
-        "timestamp": 0,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.KEY,
+            "timestamp": 0,
+            "data": data,
+        }
+    )
 
     assert chunk.type == EncodedVideoChunkType.KEY
 
@@ -117,10 +131,12 @@ def test_encoded_video_chunk_type_key():
 def test_encoded_video_chunk_type_delta():
     """DELTA タイプの EncodedVideoChunk をテスト"""
     data = b"delta_frame_data"
-    chunk = EncodedVideoChunk({
-        "type": EncodedVideoChunkType.DELTA,
-        "timestamp": 0,
-        "data": data,
-    })
+    chunk = EncodedVideoChunk(
+        {
+            "type": EncodedVideoChunkType.DELTA,
+            "timestamp": 0,
+            "data": data,
+        }
+    )
 
     assert chunk.type == EncodedVideoChunkType.DELTA

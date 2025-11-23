@@ -326,10 +326,12 @@ nanobind_add_module(
     src/bindings/audio_decoder.cpp
     src/bindings/audio_decoder_opus.cpp
     src/bindings/audio_decoder_flac.cpp
+    src/bindings/audio_decoder_apple_audio_toolbox.cpp
     src/bindings/video_encoder.cpp
     src/bindings/audio_encoder.cpp
     src/bindings/audio_encoder_opus.cpp
     src/bindings/audio_encoder_flac.cpp
+    src/bindings/audio_encoder_apple_audio_toolbox.cpp
     src/bindings/encoded_video_chunk.cpp
     src/bindings/encoded_audio_chunk.cpp
     src/bindings/video_codec_capabilities.cpp
@@ -378,6 +380,7 @@ if(APPLE)
         "-framework CoreVideo"
         "-framework VideoToolbox"
         "-framework CoreMedia"
+        "-framework AudioToolbox"
     )
 endif()
 

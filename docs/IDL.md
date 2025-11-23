@@ -545,6 +545,27 @@ interface ImageTrack {
 };
 ```
 
+## AAC WebCodecs Registration
+
+<https://www.w3.org/TR/webcodecs-aac-codec-registration/>
+
+```idl
+partial dictionary AudioEncoderConfig {
+  AacEncoderConfig aac;
+};
+
+
+dictionary AacEncoderConfig {
+  AacBitstreamFormat format = "aac";
+};
+
+
+enum AacBitstreamFormat {
+  "aac",
+  "adts",
+};
+```
+
 ## Opus WebCodecs Registration
 
 <https://w3c.github.io/webcodecs/opus_codec_registration.html>

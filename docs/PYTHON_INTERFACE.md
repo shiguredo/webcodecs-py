@@ -303,7 +303,7 @@ config: AudioDecoderConfig = {
 decoder.configure(config)
 ```
 
-### AudioEncoder の例
+### AudioEncoder の例 (Opus)
 
 ```python
 from webcodecs import AudioEncoder, AudioEncoderConfig
@@ -324,6 +324,32 @@ config: AudioEncoderConfig = {
     "sample_rate": 48000,
     "number_of_channels": 2,
     "bitrate": 64000,
+}
+encoder.configure(config)
+```
+
+### AudioEncoder の例 (AAC - macOS のみ)
+
+```python
+from webcodecs import AudioEncoder, AudioEncoderConfig
+
+
+def on_output(chunk):
+    print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = AudioEncoder(on_output, on_error)
+
+# コーデック名は "mp4a.40.2" または "aac" が使用可能
+config: AudioEncoderConfig = {
+    "codec": "mp4a.40.2",
+    "sample_rate": 48000,
+    "number_of_channels": 2,
+    "bitrate": 128000,
 }
 encoder.configure(config)
 ```
@@ -1029,10 +1055,13 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 ### Audio コーデック
 
-| コーデック | エンコード | デコード | ライブラリ | プラットフォーム |
-|----------|-----------|----------|-----------|----------------|
+| コーデック | エンコード | デコード | ライブラリ/API | プラットフォーム |
+|----------|-----------|----------|---------------|----------------|
 | Opus | o | o | libopus | All |
 | FLAC | o | o | libFLAC | All |
+| AAC | o | o | AudioToolbox* | macOS |
+
+*ハードウェアアクセラレーション使用
 
 ## パフォーマンス最適化
 
@@ -1106,6 +1135,7 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 
 3. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
+   - AudioToolbox (AAC) は macOS のみ
 
 4. **H.264/H.265 ビットストリームフォーマット**
    - **VideoDecoder は Annex B 形式のみ対応**
@@ -1129,10 +1159,7 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
    - エンコード/デコード時のメタデータ処理
    - フレームメタデータの管理
 
-3. **追加コーデックサポート**
-   - AAC オーディオコーデック (Apple Audio Toolbox)
-
-4. **ハードウェアアクセラレーション**
+3. **ハードウェアアクセラレーション**
    - Windows/Linux でのハードウェアアクセラレーション対応
 
 ## 参考資料
