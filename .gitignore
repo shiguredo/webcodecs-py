@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+_build/
+dist/
+wheels/
+*.egg-info
+*.pyi
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+
+# CMake dependencies
+_deps/
+
+# macos
+.DS_Store
+
+# Claude Code
+.claude/
+
+# container
+*.ivf
+*.y4m
+*.mp4
