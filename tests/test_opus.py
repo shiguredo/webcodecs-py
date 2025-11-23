@@ -171,7 +171,11 @@ def test_opus_encoded_chunk():
     # Create fake Opus packet data
     opus_packet_data = b"OpusHead" + b"\x00" * 50  # Simplified Opus data
 
-    chunk = EncodedAudioChunk(opus_packet_data, EncodedAudioChunkType.KEY, timestamp=0)
+    chunk = EncodedAudioChunk({
+        "type": EncodedAudioChunkType.KEY,
+        "timestamp": 0,
+        "data": opus_packet_data,
+    })
 
     assert chunk.type == EncodedAudioChunkType.KEY
     assert chunk.timestamp == 0
@@ -187,11 +191,11 @@ def test_opus_timestamp_sequence():
     chunks = []
     for ts in timestamps:
         opus_data = b"opus_frame" + bytes([ts // 1000])  # Simple fake data
-        chunk = EncodedAudioChunk(
-            opus_data,
-            EncodedAudioChunkType.KEY,  # All Opus chunks are "key"
-            timestamp=ts,
-        )
+        chunk = EncodedAudioChunk({
+            "type": EncodedAudioChunkType.KEY,  # All Opus chunks are "key"
+            "timestamp": ts,
+            "data": opus_data,
+        })
         chunks.append(chunk)
         assert chunk.timestamp == ts
 

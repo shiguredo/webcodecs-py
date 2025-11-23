@@ -37,12 +37,31 @@ void init_encoded_audio_chunk(nb::module_& m) {
       .value("DELTA", EncodedAudioChunkType::DELTA);
 
   nb::class_<EncodedAudioChunk>(m, "EncodedAudioChunk")
-      .def(nb::init<nb::bytes, EncodedAudioChunkType, int64_t, uint64_t>(),
-           nb::arg("data"), nb::arg("type"), nb::arg("timestamp"),
-           nb::arg("duration") = 0,
-           nb::sig(
-               "def __init__(self, data: bytes, type: EncodedAudioChunkType, "
-               "timestamp: int, duration: int = 0) -> None"))
+      .def(
+          "__init__",
+          [](EncodedAudioChunk* self, nb::dict init) {
+            // EncodedAudioChunkInit から必要なフィールドを取得
+            if (!init.contains("type"))
+              throw nb::value_error("type is required");
+            if (!init.contains("timestamp"))
+              throw nb::value_error("timestamp is required");
+            if (!init.contains("data"))
+              throw nb::value_error("data is required");
+
+            EncodedAudioChunkType type =
+                nb::cast<EncodedAudioChunkType>(init["type"]);
+            int64_t timestamp = nb::cast<int64_t>(init["timestamp"]);
+            uint64_t duration = 0;
+            if (init.contains("duration")) {
+              duration = nb::cast<uint64_t>(init["duration"]);
+            }
+            nb::bytes data = nb::cast<nb::bytes>(init["data"]);
+
+            new (self) EncodedAudioChunk(data, type, timestamp, duration);
+          },
+          nb::arg("init"),
+          nb::sig("def __init__(self, init: webcodecs.EncodedAudioChunkInit) "
+                  "-> None"))
       .def_prop_ro("type", &EncodedAudioChunk::type,
                    nb::sig("def type(self, /) -> EncodedAudioChunkType"))
       .def_prop_ro("timestamp", &EncodedAudioChunk::timestamp,

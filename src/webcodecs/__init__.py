@@ -53,6 +53,28 @@ class HardwareAccelerationEngine(str, Enum):
 # TypedDict 定義
 
 
+class EncodedAudioChunkInit(TypedDict):
+    """EncodedAudioChunk コンストラクタの初期化パラメータ (WebCodecs API 準拠)"""
+
+    # 必須フィールド
+    type: EncodedAudioChunkType
+    timestamp: int  # マイクロ秒
+    data: bytes
+    # オプションフィールド
+    duration: NotRequired[int]  # マイクロ秒
+
+
+class EncodedVideoChunkInit(TypedDict):
+    """EncodedVideoChunk コンストラクタの初期化パラメータ (WebCodecs API 準拠)"""
+
+    # 必須フィールド
+    type: EncodedVideoChunkType
+    timestamp: int  # マイクロ秒
+    data: bytes
+    # オプションフィールド
+    duration: NotRequired[int]  # マイクロ秒
+
+
 class VideoFrameBufferInit(TypedDict, total=False):
     """VideoFrame コンストラクタの初期化パラメータ (WebCodecs API 準拠)"""
 
@@ -331,8 +353,10 @@ __all__ = [
     # Encoded types
     "EncodedVideoChunkType",
     "EncodedVideoChunk",
+    "EncodedVideoChunkInit",
     "EncodedAudioChunkType",
     "EncodedAudioChunk",
+    "EncodedAudioChunkInit",
     # Encoder/Decoder types
     "VideoEncoder",
     "AudioEncoder",

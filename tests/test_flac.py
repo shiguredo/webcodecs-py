@@ -439,7 +439,12 @@ def test_flac_encode_decode_lossless():
     # デコード (結合したデータを 1 つのチャンクとして渡す)
     from webcodecs import EncodedAudioChunk, EncodedAudioChunkType
 
-    chunk = EncodedAudioChunk(combined_data, EncodedAudioChunkType.KEY, 0, 0)
+    chunk = EncodedAudioChunk({
+        "type": EncodedAudioChunkType.KEY,
+        "timestamp": 0,
+        "duration": 0,
+        "data": combined_data,
+    })
     decoder.decode(chunk)
 
     decoder.flush()
@@ -548,7 +553,12 @@ def test_flac_streaming_decode():
             if chunk_type == EncodedAudioChunkType.KEY
             else EncodedAudioChunkType.DELTA
         )
-        chunk = EncodedAudioChunk(data, chunk_type_enum, timestamp, duration)
+        chunk = EncodedAudioChunk({
+            "type": chunk_type_enum,
+            "timestamp": timestamp,
+            "duration": duration,
+            "data": data,
+        })
         decoder.decode(chunk)
 
     decoder.flush()

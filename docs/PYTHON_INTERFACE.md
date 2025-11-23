@@ -151,6 +151,8 @@ Init 系:
 
 - `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 - `AudioDataInit` - AudioData コンストラクタ用
+- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
+- `EncodedAudioChunkInit` - EncodedAudioChunk コンストラクタ用
 
 Config 系:
 
@@ -260,9 +262,13 @@ import numpy as np
 from webcodecs import EncodedVideoChunk, EncodedVideoChunkType
 
 # エンコード済みデータ (実際にはエンコーダーから取得)
-data = np.zeros(1000, dtype=np.uint8)
+data = b"\x00" * 1000
 
-chunk = EncodedVideoChunk(data, EncodedVideoChunkType.KEY, 0)
+chunk = EncodedVideoChunk({
+    "type": EncodedVideoChunkType.KEY,
+    "timestamp": 0,
+    "data": data,
+})
 
 # エンコード済みデータをコピー
 destination = np.zeros(chunk.byte_length, dtype=np.uint8)
@@ -486,7 +492,7 @@ encoder.configure(config)
 
 | メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
 |-----------------|---------|-------------|--------|------|
-| `constructor(init)` | o | * | o | **Python 実装**: `EncodedAudioChunk(data, type, timestamp, duration)` パラメータ直接渡し |
+| `constructor(init)` | o | o | o | `EncodedAudioChunkInit` (dict) を受け取る |
 | `type` | o | o | o | "key" または "delta" |
 | `timestamp` | o | o | o | |
 | `duration` | o | o | o | |
@@ -560,7 +566,7 @@ encoder.configure(config)
 
 | メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
 |-----------------|---------|-------------|--------|------|
-| `constructor(init)` | o | * | o | **Python 実装**: `EncodedVideoChunk(data, type, timestamp, duration)` パラメータ直接渡し |
+| `constructor(init)` | o | o | o | `EncodedVideoChunkInit` (dict) を受け取る |
 | `type` | o | o | o | "key" または "delta" |
 | `timestamp` | o | o | o | |
 | `duration` | o | o | o | |
