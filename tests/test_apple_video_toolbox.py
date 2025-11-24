@@ -108,13 +108,13 @@ def test_opus_encoder_is_config_supported():
     assert support["config"]["number_of_channels"] == 2
 
     # サポートされていないコーデック
-    config_aac: AudioEncoderConfig = {
-        "codec": "aac",
+    config_unsupported: AudioEncoderConfig = {
+        "codec": "unsupported-codec",
         "sample_rate": 48000,
         "number_of_channels": 2,
     }
-    support_aac = AudioEncoder.is_config_supported(config_aac)
-    assert support_aac["supported"] is False
+    support_unsupported = AudioEncoder.is_config_supported(config_unsupported)
+    assert support_unsupported["supported"] is False
 
 
 def test_opus_decoder_is_config_supported():
@@ -131,13 +131,13 @@ def test_opus_decoder_is_config_supported():
     assert support["config"]["number_of_channels"] == 2
 
     # サポートされていないコーデック
-    config_aac: AudioDecoderConfig = {
-        "codec": "aac",
+    config_unsupported: AudioDecoderConfig = {
+        "codec": "unsupported-codec",
         "sample_rate": 48000,
         "number_of_channels": 2,
     }
-    support_aac = AudioDecoder.is_config_supported(config_aac)
-    assert support_aac["supported"] is False
+    support_unsupported = AudioDecoder.is_config_supported(config_unsupported)
+    assert support_unsupported["supported"] is False
 
 
 def test_h264_encode_decode():

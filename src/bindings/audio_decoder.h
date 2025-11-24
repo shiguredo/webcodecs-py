@@ -18,6 +18,10 @@
 #include <opus.h>
 #include "webcodecs_types.h"
 
+#if defined(__APPLE__)
+#include <AudioToolbox/AudioToolbox.h>
+#endif
+
 namespace nb = nanobind;
 
 class AudioData;
@@ -62,9 +66,24 @@ class AudioDecoder {
   static AudioDecoderSupport is_config_supported(
       const AudioDecoderConfig& config);
 
+ public:
+#if defined(__APPLE__)
+  // AAC デコーダーのコールバック用
+  OSStatus aac_provide_input_data(
+      UInt32* number_data_packets,
+      AudioBufferList* data,
+      AudioStreamPacketDescription** data_packet_description);
+#endif
+
  private:
   OpusDecoder* opus_decoder_;
   FLAC__StreamDecoder* flac_decoder_;
+
+#if defined(__APPLE__)
+  AudioConverterRef aac_converter_ = nullptr;
+  std::vector<uint8_t> aac_input_buffer_;
+  AudioStreamPacketDescription aac_packet_description_;
+#endif
 
   AudioDecoderConfig config_;  // 内部で保持する設定
   CodecState state_;
@@ -98,6 +117,12 @@ class AudioDecoder {
 
   void init_flac_decoder();
   void decode_frame_flac(const EncodedAudioChunk& chunk);
+
+#if defined(__APPLE__)
+  void init_aac_decoder();
+  void decode_frame_aac(const EncodedAudioChunk& chunk);
+  void cleanup_aac_decoder();
+#endif
   // FLAC コールバック用の静的メソッド
   static FLAC__StreamDecoderReadStatus flac_read_callback(
       const FLAC__StreamDecoder* decoder,

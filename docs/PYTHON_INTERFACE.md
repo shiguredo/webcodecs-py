@@ -303,7 +303,7 @@ config: AudioDecoderConfig = {
 decoder.configure(config)
 ```
 
-### AudioEncoder の例
+### AudioEncoder の例 (Opus)
 
 ```python
 from webcodecs import AudioEncoder, AudioEncoderConfig
@@ -324,6 +324,32 @@ config: AudioEncoderConfig = {
     "sample_rate": 48000,
     "number_of_channels": 2,
     "bitrate": 64000,
+}
+encoder.configure(config)
+```
+
+### AudioEncoder の例 (AAC - macOS のみ)
+
+```python
+from webcodecs import AudioEncoder, AudioEncoderConfig
+
+
+def on_output(chunk):
+    print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = AudioEncoder(on_output, on_error)
+
+# コーデック名は "mp4a.40.2" または "aac" が使用可能
+config: AudioEncoderConfig = {
+    "codec": "mp4a.40.2",
+    "sample_rate": 48000,
+    "number_of_channels": 2,
+    "bitrate": 128000,
 }
 encoder.configure(config)
 ```
@@ -1029,10 +1055,13 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 ### Audio コーデック
 
-| コーデック | エンコード | デコード | ライブラリ | プラットフォーム |
-|----------|-----------|----------|-----------|----------------|
+| コーデック | エンコード | デコード | ライブラリ/API | プラットフォーム |
+|----------|-----------|----------|---------------|----------------|
 | Opus | o | o | libopus | All |
 | FLAC | o | o | libFLAC | All |
+| AAC | o | o | AudioToolbox* | macOS |
+
+*ハードウェアアクセラレーション使用
 
 ## パフォーマンス最適化
 
@@ -1071,9 +1100,9 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 ### メモリ管理の実装方式
 
 1. **初期化時**：データのコピーが発生（安全性重視）
-2. **planes() メソッド**：内部データのビューを返す（コピーなし）
-3. **copy_to() メソッド**：destination バッファに書き込み（WebCodecs API 準拠）
-4. **エンコーダー/デコーダー**：自動的に内部コピーを作成（セグフォ防止）
+1. **planes() メソッド**：内部データのビューを返す（コピーなし）
+1. **copy_to() メソッド**：destination バッファに書き込み（WebCodecs API 準拠）
+1. **エンコーダー/デコーダー**：自動的に内部コピーを作成（セグフォ防止）
 
 ### 使い分けガイドライン
 
@@ -1099,15 +1128,13 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 1. **メモリ管理**
    - planes() でビューを取得した場合、VideoFrame/AudioData の生存期間に注意
    - ハードウェアエンコーダーを使用する場合は copy_to() を推奨
-
-2. **スレッドセーフティ**
+1. **スレッドセーフティ**
    - エンコーダー/デコーダーはシングルスレッドでの使用を想定
    - 複数スレッドから同時アクセスする場合は外部で同期が必要
-
-3. **プラットフォーム依存**
+1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
-
-4. **H.264/H.265 ビットストリームフォーマット**
+   - AudioToolbox (AAC) は macOS のみ
+1. **H.264/H.265 ビットストリームフォーマット**
    - **VideoDecoder は Annex B 形式のみ対応**
      - スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニット
      - キーフレームには SPS/PPS（H.264）または VPS/SPS/PPS（H.265）が含まれる必要あり
@@ -1124,16 +1151,14 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 1. **色空間サポート**
    - VideoColorSpace インターフェースの完全実装
    - 色空間変換の改善
-
-2. **メタデータサポート**
+1. **メタデータサポート**
    - エンコード/デコード時のメタデータ処理
    - フレームメタデータの管理
-
-3. **追加コーデックサポート**
-   - AAC オーディオコーデック (Apple Audio Toolbox)
-
-4. **ハードウェアアクセラレーション**
+1. **ハードウェアアクセラレーション**
    - Windows/Linux でのハードウェアアクセラレーション対応
+1. OpenH264 対応
+   - libopenh264 を使用した H.264 エンコーディング/デコーディング
+   - 外部読み込みファイル対応
 
 ## 参考資料
 
