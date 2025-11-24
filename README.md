@@ -21,11 +21,11 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 ## webcodecs-py について
 
-webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) に似た API を Python で利用できるようにするライブラリです。
+webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Python で利用できるようにするライブラリです。
 
 ## 特徴
 
-- WebCodecs API に寄せた Python バインディング
+- WebCodecs API の Python バインディング
 - Opus、FLAC、AAC、AV1、H.264、H.265 コーデックをサポート
   - AAC は macOS の AudioToolbox を利用
   - H.264 と H.265 は macOS の VideoToolbox を利用
