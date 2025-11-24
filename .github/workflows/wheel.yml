@@ -171,7 +171,7 @@ jobs:
           - name: windows-2025_x86_64
         python_version:
           - "3.13"
-          # - "3.14"
+          - "3.14"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: pypi
