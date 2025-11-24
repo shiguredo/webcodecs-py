@@ -21,6 +21,21 @@ classifiers = [
 ]
 requires-python = ">=3.13"
 
+[project.urls]
+Source = "https://github.com/shiguredo/webcodecs-py"
+Discord = "https://discord.gg/shiguredo"
+
+[dependency-groups]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+    { include-group = "example" },
+]
+test = ["pytest", "pytest-timeout", "numpy"]
+lint = ["ruff", "ty"]
+example = ["opencv-python", "blend2d-py", "mp4-py"]
+pypi = ["auditwheel", "patchelf"]
+
 [tool.scikit-build]
 minimum-version = "0.11.3"
 sdist.include = ["VERSION"]
@@ -49,13 +64,6 @@ regex = "^(?P<value>.+)$"
 package = false
 managed = true
 python-preference = "only-managed"
-
-[dependency-groups]
-dev = [{ include-group = "test" }, { include-group = "lint" }]
-test = ["pytest", "pytest-timeout", "numpy", "blend2d-py", "mp4-py"]
-lint = ["ruff", "ty"]
-pypi = ["auditwheel", "patchelf"]
-example = ["opencv-python", "numpy", "blend2d-py", "mp4-py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
