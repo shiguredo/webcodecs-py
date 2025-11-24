@@ -34,7 +34,7 @@ jobs:
               labels: [self-hosted, macOS, ARM64]
             env_vars: |
               APPLE_VIDEO_TOOLBOX=true
-            test_target: tests/test_apple_video_toolbox.py
+            test_target: "tests/test_apple_video_toolbox.py tests/test_apple_audio_toolbox.py"
             # Apple Video Toolbox 用の wheel は macos_arm64 のものを使用
             wheel_platform: macos-15_arm64
         python_version:
