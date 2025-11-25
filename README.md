@@ -1,9 +1,5 @@
 # webcodecs-py
 
-> [!CAUTION]
-> webcodecs-py はまだ開発中であり、安定版ではありません。将来的に API が変更される可能性があります。
-> 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
-
 [![PyPI](https://img.shields.io/pypi/v/webcodecs-py)](https://pypi.org/project/webcodecs-py/)
 [![image](https://img.shields.io/pypi/pyversions/webcodecs-py.svg)](https://pypi.python.org/pypi/webcodecs-py)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -34,9 +30,15 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
   - Ubuntu
   - Windows
 
+開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
+
 ## 実装しない機能
 
-- ImageDecoder（画像デコード機能は PIL/Pillow や OpenCV を使用してください）
+- ImageDecoder: 画像デコード機能は実装対象外
+  - Pillow や OpenCV を使用してください
+- CanvasImageSource: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
+
+-
 
 ## サンプルコード
 
