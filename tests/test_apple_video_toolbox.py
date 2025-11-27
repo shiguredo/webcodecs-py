@@ -1549,3 +1549,199 @@ def test_h265_encoder_hevc_quantizer_invalid_range():
 
     frame.close()
     encoder.close()
+
+
+def test_h264_decode_multiple_delta_frames():
+    """H.264 デコーダーが複数のデルタフレームを正しくデコードできることを確認.
+
+    この修正により、キーフレームで作成した CMFormatDescription を
+    キャッシュして後続のデルタフレームでも再利用するようになった。
+    """
+    # エンコーダー設定
+    encoded_chunks = []
+
+    def on_encode_output(chunk):
+        encoded_chunks.append(chunk)
+
+    def on_encode_error(error):
+        pytest.fail(f"Encoder error: {error}")
+
+    encoder = VideoEncoder(on_encode_output, on_encode_error)
+
+    encoder_config: VideoEncoderConfig = {
+        "codec": "avc1.42E01E",
+        "width": 320,
+        "height": 240,
+        "bitrate": 500_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+        "avc": {"format": "annexb"},
+    }
+
+    encoder.configure(encoder_config)
+
+    # テストフレームを作成（10フレーム: キー + 9デルタ）
+    test_frames = []
+    width, height = 320, 240
+    data_size = width * height * 3 // 2  # I420
+    for i in range(10):
+        # 各フレームで少し異なるデータを使用して動きを再現
+        data = np.full(data_size, (i * 25) % 256, dtype=np.uint8)
+        init: VideoFrameBufferInit = {
+            "format": VideoPixelFormat.I420,
+            "coded_width": width,
+            "coded_height": height,
+            "timestamp": i * 33333,
+        }
+        frame = VideoFrame(data, init)
+        test_frames.append(frame)
+        # 最初のフレームのみキーフレーム
+        encoder.encode(frame, {"keyFrame": i == 0})
+
+    encoder.flush()
+
+    assert len(encoded_chunks) >= 10, f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+
+    # デコーダー設定
+    decoded_frames = []
+    decode_errors = []
+
+    def on_decode_output(frame):
+        decoded_frames.append(frame)
+
+    def on_decode_error(error):
+        decode_errors.append(error)
+
+    decoder = VideoDecoder(on_decode_output, on_decode_error)
+
+    decoder_config: VideoDecoderConfig = {
+        "codec": "avc1.42E01E",
+        "coded_width": 320,
+        "coded_height": 240,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+
+    decoder.configure(decoder_config)
+
+    # エンコードされたチャンクをデコード
+    for chunk in encoded_chunks:
+        decoder.decode(chunk)
+
+    decoder.flush()
+
+    # デコードエラーがないことを確認
+    assert len(decode_errors) == 0, f"デコードエラーが発生: {decode_errors}"
+
+    # すべてのフレームがデコードされたことを確認（少なくとも8フレーム）
+    assert len(decoded_frames) >= 8, (
+        f"少なくとも 8 フレームがデコードされるべき、実際: {len(decoded_frames)}"
+    )
+
+    print(f"エンコードチャンク数: {len(encoded_chunks)}, デコードフレーム数: {len(decoded_frames)}")
+
+    # クリーンアップ
+    for frame in test_frames:
+        frame.close()
+    for frame in decoded_frames:
+        frame.close()
+    encoder.close()
+    decoder.close()
+
+
+def test_h265_decode_multiple_delta_frames():
+    """H.265 デコーダーが複数のデルタフレームを正しくデコードできることを確認.
+
+    この修正により、キーフレームで作成した CMFormatDescription を
+    キャッシュして後続のデルタフレームでも再利用するようになった。
+    """
+    # エンコーダー設定
+    encoded_chunks = []
+
+    def on_encode_output(chunk):
+        encoded_chunks.append(chunk)
+
+    def on_encode_error(error):
+        pytest.fail(f"Encoder error: {error}")
+
+    encoder = VideoEncoder(on_encode_output, on_encode_error)
+
+    encoder_config: VideoEncoderConfig = {
+        "codec": "hvc1.1.6.L93.B0",
+        "width": 320,
+        "height": 240,
+        "bitrate": 500_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+        "hevc": {"format": "annexb"},
+    }
+
+    encoder.configure(encoder_config)
+
+    # テストフレームを作成（10フレーム: キー + 9デルタ）
+    test_frames = []
+    width, height = 320, 240
+    data_size = width * height * 3 // 2  # I420
+    for i in range(10):
+        # 各フレームで少し異なるデータを使用して動きを再現
+        data = np.full(data_size, (i * 25) % 256, dtype=np.uint8)
+        init: VideoFrameBufferInit = {
+            "format": VideoPixelFormat.I420,
+            "coded_width": width,
+            "coded_height": height,
+            "timestamp": i * 33333,
+        }
+        frame = VideoFrame(data, init)
+        test_frames.append(frame)
+        # 最初のフレームのみキーフレーム
+        encoder.encode(frame, {"keyFrame": i == 0})
+
+    encoder.flush()
+
+    assert len(encoded_chunks) >= 10, f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+
+    # デコーダー設定
+    decoded_frames = []
+    decode_errors = []
+
+    def on_decode_output(frame):
+        decoded_frames.append(frame)
+
+    def on_decode_error(error):
+        decode_errors.append(error)
+
+    decoder = VideoDecoder(on_decode_output, on_decode_error)
+
+    decoder_config: VideoDecoderConfig = {
+        "codec": "hvc1.1.6.L93.B0",
+        "coded_width": 320,
+        "coded_height": 240,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+
+    decoder.configure(decoder_config)
+
+    # エンコードされたチャンクをデコード
+    for chunk in encoded_chunks:
+        decoder.decode(chunk)
+
+    decoder.flush()
+
+    # デコードエラーがないことを確認
+    assert len(decode_errors) == 0, f"デコードエラーが発生: {decode_errors}"
+
+    # すべてのフレームがデコードされたことを確認（少なくとも8フレーム）
+    assert len(decoded_frames) >= 8, (
+        f"少なくとも 8 フレームがデコードされるべき、実際: {len(decoded_frames)}"
+    )
+
+    print(f"エンコードチャンク数: {len(encoded_chunks)}, デコードフレーム数: {len(decoded_frames)}")
+
+    # クリーンアップ
+    for frame in test_frames:
+        frame.close()
+    for frame in decoded_frames:
+        frame.close()
+    encoder.close()
+    decoder.close()
