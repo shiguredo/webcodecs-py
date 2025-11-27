@@ -97,6 +97,8 @@ class VideoDecoder {
 
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)
   void* vt_session_ = nullptr;
+  // キーフレームから作成した CMVideoFormatDescriptionRef をキャッシュ
+  void* vt_format_desc_ = nullptr;
 
   // 内部メソッド
   void init_decoder();

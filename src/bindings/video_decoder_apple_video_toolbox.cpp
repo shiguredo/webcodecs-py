@@ -360,6 +360,10 @@ void VideoDecoder::cleanup_videotoolbox_decoder() {
     CFRelease(s);
     vt_session_ = nullptr;
   }
+  if (vt_format_desc_) {
+    CFRelease((CFTypeRef)vt_format_desc_);
+    vt_format_desc_ = nullptr;
+  }
 }
 
 bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
@@ -380,10 +384,10 @@ bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
 
   const auto data = chunk.data_vector();
 
-  // キーフレームの場合、フォーマット記述子を更新
-  CMVideoFormatDescriptionRef format_desc = nullptr;
+  // キーフレームの場合、フォーマット記述子を更新してキャッシュ
   if (chunk.type() == EncodedVideoChunkType::KEY) {
-    format_desc = create_format_description(data.data(), data.size(), is_h264);
+    CMVideoFormatDescriptionRef format_desc =
+        create_format_description(data.data(), data.size(), is_h264);
     if (!format_desc) {
       if (error_callback_) {
         nb::gil_scoped_acquire gil;
@@ -391,6 +395,14 @@ bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
       }
       return false;
     }
+
+    // 既存のキャッシュを解放
+    if (vt_format_desc_) {
+      CFRelease((CFTypeRef)vt_format_desc_);
+    }
+    // 新しいフォーマット記述子をキャッシュ（参照カウントを増やす）
+    CFRetain(format_desc);
+    vt_format_desc_ = (void*)format_desc;
 
     // 既存のセッションをクリーンアップ
     if (vt_session_) {
@@ -462,48 +474,24 @@ bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
 
   VTDecompressionSessionRef session = (VTDecompressionSessionRef)vt_session_;
 
-  // サンプルバッファを作成するためのフォーマット記述子を取得
-  // セッションが既に存在する場合は、ダミーのフォーマット記述子を使用
-  CMVideoFormatDescriptionRef format_for_sample = nullptr;
-
-  if (chunk.type() == EncodedVideoChunkType::KEY) {
-    // キーフレームの場合、フォーマット記述子を作成
-    format_for_sample =
-        create_format_description(data.data(), data.size(), is_h264);
-    if (!format_for_sample) {
-      if (error_callback_) {
-        nb::gil_scoped_acquire gil;
-        error_callback_("Failed to create format description for keyframe");
-      }
-      return false;
+  // キャッシュしたフォーマット記述子を使用（キーフレームとデルタフレームの両方で）
+  // キャッシュがない場合はエラー（キーフレームが先に来ていない）
+  if (!vt_format_desc_) {
+    if (error_callback_) {
+      nb::gil_scoped_acquire gil;
+      error_callback_(
+          "No cached format description (keyframe required before delta "
+          "frames)");
     }
-  } else {
-    // デルタフレームの場合、簡易的なフォーマット記述子を作成
-    if (is_h264) {
-      CMVideoFormatDescriptionCreate(
-          kCFAllocatorDefault, kCMVideoCodecType_H264,
-          config_.coded_width.value_or(0), config_.coded_height.value_or(0),
-          nullptr, &format_for_sample);
-    } else {
-      CMVideoFormatDescriptionCreate(
-          kCFAllocatorDefault, kCMVideoCodecType_HEVC,
-          config_.coded_width.value_or(0), config_.coded_height.value_or(0),
-          nullptr, &format_for_sample);
-    }
-    if (!format_for_sample) {
-      if (error_callback_) {
-        nb::gil_scoped_acquire gil;
-        error_callback_("Failed to create format description for delta frame");
-      }
-      return false;
-    }
+    return false;
   }
+
+  CMVideoFormatDescriptionRef format_for_sample =
+      (CMVideoFormatDescriptionRef)vt_format_desc_;
 
   // サンプルバッファを作成
   CMSampleBufferRef sample_buffer = create_sample_buffer(
       data.data(), data.size(), format_for_sample, chunk.timestamp(), is_h264);
-
-  CFRelease(format_for_sample);
 
   if (!sample_buffer) {
     if (error_callback_) {
