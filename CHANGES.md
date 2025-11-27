@@ -11,6 +11,9 @@
 
 ## develop
 
+- [FIX] Apple Video Toolbox で連続フレームデコードが動かない問題を修正する
+  - @voluntas
+
 ## 2025.1.0
 
 **リリース日**:: 2025-11-25
