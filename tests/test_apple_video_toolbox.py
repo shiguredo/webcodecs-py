@@ -1601,7 +1601,9 @@ def test_h264_decode_multiple_delta_frames():
 
     encoder.flush()
 
-    assert len(encoded_chunks) >= 10, f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+    assert len(encoded_chunks) >= 10, (
+        f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+    )
 
     # デコーダー設定
     decoded_frames = []
@@ -1699,7 +1701,9 @@ def test_h265_decode_multiple_delta_frames():
 
     encoder.flush()
 
-    assert len(encoded_chunks) >= 10, f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+    assert len(encoded_chunks) >= 10, (
+        f"10 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
+    )
 
     # デコーダー設定
     decoded_frames = []

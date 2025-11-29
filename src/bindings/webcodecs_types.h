@@ -167,7 +167,7 @@ struct VideoDecoderConfig {
   std::string codec;
 
   // オプショナルフィールド
-  std::optional<std::string> description;  // コーデック固有の設定
+  std::optional<std::vector<uint8_t>> description;  // コーデック固有の設定
   std::optional<uint32_t> coded_width;
   std::optional<uint32_t> coded_height;
   std::optional<uint32_t> display_aspect_width;
@@ -229,7 +229,7 @@ struct AudioDecoderConfig {
   uint32_t number_of_channels;
 
   // オプショナルフィールド
-  std::optional<std::string> description;  // コーデック固有の設定
+  std::optional<std::vector<uint8_t>> description;  // コーデック固有の設定
 
   AudioDecoderConfig() : sample_rate(0), number_of_channels(0) {}
 };

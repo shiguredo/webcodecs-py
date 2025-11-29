@@ -65,8 +65,14 @@ void AudioDecoder::configure(nb::dict config_dict) {
       nb::cast<uint32_t>(config_dict["number_of_channels"]);
 
   // オプションフィールド
-  if (config_dict.contains("description"))
-    config.description = nb::cast<std::string>(config_dict["description"]);
+  if (config_dict.contains("description")) {
+    nb::bytes desc = nb::cast<nb::bytes>(config_dict["description"]);
+    const char* ptr = desc.c_str();
+    size_t size = desc.size();
+    config.description =
+        std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(ptr),
+                             reinterpret_cast<const uint8_t*>(ptr) + size);
+  }
 
   // AudioDecoderConfig を保存
   config_ = config;
@@ -380,9 +386,14 @@ void init_audio_decoder(nb::module_& m) {
                 nb::cast<uint32_t>(config_dict["number_of_channels"]);
 
             // オプションフィールド
-            if (config_dict.contains("description"))
-              config.description =
-                  nb::cast<std::string>(config_dict["description"]);
+            if (config_dict.contains("description")) {
+              nb::bytes desc = nb::cast<nb::bytes>(config_dict["description"]);
+              const char* ptr = desc.c_str();
+              size_t size = desc.size();
+              config.description = std::vector<uint8_t>(
+                  reinterpret_cast<const uint8_t*>(ptr),
+                  reinterpret_cast<const uint8_t*>(ptr) + size);
+            }
 
             return AudioDecoder::is_config_supported(config);
           },
