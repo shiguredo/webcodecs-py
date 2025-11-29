@@ -11,6 +11,10 @@
 
 ## develop
 
+## 2025.1.2
+
+**リリース日**:: 2025-11-29
+
 - [FIX] VideoDecoderConfig と AudioDecoderConfig の description を string 型から bytes 型に修正する
   - WebCodecs API 仕様では AllowSharedBufferSource（バイナリデータ）として定義されている
   - @voluntas
