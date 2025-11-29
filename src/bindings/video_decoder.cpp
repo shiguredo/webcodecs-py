@@ -62,8 +62,13 @@ void VideoDecoder::configure(nb::dict config_dict) {
   if (config_dict.contains("coded_height"))
     config.coded_height = nb::cast<uint32_t>(config_dict["coded_height"]);
   if (config_dict.contains("description")) {
-    // description は string として扱う
-    config.description = nb::cast<std::string>(config_dict["description"]);
+    // description は bytes として扱う
+    nb::bytes desc = nb::cast<nb::bytes>(config_dict["description"]);
+    const char* ptr = desc.c_str();
+    size_t size = desc.size();
+    config.description =
+        std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(ptr),
+                             reinterpret_cast<const uint8_t*>(ptr) + size);
   }
 
   // 既存のデコーダーをクリーンアップ
@@ -489,9 +494,14 @@ void init_video_decoder(nb::module_& m) {
             if (config_dict.contains("coded_height"))
               config.coded_height =
                   nb::cast<uint32_t>(config_dict["coded_height"]);
-            if (config_dict.contains("description"))
-              config.description =
-                  nb::cast<std::string>(config_dict["description"]);
+            if (config_dict.contains("description")) {
+              nb::bytes desc = nb::cast<nb::bytes>(config_dict["description"]);
+              const char* ptr = desc.c_str();
+              size_t size = desc.size();
+              config.description = std::vector<uint8_t>(
+                  reinterpret_cast<const uint8_t*>(ptr),
+                  reinterpret_cast<const uint8_t*>(ptr) + size);
+            }
             if (config_dict.contains("hardware_acceleration"))
               config.hardware_acceleration =
                   nb::cast<std::string>(config_dict["hardware_acceleration"]);

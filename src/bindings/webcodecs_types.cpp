@@ -203,7 +203,12 @@ void init_webcodecs_types(nb::module_& m) {
              self->codec = nb::cast<std::string>(kwargs["codec"]);
 
              if (kwargs.contains("description")) {
-               self->description = nb::cast<std::string>(kwargs["description"]);
+               nb::bytes desc = nb::cast<nb::bytes>(kwargs["description"]);
+               const char* ptr = desc.c_str();
+               size_t size = desc.size();
+               self->description = std::vector<uint8_t>(
+                   reinterpret_cast<const uint8_t*>(ptr),
+                   reinterpret_cast<const uint8_t*>(ptr) + size);
              }
              if (kwargs.contains("coded_width")) {
                self->coded_width = nb::cast<uint32_t>(kwargs["coded_width"]);
@@ -351,8 +356,11 @@ void init_webcodecs_types(nb::module_& m) {
                d["codec"] = self.config.codec;
                d["sample_rate"] = self.config.sample_rate;
                d["number_of_channels"] = self.config.number_of_channels;
-               if (self.config.description.has_value())
-                 d["description"] = self.config.description.value();
+               if (self.config.description.has_value()) {
+                 const auto& desc = self.config.description.value();
+                 d["description"] = nb::bytes(
+                     reinterpret_cast<const char*>(desc.data()), desc.size());
+               }
                return nb::cast(d);
              } else {
                throw nb::key_error(("Unknown key: " + key).c_str());
@@ -370,8 +378,11 @@ void init_webcodecs_types(nb::module_& m) {
              } else if (key == "config") {
                nb::dict d;
                d["codec"] = self.config.codec;
-               if (self.config.description.has_value())
-                 d["description"] = self.config.description.value();
+               if (self.config.description.has_value()) {
+                 const auto& desc = self.config.description.value();
+                 d["description"] = nb::bytes(
+                     reinterpret_cast<const char*>(desc.data()), desc.size());
+               }
                if (self.config.coded_width.has_value())
                  d["coded_width"] = self.config.coded_width.value();
                if (self.config.coded_height.has_value())
