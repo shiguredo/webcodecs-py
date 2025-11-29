@@ -57,9 +57,7 @@ VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
   timestamp_ = nb::cast<int64_t>(init_dict["timestamp"]);
 
   // オプションフィールド
-  duration_ = init_dict.contains("duration")
-                  ? nb::cast<uint64_t>(init_dict["duration"])
-                  : 0;
+  duration_ = nb::cast<uint64_t>(init_dict.get("duration", nb::int_(0)));
 
   if (init_dict.contains("layout")) {
     nb::list layout_list = nb::cast<nb::list>(init_dict["layout"]);
@@ -96,25 +94,18 @@ VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
     color_space_ = cs;
   }
 
-  rotation_ = init_dict.contains("rotation")
-                  ? nb::cast<uint32_t>(init_dict["rotation"])
-                  : 0;
-  flip_ =
-      init_dict.contains("flip") ? nb::cast<bool>(init_dict["flip"]) : false;
+  rotation_ = nb::cast<uint32_t>(init_dict.get("rotation", nb::int_(0)));
+  flip_ = nb::cast<bool>(init_dict.get("flip", nb::bool_(false)));
 
   if (init_dict.contains("metadata")) {
     metadata_ = nb::cast<nb::dict>(init_dict["metadata"]);
   }
 
   // display_width/height の処理
-  uint32_t init_display_width =
-      init_dict.contains("display_width")
-          ? nb::cast<uint32_t>(init_dict["display_width"])
-          : coded_width_;
-  uint32_t init_display_height =
-      init_dict.contains("display_height")
-          ? nb::cast<uint32_t>(init_dict["display_height"])
-          : coded_height_;
+  uint32_t init_display_width = nb::cast<uint32_t>(
+      init_dict.get("display_width", nb::int_(coded_width_)));
+  uint32_t init_display_height = nb::cast<uint32_t>(
+      init_dict.get("display_height", nb::int_(coded_height_)));
 
   // rotation が 90 度または 270 度の場合は display_width と display_height を入れ替える
   if (rotation_ == 90 || rotation_ == 270) {
