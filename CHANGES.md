@@ -11,7 +11,24 @@
 
 ## develop
 
+- [ADD] VideoEncoder の output callback で EncodedVideoChunkMetadata をサポートする
+  - WebCodecs API 準拠で、キーフレーム時に decoderConfig を含む metadata を提供する
+  - @voluntas
+- [ADD] VideoToolbox エンコーダーでキーフレーム時に decoderConfig.description (avcC/hvcC) を提供する
+  - @voluntas
 - [UPDATE] nanobind の dict.get() を使用してオプションフィールドの取得を簡潔化する
+  - @voluntas
+
+### misc
+
+- [ADD] pytest-benchmark を開発依存に追加する
+  - @voluntas
+- [ADD] tests/benchmarks/ にベンチマークテストを追加する
+  - bench_ prefix を持つファイルのみがベンチマークとして実行される
+  - @voluntas
+- [UPDATE] examples/blend2d_to_mp4.py で metadata.decoderConfig.description を使用して MP4 を生成するように修正する
+  - @voluntas
+- [UPDATE] examples/blend2d_to_mp4.py で H.264 High Profile Level 5.1 に対応する
   - @voluntas
 
 ## 2025.1.2
