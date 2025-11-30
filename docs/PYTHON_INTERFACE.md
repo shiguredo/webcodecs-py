@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-11-23
+- 最終更新: 2025-11-30
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -183,6 +183,11 @@ Support 系 (is_config_supported() の戻り値):
 - `AudioDecoderSupport` - AudioDecoder.is_config_supported() 用
 - `VideoEncoderSupport` - VideoEncoder.is_config_supported() 用
 - `VideoDecoderSupport` - VideoDecoder.is_config_supported() 用
+
+Metadata 系 (出力コールバックで提供):
+
+- `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
+- `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoderConfig
 
 ### 6. Promise の代替
 
@@ -426,7 +431,7 @@ encoder.configure(config)
 | `codec` | o | o | o | **必須** |
 | `sample_rate` | o | o | o | **必須** |
 | `number_of_channels` | o | o | o | **必須** |
-| `description` | o | o | x | Codec-specific configuration |
+| `description` | o | o | o | bytes 型 (WebCodecs API では AllowSharedBufferSource) |
 
 #### AudioEncoderConfig
 
@@ -462,7 +467,7 @@ encoder.configure(config)
 | プロパティ | Python | WebCodecs API | テスト | 備考 |
 |-----------|---------|-------------|--------|------|
 | `codec` | o | o | o | **必須** |
-| `description` | o | o | x | Codec-specific configuration |
+| `description` | o | o | o | bytes 型 (WebCodecs API では AllowSharedBufferSource) |
 | `coded_width` | o | o | o | |
 | `coded_height` | o | o | o | |
 | `display_aspect_width` | x | o | - | **未実装** |
@@ -634,6 +639,21 @@ encoder.configure(config)
 | **`on_error(callback)`** | o | x | o | **独自拡張**: コールバック設定 (WebCodecs はコンストラクタで指定) |
 
 **注**: `avc.quantizer` / `hevc.quantizer` は VideoToolbox (Apple) ではフレームごとの指定がサポートされていないため無視される。
+
+**output callback の metadata**: WebCodecs API 仕様に準拠し、キーフレーム時に `metadata` (dict) が第 2 引数として渡される。後方互換性のため、1 引数のコールバックも引き続きサポートされる。
+
+```python
+def on_output(chunk, metadata=None):
+    # metadata はキーフレーム時のみ提供される
+    if metadata is not None:
+        decoder_config = metadata.get("decoderConfig")
+        if decoder_config is not None:
+            # codec: str
+            # codedWidth: int (オプション)
+            # codedHeight: int (オプション)
+            # description: bytes (H.264 では avcC、H.265 では hvcC)
+            description = decoder_config.get("description")
+```
 
 ## 独自インターフェース
 
@@ -1031,9 +1051,10 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |--------|------|
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
-| `EncodedVideoChunkMetadata` | メタデータサポート未実装 |
 | `SvcOutputMetadata` | SVC サポート未実装 |
 | `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
+
+**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoderConfig` を含む)。
 
 ### 未実装の列挙型
 

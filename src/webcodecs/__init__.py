@@ -147,7 +147,7 @@ class VideoDecoderConfig(TypedDict):
     coded_height: NotRequired[int | None]
     display_aspect_width: NotRequired[int | None]
     display_aspect_height: NotRequired[int | None]
-    description: NotRequired[str | None]
+    description: NotRequired[bytes | None]
     hardware_acceleration: NotRequired[str | None]
     optimize_for_latency: NotRequired[bool | None]
     color_space: NotRequired[str | None]
@@ -199,7 +199,7 @@ class AudioDecoderConfig(TypedDict):
     sample_rate: int
     number_of_channels: int
     # オプションフィールド
-    description: NotRequired[str | None]
+    description: NotRequired[bytes | None]
 
 
 class AudioDataInit(TypedDict):
@@ -289,6 +289,25 @@ class AudioDecoderSupport(TypedDict):
 
     supported: bool
     config: AudioDecoderConfig
+
+
+# Metadata 型定義 (VideoEncoder output callback の第 2 引数)
+class EncodedVideoChunkMetadataDecoderConfig(TypedDict, total=False):
+    """EncodedVideoChunkMetadata の decoderConfig (WebCodecs API 準拠)"""
+
+    codec: str
+    codedWidth: int
+    codedHeight: int
+    description: bytes  # avcC / hvcC / av1C などのコーデック固有データ
+
+
+class EncodedVideoChunkMetadata(TypedDict, total=False):
+    """VideoEncoder の output callback で提供される metadata (WebCodecs API 準拠)
+
+    キーフレーム時のみ decoderConfig が含まれる。
+    """
+
+    decoderConfig: EncodedVideoChunkMetadataDecoderConfig
 
 
 def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
@@ -383,6 +402,9 @@ __all__ = [
     "VideoDecoderSupport",
     "AudioEncoderSupport",
     "AudioDecoderSupport",
+    # Metadata types
+    "EncodedVideoChunkMetadata",
+    "EncodedVideoChunkMetadataDecoderConfig",
     # Enums
     "CodecState",
     "LatencyMode",
