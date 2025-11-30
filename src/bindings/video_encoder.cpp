@@ -524,31 +524,66 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
 }
 
 // 出力フレームの順序制御
-void VideoEncoder::handle_output(uint64_t sequence,
-                                 std::shared_ptr<EncodedVideoChunk> chunk) {
-  std::vector<std::shared_ptr<EncodedVideoChunk>> chunks_to_output;
+void VideoEncoder::handle_output(
+    uint64_t sequence,
+    std::shared_ptr<EncodedVideoChunk> chunk,
+    std::optional<EncodedVideoChunkMetadata> metadata) {
+  std::vector<OutputEntry> entries_to_output;
 
   {
     std::lock_guard<std::mutex> lock(output_mutex_);
 
-    // チャンクをバッファに追加
-    output_buffer_[sequence] = chunk;
+    // チャンクと metadata をバッファに追加
+    output_buffer_[sequence] = OutputEntry{chunk, metadata};
 
     // 順序通りに出力できるチャンクを収集
     while (output_buffer_.find(next_output_sequence_) != output_buffer_.end()) {
-      chunks_to_output.push_back(output_buffer_[next_output_sequence_]);
+      entries_to_output.push_back(output_buffer_[next_output_sequence_]);
       output_buffer_.erase(next_output_sequence_);
       next_output_sequence_++;
     }
   }
 
   // コールバックを呼び出す (GIL を取得)
-  if (output_callback_ && !chunks_to_output.empty()) {
+  // WebCodecs API では callback は (chunk, metadata?) で metadata は optional
+  // Python では常に 2 引数で呼び出し、callback 側で metadata=None のデフォルト引数を使用する
+  if (output_callback_ && !entries_to_output.empty()) {
     nb::gil_scoped_acquire gil;
-    for (auto& chunk : chunks_to_output) {
+    for (auto& entry : entries_to_output) {
       // コピーを作成して渡す (Python 側で所有権を持つ)
-      EncodedVideoChunk chunk_copy = *chunk;
-      output_callback_(chunk_copy);
+      EncodedVideoChunk chunk_copy = *entry.chunk;
+
+      // metadata を dict に変換 (存在しない場合は空の dict)
+      nb::dict metadata_dict;
+      if (entry.metadata.has_value() &&
+          entry.metadata->decoder_config.has_value()) {
+        const auto& config = entry.metadata->decoder_config.value();
+        nb::dict decoder_config_dict;
+        decoder_config_dict["codec"] = config.codec;
+        if (config.coded_width.has_value()) {
+          decoder_config_dict["codedWidth"] = config.coded_width.value();
+        }
+        if (config.coded_height.has_value()) {
+          decoder_config_dict["codedHeight"] = config.coded_height.value();
+        }
+        if (config.description.has_value()) {
+          const auto& desc = config.description.value();
+          decoder_config_dict["description"] =
+              nb::bytes(reinterpret_cast<const char*>(desc.data()), desc.size());
+        }
+        metadata_dict["decoderConfig"] = decoder_config_dict;
+      }
+
+      // callback を呼び出す
+      // Python 側では def on_output(chunk, metadata=None): と定義することを推奨
+      // 後方互換性のため、まず 2 引数で呼び出しを試み、失敗したら 1 引数で呼び出す
+      try {
+        output_callback_(chunk_copy, metadata_dict);
+      } catch (const nb::python_error&) {
+        // 2 引数呼び出しが失敗した場合は 1 引数で呼び出す (後方互換性)
+        PyErr_Clear();
+        output_callback_(chunk_copy);
+      }
     }
   }
 }

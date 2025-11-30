@@ -31,7 +31,14 @@ dev = [
     { include-group = "lint" },
     { include-group = "example" },
 ]
-test = ["pytest", "pytest-timeout", "numpy"]
+test = [
+    "pytest",
+    "pytest-repeat",
+    "pytest-timeout",
+    "pytest-benchmark",
+    "numpy",
+    "blend2d-py",
+]
 lint = ["ruff", "ty"]
 example = ["opencv-python", "blend2d-py", "mp4-py"]
 pypi = ["auditwheel", "patchelf"]
@@ -67,6 +74,9 @@ python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# benchmark を有効にした場合は以下をコメントアウトする
+# python_files = ["test_*.py", "bench_*.py"]
+# addopts = "--benchmark-disable"
 
 [tool.ruff]
 target-version = "py313"

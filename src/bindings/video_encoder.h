@@ -92,8 +92,11 @@ class VideoEncoder {
       const VideoEncoderConfig& config);
 
   // VideoToolbox コールバック用に public にする
-  void handle_output(uint64_t sequence,
-                     std::shared_ptr<EncodedVideoChunk> chunk);  // 出力処理
+  // metadata はオプショナルで、キーフレーム時に decoderConfig を含む
+  void handle_output(
+      uint64_t sequence,
+      std::shared_ptr<EncodedVideoChunk> chunk,
+      std::optional<EncodedVideoChunkMetadata> metadata = std::nullopt);
 
  private:
   aom_codec_ctx_t* aom_encoder_;
@@ -120,9 +123,14 @@ class VideoEncoder {
   std::atomic<bool> should_stop_{false};  // スレッド終了フラグ
   uint64_t current_sequence_{0};          // 現在処理中のシーケンス番号
 
+  // 出力エントリ (chunk と metadata のペア)
+  struct OutputEntry {
+    std::shared_ptr<EncodedVideoChunk> chunk;
+    std::optional<EncodedVideoChunkMetadata> metadata;
+  };
+
   // 出力順序制御のためのメンバー
-  std::map<uint64_t, std::shared_ptr<EncodedVideoChunk>>
-      output_buffer_;                 // 順序待ちバッファ
+  std::map<uint64_t, OutputEntry> output_buffer_;  // 順序待ちバッファ
   uint64_t next_output_sequence_{0};  // 次に出力すべきシーケンス番号
   std::mutex output_mutex_;           // 出力バッファの同期
 

@@ -274,6 +274,15 @@ struct VideoEncoderSupport {
       : supported(supported), config(config) {}
 };
 
+// WebCodecs API の EncodedVideoChunkMetadata 構造体
+struct EncodedVideoChunkMetadata {
+  // decoderConfig: キーフレームで提供される VideoDecoderConfig
+  // description には avcC/hvcC/av1C などのコーデック固有データが含まれる
+  std::optional<VideoDecoderConfig> decoder_config;
+
+  EncodedVideoChunkMetadata() = default;
+};
+
 // WebCodecs API の CodecState 列挙型
 enum class CodecState { UNCONFIGURED, CONFIGURED, CLOSED };
 

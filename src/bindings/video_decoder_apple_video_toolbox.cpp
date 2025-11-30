@@ -73,8 +73,13 @@ static void vt_decode_callback(void* decompressionOutputRefCon,
   // Y プレーンをコピー
   const uint8_t* dst_y = frame->plane_ptr(0);
   uint8_t* dst_y_mut = const_cast<uint8_t*>(dst_y);
-  for (size_t row = 0; row < height; ++row) {
-    memcpy(dst_y_mut + row * width, y_plane + row * y_stride, width);
+  // ストライドが width と等しければ一括コピー
+  if (y_stride == width) {
+    memcpy(dst_y_mut, y_plane, width * height);
+  } else {
+    for (size_t row = 0; row < height; ++row) {
+      memcpy(dst_y_mut + row * width, y_plane + row * y_stride, width);
+    }
   }
 
   // UV プレーンをコピー
@@ -82,9 +87,14 @@ static void vt_decode_callback(void* decompressionOutputRefCon,
   uint8_t* dst_uv_mut = const_cast<uint8_t*>(dst_uv);
   size_t chroma_height = (height + 1) / 2;
   size_t chroma_width = ((width + 1) / 2) * 2;  // 偶数幅
-  for (size_t row = 0; row < chroma_height; ++row) {
-    memcpy(dst_uv_mut + row * chroma_width, uv_plane + row * uv_stride,
-           chroma_width);
+  // ストライドが chroma_width と等しければ一括コピー
+  if (uv_stride == chroma_width) {
+    memcpy(dst_uv_mut, uv_plane, chroma_width * chroma_height);
+  } else {
+    for (size_t row = 0; row < chroma_height; ++row) {
+      memcpy(dst_uv_mut + row * chroma_width, uv_plane + row * uv_stride,
+             chroma_width);
+    }
   }
 
   CVPixelBufferUnlockBaseAddress(pb, kCVPixelBufferLock_ReadOnly);
@@ -102,6 +112,8 @@ static CMSampleBufferRef create_sample_buffer(
     bool is_h264) {
   // Annex B のスタートコードを検索して NALU を抽出
   std::vector<uint8_t> avcc_data;
+  // 入力サイズと同程度を事前確保（再割り当てを減らす）
+  avcc_data.reserve(size);
   std::vector<size_t> nalu_offsets;
   std::vector<size_t> nalu_sizes;
 
