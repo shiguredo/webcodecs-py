@@ -38,8 +38,6 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
   - Pillow や OpenCV を使用してください
 - CanvasImageSource: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
--
-
 ## サンプルコード
 
 ### Opus オーディオエンコード
