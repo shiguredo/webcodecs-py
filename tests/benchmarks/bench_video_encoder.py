@@ -2,9 +2,6 @@
 映像エンコード性能ベンチマーク
 
 実行方法:
-    # benchmark グループをインストール
-    uv sync --group benchmark
-
     # VideoToolbox を有効にして実行
     APPLE_VIDEO_TOOLBOX=1 uv run pytest tests/benchmarks/bench_video_encoder.py -v
 
@@ -20,6 +17,7 @@ import sys
 
 import numpy as np
 import pytest
+from blend2d import Context, Image
 
 from webcodecs import (
     HardwareAccelerationEngine,
@@ -29,9 +27,6 @@ from webcodecs import (
     VideoFrameBufferInit,
     VideoPixelFormat,
 )
-
-from blend2d import Context, Image
-
 
 # 解像度の定義
 RESOLUTIONS = {

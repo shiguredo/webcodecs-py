@@ -31,8 +31,14 @@ dev = [
     { include-group = "lint" },
     { include-group = "example" },
 ]
-test = ["pytest", "pytest-timeout", "numpy"]
-benchmark = ["pytest", "pytest-benchmark", "numpy", "blend2d-py"]
+test = [
+    "pytest",
+    "pytest-repeat",
+    "pytest-timeout",
+    "pytest-benchmark",
+    "numpy",
+    "blend2d-py",
+]
 lint = ["ruff", "ty"]
 example = ["opencv-python", "blend2d-py", "mp4-py"]
 pypi = ["auditwheel", "patchelf"]
