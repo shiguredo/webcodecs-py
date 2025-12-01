@@ -414,3 +414,80 @@ def test_audio_data_allocation_size_requires_options():
         audio.allocation_size()
 
     audio.close()
+
+
+def test_audio_data_context_manager():
+    """AudioData の context manager 対応テスト"""
+    sample_rate = 48000
+    frames = 960
+    channels = 2
+
+    data = np.ones((frames, channels), dtype=np.float32) * 0.5
+    init = {
+        "format": AudioSampleFormat.F32,
+        "sample_rate": sample_rate,
+        "number_of_frames": frames,
+        "number_of_channels": channels,
+        "timestamp": 0,
+        "data": data,
+    }
+
+    # with 文で AudioData を使用
+    with AudioData(init) as audio:
+        assert not audio.is_closed
+        assert audio.number_of_channels == channels
+        assert audio.number_of_frames == frames
+
+    # with 文を抜けると自動的に close される
+    assert audio.is_closed
+
+
+def test_audio_data_context_manager_exception():
+    """AudioData の context manager で例外が発生しても close される"""
+    sample_rate = 48000
+    frames = 960
+    channels = 2
+
+    data = np.ones((frames, channels), dtype=np.float32) * 0.5
+    init = {
+        "format": AudioSampleFormat.F32,
+        "sample_rate": sample_rate,
+        "number_of_frames": frames,
+        "number_of_channels": channels,
+        "timestamp": 0,
+        "data": data,
+    }
+
+    audio = None
+    with pytest.raises(ValueError):
+        with AudioData(init) as audio:
+            assert not audio.is_closed
+            raise ValueError("test exception")
+
+    # 例外が発生しても close される
+    assert audio is not None
+    assert audio.is_closed
+
+
+def test_audio_data_context_manager_returns_self():
+    """AudioData の __enter__ は self を返す"""
+    sample_rate = 48000
+    frames = 960
+    channels = 2
+
+    data = np.ones((frames, channels), dtype=np.float32) * 0.5
+    init = {
+        "format": AudioSampleFormat.F32,
+        "sample_rate": sample_rate,
+        "number_of_frames": frames,
+        "number_of_channels": channels,
+        "timestamp": 0,
+        "data": data,
+    }
+
+    audio_outer = AudioData(init)
+    with audio_outer as audio_inner:
+        # __enter__ は self を返すので同じオブジェクト
+        assert audio_outer is audio_inner
+
+    audio_outer.close()

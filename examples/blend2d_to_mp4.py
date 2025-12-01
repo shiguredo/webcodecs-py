@@ -517,34 +517,30 @@ def main():
             # NumPy 配列として取得
             bgra = img.asarray()
 
-            # VideoFrame を作成（BGRA フォーマット）
-            init = VideoFrameBufferInit(
-                format=VideoPixelFormat.BGRA,
-                coded_width=width,
-                coded_height=height,
-                timestamp=timestamp,
-            )
-            bgra_frame = VideoFrame(bgra, init)
+            # with 文で VideoFrame を使用（自動的に close される）
+            init: VideoFrameBufferInit = {
+                "format": VideoPixelFormat.BGRA,
+                "coded_width": width,
+                "coded_height": height,
+                "timestamp": timestamp,
+            }
+            with VideoFrame(bgra, init) as bgra_frame:
+                # BGRA → I420 変換（AV1 エンコーダーは I420 が必要）
+                i420_size = bgra_frame.allocation_size({"format": VideoPixelFormat.I420})
+                i420_buffer = np.zeros(i420_size, dtype=np.uint8)
+                bgra_frame.copy_to(i420_buffer, {"format": VideoPixelFormat.I420})
 
-            # BGRA → I420 変換（AV1 エンコーダーは I420 が必要）
-            i420_size = bgra_frame.allocation_size({"format": VideoPixelFormat.I420})
-            i420_buffer = np.zeros(i420_size, dtype=np.uint8)
-            bgra_frame.copy_to(i420_buffer, {"format": VideoPixelFormat.I420})
-            bgra_frame.close()
-
-            # I420 VideoFrame を作成
-            i420_init = VideoFrameBufferInit(
-                format=VideoPixelFormat.I420,
-                coded_width=width,
-                coded_height=height,
-                timestamp=timestamp,
-            )
-            i420_frame = VideoFrame(i420_buffer, i420_init)
-
-            # エンコード（最初のフレームと 3 秒ごとにキーフレームを強制）
-            keyframe = frame_count == 0 or frame_count % (fps * 3) == 0
-            encoder.encode(i420_frame, {"keyFrame": keyframe})
-            i420_frame.close()
+            # with 文で I420 VideoFrame を使用（自動的に close される）
+            i420_init: VideoFrameBufferInit = {
+                "format": VideoPixelFormat.I420,
+                "coded_width": width,
+                "coded_height": height,
+                "timestamp": timestamp,
+            }
+            with VideoFrame(i420_buffer, i420_init) as i420_frame:
+                # エンコード（最初のフレームと 3 秒ごとにキーフレームを強制）
+                keyframe = frame_count == 0 or frame_count % (fps * 3) == 0
+                encoder.encode(i420_frame, {"keyFrame": keyframe})
 
             timestamp += frame_duration
 

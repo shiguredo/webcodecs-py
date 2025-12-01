@@ -904,3 +904,71 @@ def test_video_frame_copy_to_nv12_with_rect():
         assert y_out[row, 0] == expected_value
 
     frame.close()
+
+
+def test_video_frame_context_manager():
+    """VideoFrame の context manager 対応テスト"""
+    width, height = 320, 240
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+
+    # with 文で VideoFrame を使用
+    with VideoFrame(data, init) as frame:
+        assert not frame.is_closed
+        assert frame.coded_width == width
+        assert frame.coded_height == height
+
+    # with 文を抜けると自動的に close される
+    assert frame.is_closed
+
+
+def test_video_frame_context_manager_exception():
+    """VideoFrame の context manager で例外が発生しても close される"""
+    width, height = 320, 240
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+
+    frame = None
+    with pytest.raises(ValueError):
+        with VideoFrame(data, init) as frame:
+            assert not frame.is_closed
+            raise ValueError("test exception")
+
+    # 例外が発生しても close される
+    assert frame is not None
+    assert frame.is_closed
+
+
+def test_video_frame_context_manager_returns_self():
+    """VideoFrame の __enter__ は self を返す"""
+    width, height = 320, 240
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+
+    frame_outer = VideoFrame(data, init)
+    with frame_outer as frame_inner:
+        # __enter__ は self を返すので同じオブジェクト
+        assert frame_outer is frame_inner
+
+    frame_outer.close()

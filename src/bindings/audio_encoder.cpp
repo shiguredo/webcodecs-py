@@ -5,6 +5,8 @@
 #include "audio_data.h"
 #include "encoded_audio_chunk.h"
 
+using namespace nb::literals;
+
 namespace {
 // AAC コーデック文字列かどうかを判定するヘルパー関数
 bool is_aac_codec(const std::string& codec) {
@@ -421,12 +423,11 @@ void AudioEncoder::handle_output(uint64_t sequence,
 
 void init_audio_encoder(nb::module_& m) {
   nb::class_<AudioEncoder>(m, "AudioEncoder")
-      .def(nb::init<nb::object, nb::object>(), nb::arg("output"),
-           nb::arg("error"),
+      .def(nb::init<nb::object, nb::object>(), "output"_a, "error"_a,
            nb::sig("def __init__(self, output: "
                    "typing.Callable[[EncodedAudioChunk], None], "
                    "error: typing.Callable[[str], None], /) -> None"))
-      .def("configure", &AudioEncoder::configure, nb::arg("config"),
+      .def("configure", &AudioEncoder::configure, "config"_a,
            nb::sig("def configure(self, config: webcodecs.AudioEncoderConfig, "
                    "/) -> None"))
       .def("encode", &AudioEncoder::encode,
@@ -468,7 +469,7 @@ void init_audio_encoder(nb::module_& m) {
 
             return AudioEncoder::is_config_supported(config);
           },
-          nb::arg("config"),
+          "config"_a,
           nb::sig("def is_config_supported(config: "
                   "webcodecs.AudioEncoderConfig, /) -> "
                   "webcodecs.AudioEncoderSupport"))

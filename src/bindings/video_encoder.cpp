@@ -9,6 +9,8 @@
 #include <VideoToolbox/VideoToolbox.h>
 #endif
 
+using namespace nb::literals;
+
 VideoEncoder::VideoEncoder(nb::object output, nb::object error)
     : output_callback_(output),
       error_callback_(error),
@@ -568,8 +570,8 @@ void VideoEncoder::handle_output(
         }
         if (config.description.has_value()) {
           const auto& desc = config.description.value();
-          decoder_config_dict["description"] =
-              nb::bytes(reinterpret_cast<const char*>(desc.data()), desc.size());
+          decoder_config_dict["description"] = nb::bytes(
+              reinterpret_cast<const char*>(desc.data()), desc.size());
         }
         metadata_dict["decoderConfig"] = decoder_config_dict;
       }
@@ -590,12 +592,11 @@ void VideoEncoder::handle_output(
 
 void init_video_encoder(nb::module_& m) {
   nb::class_<VideoEncoder>(m, "VideoEncoder")
-      .def(nb::init<nb::object, nb::object>(), nb::arg("output"),
-           nb::arg("error"),
+      .def(nb::init<nb::object, nb::object>(), "output"_a, "error"_a,
            nb::sig("def __init__(self, output: "
                    "typing.Callable[[EncodedVideoChunk], None], "
                    "error: typing.Callable[[str], None], /) -> None"))
-      .def("configure", &VideoEncoder::configure, nb::arg("config"),
+      .def("configure", &VideoEncoder::configure, "config"_a,
            nb::sig("def configure(self, config: webcodecs.VideoEncoderConfig, "
                    "/) -> None"))
       // WebCodecs 互換: encode(frame) または encode(frame, {"keyFrame": True})
@@ -604,7 +605,7 @@ void init_video_encoder(nb::module_& m) {
           [](VideoEncoder& self, const VideoFrame& frame) {
             self.encode(frame, false);
           },
-          nb::arg("frame"), nb::call_guard<nb::gil_scoped_release>(),
+          "frame"_a, nb::call_guard<nb::gil_scoped_release>(),
           nb::sig("def encode(self, frame: VideoFrame, /) -> None"))
       .def(
           "encode",
@@ -655,7 +656,7 @@ void init_video_encoder(nb::module_& m) {
               self.encode(frame, encode_options);
             }
           },
-          nb::arg("frame"), nb::arg("options"),
+          "frame"_a, "options"_a,
           nb::sig("def encode(self, frame: VideoFrame, options: "
                   "webcodecs.VideoEncoderEncodeOptions, /) -> None"))
       .def("flush", &VideoEncoder::flush,
@@ -718,7 +719,7 @@ void init_video_encoder(nb::module_& m) {
 
             return VideoEncoder::is_config_supported(config);
           },
-          nb::arg("config"),
+          "config"_a,
           nb::sig("def is_config_supported(config: "
                   "webcodecs.VideoEncoderConfig, /) -> "
                   "webcodecs.VideoEncoderSupport"))

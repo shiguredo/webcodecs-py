@@ -89,13 +89,15 @@ init: AudioDataInit = {
     "timestamp": 0,
     "data": audio_samples,
 }
-audio_data = AudioData(init)
-encoder.encode(audio_data)
+
+# with 文で AudioData を使用（自動的に close される）
+with AudioData(init) as audio_data:
+    encoder.encode(audio_data)
+
 encoder.flush()
 
 print(f"エンコード完了: {len(encoded_chunks)} チャンク")
 
-audio_data.close()
 encoder.close()
 ```
 
@@ -147,15 +149,15 @@ init: VideoFrameBufferInit = {
     "coded_height": height,
     "timestamp": 0,
 }
-frame = VideoFrame(frame_data, init)
 
-# エンコード
-encoder.encode(frame, {"keyFrame": True})
+# with 文で VideoFrame を使用（自動的に close される）
+with VideoFrame(frame_data, init) as frame:
+    encoder.encode(frame, {"keyFrame": True})
+
 encoder.flush()
 
 print(f"エンコード完了: {len(encoded_chunks)} チャンク, {encoded_chunks[0].byte_length} bytes")
 
-frame.close()
 encoder.close()
 ```
 

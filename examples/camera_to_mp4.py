@@ -436,20 +436,18 @@ def main():
                 raw_file.write(b"FRAME\n")
                 raw_file.write(i420_data.tobytes())
 
-            # VideoFrame を作成
-            init = VideoFrameBufferInit(
-                format=VideoPixelFormat.I420,
-                coded_width=actual_width,
-                coded_height=actual_height,
-                timestamp=timestamp,
-            )
-            video_frame = VideoFrame(i420_data, init)
-
-            # エンコード（最初のフレームと 20 秒ごとにキーフレームを強制）
-            # WebCodecs API ではアプリケーション側で明示的にキーフレームを制御する
-            keyframe = frame_count == 0 or frame_count % (args.fps * 20) == 0
-            encoder.encode(video_frame, {"keyFrame": keyframe})
-            video_frame.close()
+            # with 文で VideoFrame を使用（自動的に close される）
+            init: VideoFrameBufferInit = {
+                "format": VideoPixelFormat.I420,
+                "coded_width": actual_width,
+                "coded_height": actual_height,
+                "timestamp": timestamp,
+            }
+            with VideoFrame(i420_data, init) as video_frame:
+                # エンコード（最初のフレームと 20 秒ごとにキーフレームを強制）
+                # WebCodecs API ではアプリケーション側で明示的にキーフレームを制御する
+                keyframe = frame_count == 0 or frame_count % (args.fps * 20) == 0
+                encoder.encode(video_frame, {"keyFrame": keyframe})
 
             frame_count += 1
             timestamp += frame_duration

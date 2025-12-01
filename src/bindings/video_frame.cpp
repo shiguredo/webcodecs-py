@@ -5,6 +5,8 @@
 
 #include <libyuv.h>
 
+using namespace nb::literals;
+
 // 内部用コンストラクタ（clone, convert_format, デコーダーで使用）
 VideoFrame::VideoFrame(uint32_t width,
                        uint32_t height,
@@ -1033,8 +1035,7 @@ void init_video_frame(nb::module_& m) {
 
   nb::class_<VideoFrame>(m, "VideoFrame")
       .def(
-          nb::init<nb::ndarray<nb::numpy>, nb::dict>(), nb::arg("data"),
-          nb::arg("init"),
+          nb::init<nb::ndarray<nb::numpy>, nb::dict>(), "data"_a, "init"_a,
           nb::sig("def __init__(self, data: numpy.typing.NDArray[numpy.uint8], "
                   "init: VideoFrameBufferInit, /) -> None"))
       .def_prop_ro("format", &VideoFrame::format,
@@ -1065,7 +1066,7 @@ void init_video_frame(nb::module_& m) {
                    nb::sig("def flip(self, /) -> bool"))
       .def("metadata", &VideoFrame::metadata,
            nb::sig("def metadata(self, /) -> dict"))
-      .def("plane", &VideoFrame::plane, nb::arg("plane_index"),
+      .def("plane", &VideoFrame::plane, "plane_index"_a,
            nb::sig("def plane(self, plane_index: int, /) -> "
                    "numpy.typing.NDArray[numpy.uint8]"))
       .def(
@@ -1076,7 +1077,7 @@ void init_video_frame(nb::module_& m) {
             }
             return self.allocation_size();
           },
-          nb::arg("options") = nb::none(),
+          "options"_a = nb::none(),
           nb::sig("def allocation_size(self, options: VideoFrameCopyToOptions "
                   "| None = None, /) -> int"))
       .def(
@@ -1088,7 +1089,7 @@ void init_video_frame(nb::module_& m) {
             }
             return self.copy_to(destination);
           },
-          nb::arg("destination"), nb::arg("options") = nb::none(),
+          "destination"_a, "options"_a = nb::none(),
           nb::sig("def copy_to(self, destination: "
                   "numpy.typing.NDArray[numpy.uint8], "
                   "options: VideoFrameCopyToOptions | None = None, /) -> "
@@ -1106,5 +1107,15 @@ void init_video_frame(nb::module_& m) {
           "clone",
           [](const VideoFrame& self) { return self.clone().release(); },
           nb::rv_policy::take_ownership,
-          nb::sig("def clone(self, /) -> VideoFrame"));
+          nb::sig("def clone(self, /) -> VideoFrame"))
+      // context manager 対応
+      .def(
+          "__enter__", [](VideoFrame& self) -> VideoFrame& { return self; },
+          nb::rv_policy::reference)
+      .def(
+          "__exit__",
+          [](VideoFrame& self, nb::object, nb::object, nb::object) {
+            self.close();
+          },
+          "exc_type"_a.none(), "exc_val"_a.none(), "exc_tb"_a.none());
 }

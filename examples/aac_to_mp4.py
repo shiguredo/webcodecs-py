@@ -321,8 +321,8 @@ def main():
             end = min(offset + frame_size, total_samples)
             frame_data = full_audio[offset:end]
 
-            # AudioData を作成
-            audio = AudioData(
+            # with 文で AudioData を使用（自動的に close される）
+            with AudioData(
                 {
                     "format": AudioSampleFormat.F32,
                     "sample_rate": sample_rate,
@@ -331,9 +331,8 @@ def main():
                     "timestamp": timestamp,
                     "data": frame_data,
                 }
-            )
-
-            encoder.encode(audio)
+            ) as audio:
+                encoder.encode(audio)
 
             # タイムスタンプを更新 (マイクロ秒単位)
             timestamp += int(len(frame_data) * 1_000_000 / sample_rate)
