@@ -61,17 +61,17 @@ wheels = [
 
 [[package]]
 name = "mp4-py"
-version = "2025.1.0.dev2"
+version = "2025.1.0.dev3"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/42/c0c769c2b81aad9283fd82d993f2d71c02b50b90db36626f2e501cf737c4/mp4_py-2025.1.0.dev2-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:ee55f116feed3f5e00e94814e30a4069134ccd2d34b0b11b31228a048dc4ca5e", size = 310480, upload-time = "2025-11-24T09:01:29.257Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/85/d26480a529f995c0774d083ee726c7658bfa8f3ff217c36574b168e73d00/mp4_py-2025.1.0.dev2-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:db081cd9f5a7ba797f6474b75d3dd15c73b2ae0a560b65627ad88a0ffe6ceda0", size = 310480, upload-time = "2025-11-24T09:01:24.476Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/08/56ef6ed7ba84db5d9af0fa7a1a446e9ce31481c2b08e354f021dbb462881/mp4_py-2025.1.0.dev2-cp313-cp313-manylinux_2_34_aarch64.whl", hash = "sha256:b5988905bebc180cd33ddcd0cd47b3acecd097c623dad02bc13e4e2bd2e07323", size = 296321, upload-time = "2025-11-24T09:01:27.029Z" },
-    { url = "https://files.pythonhosted.org/packages/cb/8d/73f87bcd743bd5063e6322075040c0d55fe382d9577728755fdbeda58fda/mp4_py-2025.1.0.dev2-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:b3dc19973f609310aa35c3abd6d47ba130e9cc00ab2894c50d3d9846c8f9cd99", size = 312179, upload-time = "2025-11-24T09:01:27.066Z" },
-    { url = "https://files.pythonhosted.org/packages/7d/16/5b828bf7424493fc06a86ce41a2f7a30e22a2a24d44aa3eca30d0739e671/mp4_py-2025.1.0.dev2-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:63019c981209f5e6079bb8de2d5331b241a67ccfad5f7fcb49afb14ea03d05b3", size = 310479, upload-time = "2025-11-24T09:01:32.175Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/4c/43158c141e10ee01713c4c7c46cbf51dcb3e4af8658516fd50e90b3eed7c/mp4_py-2025.1.0.dev2-cp314-cp314-macosx_15_0_arm64.whl", hash = "sha256:5fae618cd83a1b245204c8cbb3d6568c9a5c5ba17619a54c7d6e3d15d69372ac", size = 310481, upload-time = "2025-11-24T09:01:26.918Z" },
-    { url = "https://files.pythonhosted.org/packages/54/22/098613919aff35c8b12616198986d557b2824023f1eee1381f4141c26ac4/mp4_py-2025.1.0.dev2-cp314-cp314-manylinux_2_34_aarch64.whl", hash = "sha256:ef64bd5d55ccb4b79b994c17a4562ab2d15e1de3e1991df846597bec7bd8443e", size = 296321, upload-time = "2025-11-24T09:01:29.257Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/37/32604ede0d947b547d9c62f52c74830b3685fca57035b28e6a2ce1bbd40f/mp4_py-2025.1.0.dev2-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:46905fe845416b4b55b816c53033aeac1e388851d08bb0a270ceebbf096cc1ea", size = 312180, upload-time = "2025-11-24T09:01:26.626Z" },
+    { url = "https://files.pythonhosted.org/packages/af/2a/fa9fe19ed68156e23668973d5f5f4cb0758805241622ce6fe9a104296be3/mp4_py-2025.1.0.dev3-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:cf67ff5711c03e1334027fd9684a7789ea63e618a7891c2c81452c60b83d2b98", size = 310575, upload-time = "2025-12-01T03:06:42.816Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/22/a3ddd6e2e9cd0991faaa635f6e349c908913e0c83a62f24a3afb6c6b4749/mp4_py-2025.1.0.dev3-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:084b84afe46c047d62060fca73eedd8e9ea2aff35eaae2ce4b931071bba1c694", size = 310574, upload-time = "2025-12-01T03:06:42.876Z" },
+    { url = "https://files.pythonhosted.org/packages/39/d2/c64696ae54b57f9f2661c11f81ba50e1752c8f3cbfdb4dfde7bc1087e49f/mp4_py-2025.1.0.dev3-cp313-cp313-manylinux_2_34_aarch64.whl", hash = "sha256:4932ace34c689b0a41b5c966ac3718768aa2f5bf3047a3f5afd8869dd7f901b4", size = 296419, upload-time = "2025-12-01T03:06:42.866Z" },
+    { url = "https://files.pythonhosted.org/packages/46/44/c83a4558422484efa6aa8c366d6632b70d8c6fd6745b034caae84835f3ab/mp4_py-2025.1.0.dev3-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:41095c9cfd60b4ffedc3729ca3940391a83d8ad28697740d1d1e7a106a41deca", size = 312277, upload-time = "2025-12-01T03:06:42.64Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/c3/90b9b548a7b255e433a66f317403146c87fa0c162cde3747a6014527f4df/mp4_py-2025.1.0.dev3-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:61c3932f573243dfeccfaaaff862cb4467c064b5f64e61bc53391891dd9dea3a", size = 310574, upload-time = "2025-12-01T03:06:46.584Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/4e/3e5bd78cbdef46ecbcacbe55a622531c16031fed1bd99c0a286080d7b295/mp4_py-2025.1.0.dev3-cp314-cp314-macosx_15_0_arm64.whl", hash = "sha256:82b2fdc7c8921ec207a7bd13890fea7a587f2bede3ebeba9923459ffa2f20101", size = 310575, upload-time = "2025-12-01T03:06:42.917Z" },
+    { url = "https://files.pythonhosted.org/packages/64/ed/9e360e28c61600b621509cb118e61f2085b735c90b7c07add71dc5ab6a0d/mp4_py-2025.1.0.dev3-cp314-cp314-manylinux_2_34_aarch64.whl", hash = "sha256:4719fe3e6fbee232f47646f716636a92c781c0d8b1b4e676a823e21fa88b5b53", size = 296419, upload-time = "2025-12-01T03:06:42.815Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/25/7850fe798251b2331f7840d99864ba9add5df2324f0ac50221dbe45234f8/mp4_py-2025.1.0.dev3-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:ea1d81495563d178ca27d59c1cf696792008ae5b9f3bd8358b05af73c6249092", size = 312278, upload-time = "2025-12-01T03:06:42.644Z" },
 ]
 
 [[package]]
