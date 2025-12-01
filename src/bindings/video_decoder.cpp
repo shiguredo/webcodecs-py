@@ -2,6 +2,8 @@
 #include <cstring>
 #include <stdexcept>
 
+using namespace nb::literals;
+
 VideoCodec VideoDecoder::string_to_codec(const std::string& codec) {
   // 完全なコーデック文字列フォーマットを持つ AV1 (av01.x.xxM.xx)
   if (codec.length() >= 5 && codec.substr(0, 5) == "av01.")
@@ -456,15 +458,14 @@ void VideoDecoder::handle_output(uint64_t sequence,
 void init_video_decoder(nb::module_& m) {
   nb::class_<VideoDecoder>(m, "VideoDecoder")
       .def(
-          nb::init<nb::object, nb::object>(), nb::arg("output"),
-          nb::arg("error"),
+          nb::init<nb::object, nb::object>(), "output"_a, "error"_a,
           nb::sig(
               "def __init__(self, output: typing.Callable[[VideoFrame], None], "
               "error: typing.Callable[[str], None], /) -> None"))
-      .def("configure", &VideoDecoder::configure, nb::arg("config"),
+      .def("configure", &VideoDecoder::configure, "config"_a,
            nb::sig("def configure(self, config: webcodecs.VideoDecoderConfig, "
                    "/) -> None"))
-      .def("decode", &VideoDecoder::decode, nb::arg("chunk"),
+      .def("decode", &VideoDecoder::decode, "chunk"_a,
            nb::call_guard<nb::gil_scoped_release>(),
            nb::sig("def decode(self, chunk: EncodedVideoChunk, /) -> None"))
       .def("flush", &VideoDecoder::flush,
@@ -511,7 +512,7 @@ void init_video_decoder(nb::module_& m) {
 
             return VideoDecoder::is_config_supported(config);
           },
-          nb::arg("config"),
+          "config"_a,
           nb::sig("def is_config_supported(config: "
                   "webcodecs.VideoDecoderConfig, /) -> "
                   "webcodecs.VideoDecoderSupport"))

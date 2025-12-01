@@ -1,6 +1,8 @@
 #include "encoded_audio_chunk.h"
 #include <cstring>
 
+using namespace nb::literals;
+
 EncodedAudioChunk::EncodedAudioChunk(const std::vector<uint8_t>& data,
                                      EncodedAudioChunkType type,
                                      int64_t timestamp,
@@ -59,7 +61,7 @@ void init_encoded_audio_chunk(nb::module_& m) {
 
             new (self) EncodedAudioChunk(data, type, timestamp, duration);
           },
-          nb::arg("init"),
+          "init"_a,
           nb::sig("def __init__(self, init: webcodecs.EncodedAudioChunkInit) "
                   "-> None"))
       .def_prop_ro("type", &EncodedAudioChunk::type,
@@ -70,7 +72,7 @@ void init_encoded_audio_chunk(nb::module_& m) {
                    nb::sig("def duration(self, /) -> int"))
       .def_prop_ro("byte_length", &EncodedAudioChunk::byte_length,
                    nb::sig("def byte_length(self, /) -> int"))
-      .def("copy_to", &EncodedAudioChunk::copy_to, nb::arg("destination"),
+      .def("copy_to", &EncodedAudioChunk::copy_to, "destination"_a,
            nb::sig("def copy_to(self, destination: "
                    "numpy.typing.NDArray[numpy.uint8]) -> None"));
 }

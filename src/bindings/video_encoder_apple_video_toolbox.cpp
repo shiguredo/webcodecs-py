@@ -111,8 +111,9 @@ CFStringRef map_hevc_profile_level(uint8_t profile_idc, uint8_t level_idc) {
 
 // CMVideoFormatDescription から avcC/hvcC を抽出する
 // これは MP4 の sample entry に直接使用できる形式
-static std::vector<uint8_t> extract_description(CMVideoFormatDescriptionRef desc,
-                                                 bool is_h264) {
+static std::vector<uint8_t> extract_description(
+    CMVideoFormatDescriptionRef desc,
+    bool is_h264) {
   std::vector<uint8_t> result;
 
   // SampleDescriptionExtensionAtoms から avcC/hvcC を取得
@@ -190,10 +191,11 @@ static void vt_output_callback(void* outputCallbackRefCon,
     int nalu_len_size = 0;
     size_t ps_count = 0;
     OSStatus st =
-        is_h264 ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                      format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size)
-                : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
-                      format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size);
+        is_h264
+            ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+                  format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size)
+            : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
+                  format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size);
     if (st == noErr) {
       for (size_t i = 0; i < ps_count; ++i) {
         const uint8_t* ps = nullptr;
@@ -213,7 +215,8 @@ static void vt_output_callback(void* outputCallbackRefCon,
   // キーフレームかつ length-prefixed フォーマットの場合、decoderConfig を metadata に含める
   if (key_frame && !use_annexb && format_desc) {
     bool is_h264 = !is_hevc_codec;
-    std::vector<uint8_t> description = extract_description(format_desc, is_h264);
+    std::vector<uint8_t> description =
+        extract_description(format_desc, is_h264);
 
     if (!description.empty()) {
       CMVideoDimensions dimensions =

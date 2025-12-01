@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include "video_frame.h"  // VideoPixelFormat の定義のため
 
+using namespace nb::literals;
+
 void VideoFrameBufferInit::validate() const {
   if (format.empty()) {
     throw std::invalid_argument("format is required");
@@ -80,15 +82,15 @@ void init_webcodecs_types(nb::module_& m) {
   // PlaneLayout クラス
   nb::class_<PlaneLayout>(m, "PlaneLayout")
       .def(nb::init<>())
-      .def(nb::init<uint32_t, uint32_t>(), nb::arg("offset"), nb::arg("stride"))
+      .def(nb::init<uint32_t, uint32_t>(), "offset"_a, "stride"_a)
       .def_rw("offset", &PlaneLayout::offset)
       .def_rw("stride", &PlaneLayout::stride);
 
   // DOMRect クラス
   nb::class_<DOMRect>(m, "DOMRect")
       .def(nb::init<>())
-      .def(nb::init<double, double, double, double>(), nb::arg("x"),
-           nb::arg("y"), nb::arg("width"), nb::arg("height"))
+      .def(nb::init<double, double, double, double>(), "x"_a, "y"_a, "width"_a,
+           "height"_a)
       .def_rw("x", &DOMRect::x)
       .def_rw("y", &DOMRect::y)
       .def_rw("width", &DOMRect::width)
