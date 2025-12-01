@@ -11,6 +11,9 @@
 
 ## develop
 
+- [ADD] AudioData と VideoFrame でコンテキストマネージャー (with 文) をサポートする
+  - `__enter__` / `__exit__` を実装し、with 文で自動的に close() が呼ばれるようにする
+  - @voluntas
 - [ADD] VideoEncoder の output callback で EncodedVideoChunkMetadata をサポートする
   - WebCodecs API 準拠で、キーフレーム時に decoderConfig を含む metadata を提供する
   - @voluntas
@@ -21,6 +24,8 @@
 
 ### misc
 
+- [UPDATE] nanobind バインディングで `nb::arg()` を `_a` リテラル形式に統一する
+  - @voluntas
 - [ADD] pytest-benchmark を開発依存に追加する
   - @voluntas
 - [ADD] tests/benchmarks/ にベンチマークテストを追加する
