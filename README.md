@@ -197,6 +197,7 @@ encoder.close()
 - Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
 - Windows 11 x86_64
+- Windows Server 2025 x86_64
 
 ## ビルド
 
