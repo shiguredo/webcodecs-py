@@ -27,6 +27,11 @@
 typedef const struct __CFString* CFStringRef;
 #endif
 
+#if defined(NVIDIA_CUDA_TOOLKIT)
+#include <cuda.h>
+#include <nvEncodeAPI.h>
+#endif
+
 namespace nb = nanobind;
 
 class EncodedVideoChunk;
@@ -171,12 +176,30 @@ class VideoEncoder {
   bool is_avc_codec() const;
   bool is_hevc_codec() const;
   bool uses_videotoolbox() const;
+  bool uses_nvidia_video_codec() const;
 
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)
   void* vt_session_ = nullptr;
 
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;
+
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  // NVIDIA Video Codec SDK (NVENC) 関連のメンバー
+  void* nvenc_encoder_ = nullptr;
+  void* nvenc_cuda_context_ = nullptr;
+  NV_ENCODE_API_FUNCTION_LIST* nvenc_api_ = nullptr;
+  void* nvenc_input_buffer_ = nullptr;
+  void* nvenc_output_buffer_ = nullptr;
+
+  // NVENC 関連のメソッド
+  void init_nvenc_encoder();
+  void encode_frame_nvenc(const VideoFrame& frame,
+                          bool keyframe,
+                          std::optional<uint16_t> quantizer = std::nullopt);
+  void flush_nvenc_encoder();
+  void cleanup_nvenc_encoder();
+#endif
 };
 
 void init_video_encoder(nb::module_& m);

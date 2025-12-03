@@ -20,6 +20,27 @@ else()
     message(FATAL_ERROR "Unsupported platform")
 endif()
 
+# NVIDIA Video Codec SDK の設定
+# CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON" uv build --wheel でビルド
+option(NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
+
+# NVIDIA Video Codec SDK のパス設定
+if(NVIDIA_CUDA_TOOLKIT)
+    # third_party/NvCodec を使用
+    set(NVCODEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/NvCodec")
+    message(STATUS "NVIDIA Video Codec SDK path: ${NVCODEC_DIR}")
+
+    # CUDA Toolkit を検索
+    find_package(CUDAToolkit REQUIRED)
+    message(STATUS "CUDA Toolkit found: ${CUDAToolkit_VERSION}")
+    message(STATUS "CUDA include dir: ${CUDAToolkit_INCLUDE_DIRS}")
+
+    # macOS では NVIDIA Video Codec SDK はサポートされていない
+    if(APPLE)
+        message(FATAL_ERROR "NVIDIA Video Codec SDK is not supported on macOS")
+    endif()
+endif()
+
 # レイアウト: ExternalProject の依存関係は _deps 配下で管理
 # SKBUILD_PROJECT_DIR が利用可能な場合は使用（scikit-build-core）、そうでなければ CMAKE_CURRENT_SOURCE_DIR にフォールバック
 if(DEFINED SKBUILD_PROJECT_DIR)
@@ -350,6 +371,25 @@ target_include_directories(_webcodecs_py PRIVATE
     ${YUV_INSTALL_DIR}/include
 )
 
+# NVIDIA Video Codec SDK を使用する場合のインクルードディレクトリ
+if(NVIDIA_CUDA_TOOLKIT)
+    target_include_directories(_webcodecs_py PRIVATE
+        ${NVCODEC_DIR}/Interface
+        ${NVCODEC_DIR}/Utils
+        ${NVCODEC_DIR}/NvCodec/NvEncoder
+        ${NVCODEC_DIR}/NvCodec/NvDecoder
+        ${CUDAToolkit_INCLUDE_DIRS}
+    )
+    # NvCodec ソースファイルを追加
+    target_sources(_webcodecs_py PRIVATE
+        ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoder.cpp
+        ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoderCuda.cpp
+        ${NVCODEC_DIR}/NvCodec/NvDecoder/NvDecoder.cpp
+    )
+    # コンパイル定義を追加
+    target_compile_definitions(_webcodecs_py PRIVATE NVIDIA_CUDA_TOOLKIT=1)
+endif()
+
 # ライブラリをリンク
 # Windows では絶対パスを明確に指定
 if(WIN32)
@@ -382,6 +422,24 @@ if(APPLE)
         "-framework CoreMedia"
         "-framework AudioToolbox"
     )
+endif()
+
+# NVIDIA Video Codec SDK ライブラリ (Ubuntu のみ対応)
+if(NVIDIA_CUDA_TOOLKIT)
+    target_link_libraries(_webcodecs_py PRIVATE
+        CUDA::cuda_driver
+        CUDA::cudart_static
+    )
+    # libnvcuvid.so と libnvidia-encode.so を動的リンク
+    find_library(NVCUVID_LIB nvcuvid PATHS /usr/local/cuda/lib64/stubs /usr/lib/x86_64-linux-gnu)
+    find_library(NVENC_LIB nvidia-encode PATHS /usr/local/cuda/lib64/stubs /usr/lib/x86_64-linux-gnu)
+    if(NVCUVID_LIB)
+        target_link_libraries(_webcodecs_py PRIVATE ${NVCUVID_LIB})
+    endif()
+    if(NVENC_LIB)
+        target_link_libraries(_webcodecs_py PRIVATE ${NVENC_LIB})
+    endif()
+    target_link_libraries(_webcodecs_py PRIVATE dl)
 endif()
 
 # .pyi スタブファイルを生成

@@ -244,9 +244,9 @@ void init_webcodecs_types(nb::module_& m) {
                  self->color_space = nb::cast<VideoColorSpace>(cs_obj);
                }
              }
-             if (kwargs.contains("hardware_acceleration")) {
-               self->hardware_acceleration =
-                   nb::cast<std::string>(kwargs["hardware_acceleration"]);
+             if (kwargs.contains("hardware_acceleration_engine")) {
+               self->hardware_acceleration_engine =
+                   nb::cast<HardwareAccelerationEngine>(kwargs["hardware_acceleration_engine"]);
              }
              if (kwargs.contains("optimize_for_latency")) {
                self->optimize_for_latency =
@@ -267,8 +267,8 @@ void init_webcodecs_types(nb::module_& m) {
       .def_rw("display_aspect_height",
               &VideoDecoderConfig::display_aspect_height)
       .def_rw("color_space", &VideoDecoderConfig::color_space)
-      .def_rw("hardware_acceleration",
-              &VideoDecoderConfig::hardware_acceleration)
+      .def_rw("hardware_acceleration_engine",
+              &VideoDecoderConfig::hardware_acceleration_engine)
       .def_rw("optimize_for_latency", &VideoDecoderConfig::optimize_for_latency)
       .def_rw("rotation", &VideoDecoderConfig::rotation)
       .def_rw("flip", &VideoDecoderConfig::flip);
@@ -395,7 +395,7 @@ void init_webcodecs_types(nb::module_& m) {
                if (self.config.display_aspect_height.has_value())
                  d["display_aspect_height"] =
                      self.config.display_aspect_height.value();
-               d["hardware_acceleration"] = self.config.hardware_acceleration;
+               d["hardware_acceleration_engine"] = self.config.hardware_acceleration_engine;
                if (self.config.optimize_for_latency.has_value())
                  d["optimize_for_latency"] =
                      self.config.optimize_for_latency.value();

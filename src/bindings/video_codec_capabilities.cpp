@@ -10,16 +10,16 @@
 
 namespace nb = nanobind;
 
-std::map<HWAccelerationEngine, EngineSupport>
+std::map<HardwareAccelerationEngine, EngineSupport>
 get_video_codec_capabilities_impl() {
-  std::map<HWAccelerationEngine, EngineSupport> capabilities;
+  std::map<HardwareAccelerationEngine, EngineSupport> capabilities;
 
   // NONE エンジン（ソフトウェア実装）は常に利用可能
   EngineSupport none_support;
   none_support.available = true;
   none_support.platform = "all";
   none_support.codecs["av01"] = {true, true};  // AV1
-  capabilities[HWAccelerationEngine::NONE] = none_support;
+  capabilities[HardwareAccelerationEngine::NONE] = none_support;
 
 #if defined(__APPLE__)
   // Apple VideoToolbox の利用可能性を確認
@@ -83,7 +83,7 @@ get_video_codec_capabilities_impl() {
 
   // VideoToolbox がサポートするコーデックがある場合のみ追加
   if (!vt_support.codecs.empty()) {
-    capabilities[HWAccelerationEngine::APPLE_VIDEO_TOOLBOX] = vt_support;
+    capabilities[HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX] = vt_support;
   }
 #endif
 
@@ -91,13 +91,13 @@ get_video_codec_capabilities_impl() {
 }
 
 void init_video_codec_capabilities(nb::module_& m) {
-  // HWAccelerationEngine enum
-  nb::enum_<HWAccelerationEngine>(m, "_HWAccelerationEngine")
-      .value("NONE", HWAccelerationEngine::NONE)
-      .value("APPLE_VIDEO_TOOLBOX", HWAccelerationEngine::APPLE_VIDEO_TOOLBOX)
-      .value("NVIDIA_VIDEO_CODEC", HWAccelerationEngine::NVIDIA_VIDEO_CODEC)
-      .value("INTEL_VPL", HWAccelerationEngine::INTEL_VPL)
-      .value("AMD_AMF", HWAccelerationEngine::AMD_AMF);
+  // HardwareAccelerationEngine enum
+  nb::enum_<HardwareAccelerationEngine>(m, "HardwareAccelerationEngine")
+      .value("NONE", HardwareAccelerationEngine::NONE)
+      .value("APPLE_VIDEO_TOOLBOX", HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX)
+      .value("NVIDIA_VIDEO_CODEC", HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC)
+      .value("INTEL_VPL", HardwareAccelerationEngine::INTEL_VPL)
+      .value("AMD_AMF", HardwareAccelerationEngine::AMD_AMF);
 
   // CodecSupport 構造体
   nb::class_<CodecSupport>(m, "_CodecSupport")

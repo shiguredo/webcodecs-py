@@ -26,6 +26,7 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 - Opus、FLAC、AAC、AV1、H.264、H.265 コーデックをサポート
   - AAC は macOS の AudioToolbox を利用
   - H.264 と H.265 は macOS の VideoToolbox を利用
+  - H.264 と H.265 と AV1 は Ubuntu の NVIDIA Video Codec SDK を利用
 - クロスプラットフォーム対応
   - macOS
   - Ubuntu
@@ -179,8 +180,10 @@ encoder.close()
   - <https://github.com/videolan/dav1d>
 - H.264 (AVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.265 (HEVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 
 ## Python
 
@@ -238,4 +241,14 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+```
+
+## NVIDIA Video Codec SDK
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/license/index.html>
+
+```text
+“This software contains source code provided by NVIDIA Corporation.”
 ```

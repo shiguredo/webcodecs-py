@@ -9,6 +9,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "video_codec_capabilities.h"
+
 namespace nb = nanobind;
 
 // WebCodecs API の PlaneLayout 構造体
@@ -149,8 +151,7 @@ struct VideoEncoderConfig {
   std::optional<std::string> content_hint;
 
   // 独自拡張 (ハードウェアアクセラレーション用)
-  std::string hardware_acceleration_engine =
-      "none";  // "none", "apple_video_toolbox", etc.
+  HardwareAccelerationEngine hardware_acceleration_engine = HardwareAccelerationEngine::NONE;
 
   // AVC 固有のオプション (WebCodecs AVC Codec Registration 準拠)
   std::string avc_format = "avc";  // "annexb", "avc" (デフォルト: "avc")
@@ -173,8 +174,8 @@ struct VideoDecoderConfig {
   std::optional<uint32_t> display_aspect_width;
   std::optional<uint32_t> display_aspect_height;
   std::optional<VideoColorSpace> color_space;
-  std::string hardware_acceleration = "no-preference";
   std::optional<bool> optimize_for_latency;
+  HardwareAccelerationEngine hardware_acceleration_engine = HardwareAccelerationEngine::NONE;
   double rotation = 0;
   bool flip = false;
 

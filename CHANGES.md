@@ -11,6 +11,15 @@
 
 ## develop
 
+- [ADD] NVIDIA Video Codec SDK (NVENC/NVDEC) をサポートする
+  - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を指定可能
+  - H.264 / HEVC / AV1 のハードウェアエンコード/デコードに対応
+  - ビルド時に CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON" の指定が必要
+  - Ubuntu のみ対応
+  - @voluntas
+- [ADD] VideoDecoder に hardware_acceleration_engine オプションを追加する
+  - HardwareAccelerationEngine ENUM でハードウェアアクセラレーションエンジンを指定可能
+  - @voluntas
 - [ADD] Python 3.12 に対応する
   - @voluntas
 - [ADD] AudioData と VideoFrame でコンテキストマネージャー (with 文) をサポートする

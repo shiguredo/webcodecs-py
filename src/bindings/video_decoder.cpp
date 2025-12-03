@@ -16,6 +16,12 @@ VideoCodec VideoDecoder::string_to_codec(const std::string& codec) {
   if (codec.length() >= 5 &&
       (codec.substr(0, 5) == "hvc1." || codec.substr(0, 5) == "hev1."))
     return VideoCodec::H265;
+  // VP9 (vp09.xx.xx.xx.xx.xx.xx.xx)
+  if (codec.length() >= 5 && codec.substr(0, 5) == "vp09.")
+    return VideoCodec::VP9;
+  // VP8
+  if (codec == "vp8" || (codec.length() >= 3 && codec.substr(0, 3) == "vp8"))
+    return VideoCodec::VP8;
   throw std::runtime_error("Unknown codec: " + codec);
 }
 
@@ -71,6 +77,10 @@ void VideoDecoder::configure(nb::dict config_dict) {
     config.description =
         std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(ptr),
                              reinterpret_cast<const uint8_t*>(ptr) + size);
+  }
+  if (config_dict.contains("hardware_acceleration_engine")) {
+    config.hardware_acceleration_engine =
+        nb::cast<HardwareAccelerationEngine>(config_dict["hardware_acceleration_engine"]);
   }
 
   // 既存のデコーダーをクリーンアップ
@@ -161,6 +171,21 @@ void VideoDecoder::flush() {
     return;
   }
 
+  // NVIDIA Video Codec SDK の場合
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (uses_nvidia_video_codec()) {
+    // 全てのペンディングタスクが完了するまで待機
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      queue_cv_.wait(lock, [this]() {
+        return decode_queue_.empty() && pending_tasks_ == 0;
+      });
+    }
+    flush_nvdec();
+    return;
+  }
+#endif
+
   // VideoToolbox は直接処理されるため、ワーカーキューの待機をスキップ
 #if defined(__APPLE__)
   VideoCodec codec = string_to_codec(config_.codec);
@@ -247,6 +272,20 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
   bool supported = false;
   try {
     VideoCodec codec = string_to_codec(config.codec);
+
+    // NVIDIA Video Codec SDK でサポートされているかチェック
+#if defined(NVIDIA_CUDA_TOOLKIT)
+    if (config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+      // NVDEC はエンコード/デコード: AV1, AVC, HEVC
+      // デコードのみ: VP8, VP9
+      if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
+          codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
+          codec == VideoCodec::VP9) {
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
     switch (codec) {
       case VideoCodec::AV1:
         supported = true;
@@ -255,8 +294,20 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
       case VideoCodec::H265:
 #if defined(__APPLE__)
         supported = true;  // macOS で VideoToolbox をサポート
+#elif defined(NVIDIA_CUDA_TOOLKIT)
+        // NVIDIA Video Codec SDK が有効な場合は nvidia_video_codec を使用
+        supported = config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
+#endif
+        break;
+      case VideoCodec::VP8:
+      case VideoCodec::VP9:
+#if defined(NVIDIA_CUDA_TOOLKIT)
+        // NVIDIA Video Codec SDK が有効な場合は nvidia_video_codec を使用
+        supported = config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+        supported = false;
 #endif
         break;
       default:
@@ -271,6 +322,14 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 }
 
 void VideoDecoder::init_decoder() {
+  // NVIDIA Video Codec SDK を使用する場合
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (uses_nvidia_video_codec()) {
+    init_nvdec_decoder();
+    return;
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
@@ -296,6 +355,14 @@ void VideoDecoder::cleanup_decoder() {
     stop_worker();
   }
 
+  // NVIDIA Video Codec SDK のクリーンアップ
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (nvdec_decoder_) {
+    cleanup_nvdec_decoder();
+    return;
+  }
+#endif
+
   if (!decoder_context_) {
     return;
   }
@@ -319,6 +386,13 @@ void VideoDecoder::cleanup_decoder() {
 }
 
 bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
+  // NVIDIA Video Codec SDK を使用する場合
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (uses_nvidia_video_codec()) {
+    return decode_nvdec(chunk);
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
@@ -347,6 +421,22 @@ void VideoDecoder::flush_dav1d() {
 // 分割されたファイルをインクルード
 #include "video_decoder_apple_video_toolbox.cpp"
 #include "video_decoder_dav1d.cpp"
+#include "video_decoder_nvidia.cpp"
+
+bool VideoDecoder::uses_nvidia_video_codec() const {
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  // NVIDIA Video Codec SDK が有効な場合
+  // エンコーダー/デコーダー: H.264, H.265, AV1
+  // デコーダーのみ: VP8, VP9
+  VideoCodec codec = string_to_codec(config_.codec);
+  return (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::AV1 || codec == VideoCodec::VP8 ||
+          codec == VideoCodec::VP9) &&
+         config_.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+  return false;
+#endif
+}
 
 // ワーカースレッドの開始
 void VideoDecoder::start_worker() {
@@ -503,9 +593,9 @@ void init_video_decoder(nb::module_& m) {
                   reinterpret_cast<const uint8_t*>(ptr),
                   reinterpret_cast<const uint8_t*>(ptr) + size);
             }
-            if (config_dict.contains("hardware_acceleration"))
-              config.hardware_acceleration =
-                  nb::cast<std::string>(config_dict["hardware_acceleration"]);
+            if (config_dict.contains("hardware_acceleration_engine"))
+              config.hardware_acceleration_engine =
+                  nb::cast<HardwareAccelerationEngine>(config_dict["hardware_acceleration_engine"]);
             if (config_dict.contains("optimize_for_latency"))
               config.optimize_for_latency =
                   nb::cast<bool>(config_dict["optimize_for_latency"]);
