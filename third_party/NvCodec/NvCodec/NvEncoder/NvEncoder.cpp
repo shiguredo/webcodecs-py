@@ -25,7 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "NvEncoder/NvEncoder.h"
+#include "NvEncoder.h"
 
 #ifndef _WIN32
 #include <cstring>

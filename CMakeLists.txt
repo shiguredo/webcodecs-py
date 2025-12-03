@@ -29,11 +29,9 @@ endif()
 
 # NVIDIA Video Codec SDK のパス設定
 if(NVIDIA_VIDEO_CODEC)
-    if(NOT DEFINED ENV{NVIDIA_VIDEO_CODEC_SDK_PATH})
-        message(FATAL_ERROR "NVIDIA_VIDEO_CODEC_SDK_PATH environment variable must be set when NVIDIA_VIDEO_CODEC is enabled")
-    endif()
-    set(NVIDIA_VIDEO_CODEC_SDK_PATH "$ENV{NVIDIA_VIDEO_CODEC_SDK_PATH}")
-    message(STATUS "NVIDIA Video Codec SDK path: ${NVIDIA_VIDEO_CODEC_SDK_PATH}")
+    # third_party/NvCodec を使用
+    set(NVCODEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/NvCodec")
+    message(STATUS "NVIDIA Video Codec SDK path: ${NVCODEC_DIR}")
 
     # CUDA Toolkit を検索
     find_package(CUDAToolkit REQUIRED)
@@ -379,8 +377,17 @@ target_include_directories(_webcodecs_py PRIVATE
 # NVIDIA Video Codec SDK を使用する場合のインクルードディレクトリ
 if(NVIDIA_VIDEO_CODEC)
     target_include_directories(_webcodecs_py PRIVATE
-        ${NVIDIA_VIDEO_CODEC_SDK_PATH}
+        ${NVCODEC_DIR}/Interface
+        ${NVCODEC_DIR}/Utils
+        ${NVCODEC_DIR}/NvCodec/NvEncoder
+        ${NVCODEC_DIR}/NvCodec/NvDecoder
         ${CUDAToolkit_INCLUDE_DIRS}
+    )
+    # NvCodec ソースファイルを追加
+    target_sources(_webcodecs_py PRIVATE
+        ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoder.cpp
+        ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoderCuda.cpp
+        ${NVCODEC_DIR}/NvCodec/NvDecoder/NvDecoder.cpp
     )
     # コンパイル定義を追加
     target_compile_definitions(_webcodecs_py PRIVATE NVIDIA_VIDEO_CODEC=1)
