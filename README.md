@@ -1,6 +1,7 @@
 # webcodecs-py
 
 [![PyPI](https://img.shields.io/pypi/v/webcodecs-py)](https://pypi.org/project/webcodecs-py/)
+[![SPEC 0 — Minimum Supported Dependencies](https://img.shields.io/badge/SPEC-0-green?labelColor=%23004811&color=%235CA038)](https://scientific-python.org/specs/spec-0000/)
 [![image](https://img.shields.io/pypi/pyversions/webcodecs-py.svg)](https://pypi.python.org/pypi/webcodecs-py)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Actions status](https://github.com/shiguredo/webcodecs-py/workflows/wheel/badge.svg)](https://github.com/shiguredo/webcodecs-py/actions)
@@ -185,6 +186,7 @@ encoder.close()
 
 - 3.14
 - 3.13
+- 3.12
 
 ## プラットフォーム
 

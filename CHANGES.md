@@ -11,6 +11,8 @@
 
 ## develop
 
+- [ADD] Python 3.12 に対応する
+  - @voluntas
 - [ADD] AudioData と VideoFrame でコンテキストマネージャー (with 文) をサポートする
   - `__enter__` / `__exit__` を実装し、with 文で自動的に close() が呼ばれるようにする
   - @voluntas
