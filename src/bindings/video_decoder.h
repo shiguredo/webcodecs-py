@@ -19,6 +19,11 @@
 #include "video_frame.h"
 #include "webcodecs_types.h"
 
+#if defined(NVIDIA_VIDEO_CODEC)
+// NVIDIA Video Codec SDK の前方宣言
+struct CUVIDDECODECAPS;
+#endif
+
 namespace nb = nanobind;
 
 enum class VideoCodec {
@@ -123,4 +128,30 @@ class VideoDecoder {
 
   // ユーティリティーメソッド
   static VideoCodec string_to_codec(const std::string& codec);
+
+  // NVIDIA Video Codec SDK を使用するかどうかを判定
+  bool uses_nvidia_video_codec() const;
+
+#if defined(NVIDIA_VIDEO_CODEC)
+  // NVIDIA Video Codec SDK (NVDEC) 関連のメンバー
+  void* nvdec_decoder_ = nullptr;
+  void* nvdec_cuda_context_ = nullptr;
+  void* nvdec_video_parser_ = nullptr;
+  void* nvdec_video_source_ = nullptr;
+
+  // NVDEC デコード用のフレームキュー
+  std::vector<void*> nvdec_frame_queue_;
+  uint32_t nvdec_decode_surface_count_ = 0;
+
+  // NVDEC 関連のメソッド
+  void init_nvdec_decoder();
+  bool decode_nvdec(const EncodedVideoChunk& chunk);
+  void flush_nvdec();
+  void cleanup_nvdec_decoder();
+
+  // NVDEC コールバック用のメンバー関数
+  static int handle_video_sequence(void* user_data, void* video_format);
+  static int handle_decode_picture(void* user_data, void* pic_params);
+  static int handle_display_picture(void* user_data, void* disp_info);
+#endif
 };
