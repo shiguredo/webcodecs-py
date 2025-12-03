@@ -477,6 +477,7 @@ encoder.configure(config)
 | `optimize_for_latency` | x | o | - | **未実装** |
 | `rotation` | x | o | - | **未実装** |
 | `flip` | x | o | - | **未実装** |
+| **`hardware_acceleration_engine`** | x | x | - | **独自拡張**: HardwareAccelerationEngine ENUM（実装予定） |
 
 #### VideoEncoderConfig
 
