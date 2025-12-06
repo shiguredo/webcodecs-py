@@ -161,6 +161,21 @@ void VideoDecoder::flush() {
     return;
   }
 
+  // NVIDIA Video Codec SDK の場合
+#if defined(NVIDIA_VIDEO_CODEC)
+  if (uses_nvidia_video_codec()) {
+    // 全てのペンディングタスクが完了するまで待機
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      queue_cv_.wait(lock, [this]() {
+        return decode_queue_.empty() && pending_tasks_ == 0;
+      });
+    }
+    flush_nvdec();
+    return;
+  }
+#endif
+
   // VideoToolbox は直接処理されるため、ワーカーキューの待機をスキップ
 #if defined(__APPLE__)
   VideoCodec codec = string_to_codec(config_.codec);
@@ -247,6 +262,18 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
   bool supported = false;
   try {
     VideoCodec codec = string_to_codec(config.codec);
+
+    // NVIDIA Video Codec SDK でサポートされているかチェック
+#if defined(NVIDIA_VIDEO_CODEC)
+    if (config.hardware_acceleration == "nvidia_video_codec") {
+      // NVDEC は AV1, AVC, HEVC をサポート
+      if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
+          codec == VideoCodec::H265) {
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
     switch (codec) {
       case VideoCodec::AV1:
         supported = true;
@@ -255,6 +282,9 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
       case VideoCodec::H265:
 #if defined(__APPLE__)
         supported = true;  // macOS で VideoToolbox をサポート
+#elif defined(NVIDIA_VIDEO_CODEC)
+        // NVIDIA Video Codec SDK が有効な場合は nvidia_video_codec を使用
+        supported = config.hardware_acceleration == "nvidia_video_codec";
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -271,6 +301,14 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 }
 
 void VideoDecoder::init_decoder() {
+  // NVIDIA Video Codec SDK を使用する場合
+#if defined(NVIDIA_VIDEO_CODEC)
+  if (uses_nvidia_video_codec()) {
+    init_nvdec_decoder();
+    return;
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
@@ -296,6 +334,14 @@ void VideoDecoder::cleanup_decoder() {
     stop_worker();
   }
 
+  // NVIDIA Video Codec SDK のクリーンアップ
+#if defined(NVIDIA_VIDEO_CODEC)
+  if (nvdec_decoder_) {
+    cleanup_nvdec_decoder();
+    return;
+  }
+#endif
+
   if (!decoder_context_) {
     return;
   }
@@ -319,6 +365,13 @@ void VideoDecoder::cleanup_decoder() {
 }
 
 bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
+  // NVIDIA Video Codec SDK を使用する場合
+#if defined(NVIDIA_VIDEO_CODEC)
+  if (uses_nvidia_video_codec()) {
+    return decode_nvdec(chunk);
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
@@ -347,6 +400,19 @@ void VideoDecoder::flush_dav1d() {
 // 分割されたファイルをインクルード
 #include "video_decoder_apple_video_toolbox.cpp"
 #include "video_decoder_dav1d.cpp"
+#include "video_decoder_nvidia.cpp"
+
+bool VideoDecoder::uses_nvidia_video_codec() const {
+#if defined(NVIDIA_VIDEO_CODEC)
+  // NVIDIA Video Codec SDK が有効な場合、H.264/H.265/AV1 をサポート
+  VideoCodec codec = string_to_codec(config_.codec);
+  return (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::AV1) &&
+         config_.hardware_acceleration == "nvidia_video_codec";
+#else
+  return false;
+#endif
+}
 
 // ワーカースレッドの開始
 void VideoDecoder::start_worker() {
