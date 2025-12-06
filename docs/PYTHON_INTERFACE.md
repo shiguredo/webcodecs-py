@@ -459,8 +459,59 @@ encoder.configure(config)
 | `color_space` | o | o | o | VideoColorSpace または dict |
 | `rotation` | o | * | o | 0, 90, 180, 270 のみ対応（WebCodecs は任意の double 値） |
 | `flip` | o | o | o | |
-| `metadata` | o | o | o | dict |
+| `metadata` | o | o | o | VideoFrameMetadata または dict |
 | `transfer` | x | o | - | **未実装** |
+
+#### VideoFrameMetadata
+
+WebCodecs VideoFrame Metadata Registry に準拠したメタデータフィールドの型定義です。
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `capture_time` | o | o | o | DOMHighResTimeStamp (マイクロ秒) |
+| `receive_time` | o | o | o | DOMHighResTimeStamp (マイクロ秒) |
+| `rtp_timestamp` | o | o | o | RTP タイムスタンプ（整数） |
+| `segments` | o | o | - | 顔セグメンテーション（型: Any） |
+| `background_blur` | o | o | - | 背景ぼかし効果ステータス（型: Any） |
+| `background_segmentation_mask` | o | o | - | 背景セグメンテーションマスク（型: Any） |
+
+**注意**:
+
+- すべてのフィールドはオプション (`total=False`)
+- TypedDict は型ヒント用であり、実行時の検証は行われない
+- 型が不明確なフィールド (segments, background_blur, background_segmentation_mask) は `Any` として定義
+- MediaCapture Extensions 仕様で定義されているフィールド
+- 参照: [WebCodecs VideoFrame Metadata Registry](https://w3c.github.io/webcodecs/video_frame_metadata_registry.html)
+
+**使用例**:
+
+```python
+from webcodecs import VideoFrame, VideoFrameBufferInit, VideoFrameMetadata, VideoPixelFormat
+import numpy as np
+
+# TypedDict を使用（IDE の補完・型チェックが効く）
+metadata: VideoFrameMetadata = {
+    "capture_time": 1234567890.0,
+    "receive_time": 1234567891.0,
+    "rtp_timestamp": 12345,
+}
+
+data = np.zeros(640 * 480 * 3 // 2, dtype=np.uint8)
+
+init: VideoFrameBufferInit = {
+    "format": VideoPixelFormat.I420,
+    "coded_width": 640,
+    "coded_height": 480,
+    "timestamp": 0,
+    "metadata": metadata,
+}
+
+frame = VideoFrame(data, init)
+
+# metadata の取得
+result = frame.metadata()
+print(result["capture_time"])  # 1234567890.0
+```
 
 #### VideoDecoderConfig
 
@@ -585,14 +636,19 @@ encoder.configure(config)
 | `duration` | o | o | o | |
 | `timestamp` | o | o | o | |
 | `color_space` | o | o | o | VideoColorSpace を返す |
-| `metadata()` | o | o | o | dict を返す |
+| `metadata()` | o | o | o | VideoFrameMetadata 型の dict を返す |
 | `allocation_size(options)` | o | o | o | copy_to() に必要なバッファサイズを返す |
 | `copy_to(destination, options)` | o | * | o | destination に書き込み、PlaneLayout のリストを返す（format 指定で変換も可能、colorSpace オプションは未実装） |
-| `clone()` | o | o | o | |
+| `clone()` | o | o | o | すべてのプロパティ（metadata 含む）をコピー |
 | `close()` | o | o | o | |
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
 | **`planes()`** | o | x | o | **独自拡張**: 全プレーン (Y, U, V) をタプルで返す（I420/I422/I444 のみ） |
 | **`plane()`** | o | x | o | **独自拡張**: 指定したプレーンを返す（全フォーマット対応） |
+
+**clone() の動作**:
+
+- すべてのプロパティ（timestamp, duration, format, color_space, metadata 等）がコピーされる
+- データは新しいメモリ領域にコピーされる（deep copy）
 
 #### EncodedVideoChunk
 

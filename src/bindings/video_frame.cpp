@@ -592,6 +592,9 @@ std::unique_ptr<VideoFrame> VideoFrame::convert_format(
     throw std::runtime_error("Unsupported conversion");
   }
 
+  // metadata をコピー
+  result->metadata_ = metadata_;
+
   return result;
 }
 
@@ -603,6 +606,16 @@ std::unique_ptr<VideoFrame> VideoFrame::clone() const {
   auto cloned =
       std::make_unique<VideoFrame>(width_, height_, format_, timestamp_);
   cloned->set_duration(duration_);
+  cloned->coded_width_ = coded_width_;
+  cloned->coded_height_ = coded_height_;
+  cloned->visible_rect_ = visible_rect_;
+  cloned->display_width_ = display_width_;
+  cloned->display_height_ = display_height_;
+  cloned->color_space_ = color_space_;
+  cloned->layout_ = layout_;
+  cloned->rotation_ = rotation_;
+  cloned->flip_ = flip_;
+  cloned->metadata_ = metadata_;
   std::memcpy(cloned->mutable_data(), data_.data(), data_.size());
   return cloned;
 }
