@@ -79,8 +79,8 @@ void VideoDecoder::configure(nb::dict config_dict) {
                              reinterpret_cast<const uint8_t*>(ptr) + size);
   }
   if (config_dict.contains("hardware_acceleration_engine")) {
-    config.hardware_acceleration_engine =
-        nb::cast<HardwareAccelerationEngine>(config_dict["hardware_acceleration_engine"]);
+    config.hardware_acceleration_engine = nb::cast<HardwareAccelerationEngine>(
+        config_dict["hardware_acceleration_engine"]);
   }
 
   // 既存のデコーダーをクリーンアップ
@@ -275,7 +275,8 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
 #if defined(NVIDIA_CUDA_TOOLKIT)
-    if (config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVDEC でサポートされているコーデック: AV1, AVC, HEVC, VP8, VP9
       if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
           codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
@@ -295,7 +296,8 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
         supported = true;  // macOS で VideoToolbox をサポート
 #elif defined(NVIDIA_CUDA_TOOLKIT)
         // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-        supported = config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+        supported = config.hardware_acceleration_engine ==
+                    HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -304,7 +306,8 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
       case VideoCodec::VP9:
 #if defined(NVIDIA_CUDA_TOOLKIT)
         // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-        if (config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+        if (config.hardware_acceleration_engine ==
+            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
           supported = true;
         } else {
 #if defined(__APPLE__) || defined(__linux__)
@@ -473,7 +476,8 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
   return (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
           codec == VideoCodec::AV1 || codec == VideoCodec::VP8 ||
           codec == VideoCodec::VP9) &&
-         config_.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
   return false;
 #endif
@@ -636,7 +640,8 @@ void init_video_decoder(nb::module_& m) {
             }
             if (config_dict.contains("hardware_acceleration_engine"))
               config.hardware_acceleration_engine =
-                  nb::cast<HardwareAccelerationEngine>(config_dict["hardware_acceleration_engine"]);
+                  nb::cast<HardwareAccelerationEngine>(
+                      config_dict["hardware_acceleration_engine"]);
             if (config_dict.contains("optimize_for_latency"))
               config.optimize_for_latency =
                   nb::cast<bool>(config_dict["optimize_for_latency"]);

@@ -395,7 +395,8 @@ void init_webcodecs_types(nb::module_& m) {
                if (self.config.display_aspect_height.has_value())
                  d["display_aspect_height"] =
                      self.config.display_aspect_height.value();
-               d["hardware_acceleration_engine"] = self.config.hardware_acceleration_engine;
+               d["hardware_acceleration_engine"] =
+                   self.config.hardware_acceleration_engine;
                if (self.config.optimize_for_latency.has_value())
                  d["optimize_for_latency"] =
                      self.config.optimize_for_latency.value();

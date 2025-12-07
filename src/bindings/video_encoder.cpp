@@ -64,8 +64,8 @@ void VideoEncoder::configure(nb::dict config_dict) {
   if (config_dict.contains("alpha"))
     config.alpha = nb::cast<AlphaOption>(config_dict["alpha"]);
   if (config_dict.contains("hardware_acceleration_engine"))
-    config.hardware_acceleration_engine =
-        nb::cast<HardwareAccelerationEngine>(config_dict["hardware_acceleration_engine"]);
+    config.hardware_acceleration_engine = nb::cast<HardwareAccelerationEngine>(
+        config_dict["hardware_acceleration_engine"]);
 
   // AVC 固有のオプション
   if (config_dict.contains("avc")) {
@@ -94,7 +94,6 @@ void VideoEncoder::configure(nb::dict config_dict) {
     config_.framerate = 30.0;  // デフォルト値
   }
 
-
   // コーデック文字列をパースして、パラメータを抽出
   try {
     codec_params_ = parse_codec_string(config_.codec);
@@ -115,7 +114,8 @@ void VideoEncoder::configure(nb::dict config_dict) {
     init_aom_encoder();
   } else if (is_avc_codec() || is_hevc_codec()) {
 #if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine == HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+    if (config_.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
       init_videotoolbox_encoder();
     } else {
       throw std::runtime_error(
@@ -172,7 +172,8 @@ bool VideoEncoder::is_vp9_codec() const {
 bool VideoEncoder::uses_videotoolbox() const {
 #if defined(__APPLE__)
   return (is_avc_codec() || is_hevc_codec()) &&
-         config_.hardware_acceleration_engine == HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
 #else
   return false;
 #endif
@@ -181,7 +182,8 @@ bool VideoEncoder::uses_videotoolbox() const {
 bool VideoEncoder::uses_nvidia_video_codec() const {
 #if defined(NVIDIA_CUDA_TOOLKIT)
   return (is_avc_codec() || is_hevc_codec() || is_av1_codec()) &&
-         config_.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
   return false;
 #endif
@@ -456,7 +458,8 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
 #if defined(NVIDIA_CUDA_TOOLKIT)
-    if (config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVENC は AV1, AVC, HEVC をサポート
       if (std::holds_alternative<AV1CodecParameters>(codec_params) ||
           std::holds_alternative<AVCCodecParameters>(codec_params) ||
@@ -474,7 +477,8 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
       supported = true;  // macOS で VideoToolbox をサポート
 #elif defined(NVIDIA_CUDA_TOOLKIT)
       // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-      supported = config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+      supported = config.hardware_acceleration_engine ==
+                  HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -612,7 +616,8 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     encode_frame_aom(*task.frame, task.keyframe, task.av1_quantizer);
   } else if (is_avc_codec() || is_hevc_codec()) {
 #if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine != HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+    if (config_.hardware_acceleration_engine !=
+        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
       throw std::runtime_error(
           "AVC/HEVC requires "
           "hardware_acceleration_engine=\"apple_video_toolbox\" on macOS");
@@ -825,8 +830,9 @@ void init_video_encoder(nb::module_& m) {
               config.content_hint =
                   nb::cast<std::string>(config_dict["content_hint"]);
             if (config_dict.contains("hardware_acceleration_engine"))
-              config.hardware_acceleration_engine = nb::cast<HardwareAccelerationEngine>(
-                  config_dict["hardware_acceleration_engine"]);
+              config.hardware_acceleration_engine =
+                  nb::cast<HardwareAccelerationEngine>(
+                      config_dict["hardware_acceleration_engine"]);
 
             return VideoEncoder::is_config_supported(config);
           },

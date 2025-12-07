@@ -94,8 +94,10 @@ void init_video_codec_capabilities(nb::module_& m) {
   // HardwareAccelerationEngine enum
   nb::enum_<HardwareAccelerationEngine>(m, "HardwareAccelerationEngine")
       .value("NONE", HardwareAccelerationEngine::NONE)
-      .value("APPLE_VIDEO_TOOLBOX", HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX)
-      .value("NVIDIA_VIDEO_CODEC", HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC)
+      .value("APPLE_VIDEO_TOOLBOX",
+             HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX)
+      .value("NVIDIA_VIDEO_CODEC",
+             HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC)
       .value("INTEL_VPL", HardwareAccelerationEngine::INTEL_VPL)
       .value("AMD_AMF", HardwareAccelerationEngine::AMD_AMF);
 
