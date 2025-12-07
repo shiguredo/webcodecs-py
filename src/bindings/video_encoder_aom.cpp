@@ -121,7 +121,7 @@ void VideoEncoder::init_aom_encoder() {
     aom_config_.g_input_bit_depth = 8;
   }
   // WebCodecs API に準拠: キーフレームはアプリケーション側で明示的に制御
-  // encode(frame, {keyFrame: true}) でのみキーフレームを挿入
+  // encode(frame, {key_frame: true}) でのみキーフレームを挿入
   // kf_max_dist を非常に大きな値に設定して、自動キーフレーム挿入を事実上無効化
   // 注意: kf_max_dist = 0 にすると全フレームがキーフレームになるため避ける
   aom_config_.kf_mode = AOM_KF_AUTO;
