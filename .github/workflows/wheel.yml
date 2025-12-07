@@ -62,12 +62,16 @@ jobs:
         platform:
           - name: ubuntu-24.04_x86_64
             runs_on: ubuntu-24.04
+            arch: x86_64
           - name: ubuntu-24.04_arm64
             runs_on: ubuntu-24.04-arm
+            arch: arm64
           - name: ubuntu-22.04_x86_64
             runs_on: ubuntu-22.04
+            arch: x86_64
           - name: ubuntu-22.04_arm64
             runs_on: ubuntu-22.04-arm
+            arch: arm64
         python_version:
           - "3.14"
           - "3.13"
@@ -89,6 +93,14 @@ jobs:
           key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
+
+      # NVIDIA Video Codec SDK のビルドに必要な CUDA Toolkit をセットアップ
+      # x86_64 のみ (ARM64 では NVIDIA Video Codec SDK は使用不可)
+      - uses: shiguredo/github-actions/.github/actions/setup-cuda-toolkit@main
+        if: matrix.platform.arch == 'x86_64'
+        with:
+          cuda_version: "13.0.2"
+          platform: ${{ matrix.platform.runs_on }}
 
       - name: Install build dependencies
         run: |
