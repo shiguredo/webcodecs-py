@@ -17,7 +17,7 @@
 #include <aom/aom_codec.h>
 #include <aom/aom_encoder.h>
 #include <aom/aomcx.h>
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
 #include <vpx/vp8cx.h>
 #include <vpx/vpx_codec.h>
 #include <vpx/vpx_encoder.h>
@@ -177,8 +177,10 @@ class VideoEncoder {
   // codec_params_ から ProfileLevel を取得するヘルパーメソッド
   CFStringRef get_h264_profile_level();
   CFStringRef get_hevc_profile_level();
+#endif
 
-  // libvpx エンコーダー (macOS のみ)
+#if defined(__APPLE__) || defined(__linux__)
+  // libvpx エンコーダー
   void init_vpx_encoder();
   void cleanup_vpx_encoder();
   void encode_frame_vpx(const VideoFrame& frame,

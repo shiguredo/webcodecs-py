@@ -310,8 +310,8 @@ else()
     )
 endif()
 
-# ========== libvpx (macOS のみ) ==========
-if(APPLE)
+# ========== libvpx (macOS / Linux) ==========
+if(APPLE OR UNIX)
     # VPX の設定を解析
     string(JSON VPX_VERSION GET ${DEPS_JSON} libvpx version)
     string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx repository)
@@ -324,12 +324,21 @@ if(APPLE)
 
     set(VPX_LIB ${VPX_INSTALL_DIR}/lib/libvpx.a)
 
-    # アーキテクチャに応じたターゲットを設定
-    # darwin24 = macOS 15 を使用（最も互換性が高い）
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-        set(VPX_TARGET "arm64-darwin24-gcc")
+    # アーキテクチャとプラットフォームに応じたターゲットを設定
+    if(APPLE)
+        # darwin24 = macOS 15 を使用
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            set(VPX_TARGET "arm64-darwin24-gcc")
+        else()
+            set(VPX_TARGET "x86_64-darwin24-gcc")
+        endif()
     else()
-        set(VPX_TARGET "x86_64-darwin24-gcc")
+        # Linux
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            set(VPX_TARGET "arm64-linux-gcc")
+        else()
+            set(VPX_TARGET "x86_64-linux-gcc")
+        endif()
     endif()
 
     if(EXISTS ${VPX_LIB})
@@ -397,7 +406,7 @@ nanobind_add_module(
 
 # ビルド順序を保証するため依存関係を追加
 add_dependencies(_webcodecs_py opus_build flac_build libaom_build libyuv_build dav1d_build)
-if(APPLE)
+if(APPLE OR UNIX)
     add_dependencies(_webcodecs_py libvpx_build)
 endif()
 
@@ -410,7 +419,7 @@ target_include_directories(_webcodecs_py PRIVATE
     ${DAV1D_INSTALL_DIR}/include
     ${YUV_INSTALL_DIR}/include
 )
-if(APPLE)
+if(APPLE OR UNIX)
     target_include_directories(_webcodecs_py PRIVATE
         ${VPX_INSTALL_DIR}/include
     )
@@ -439,10 +448,16 @@ else()
     )
 endif()
 
-# macOS フレームワークと libvpx
-if(APPLE)
+# libvpx (macOS / Linux)
+if(APPLE OR UNIX)
     target_link_libraries(_webcodecs_py PRIVATE
         ${VPX_LIB}
+    )
+endif()
+
+# macOS フレームワーク
+if(APPLE)
+    target_link_libraries(_webcodecs_py PRIVATE
         "-framework CoreFoundation"
         "-framework CoreVideo"
         "-framework VideoToolbox"

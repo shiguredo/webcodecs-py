@@ -18,10 +18,10 @@ from webcodecs import (
 )
 
 
-# macOS のみ VP8/VP9 をサポート
+# macOS / Linux のみ VP8/VP9 をサポート
 pytestmark = pytest.mark.skipif(
-    platform.system() != "Darwin",
-    reason="VP8/VP9 は macOS のみサポート",
+    platform.system() not in ("Darwin", "Linux"),
+    reason="VP8/VP9 は macOS / Linux のみサポート",
 )
 
 

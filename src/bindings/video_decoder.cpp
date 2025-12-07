@@ -267,8 +267,8 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
         break;
       case VideoCodec::VP8:
       case VideoCodec::VP9:
-#if defined(__APPLE__)
-        supported = true;  // macOS で libvpx をサポート
+#if defined(__APPLE__) || defined(__linux__)
+        supported = true;  // macOS / Linux で libvpx をサポート
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -300,7 +300,7 @@ void VideoDecoder::init_decoder() {
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
       init_vpx_decoder();
 #else
       throw std::runtime_error("VP8/VP9 not supported on this platform");
@@ -319,7 +319,7 @@ void VideoDecoder::cleanup_decoder() {
   }
 
   if (!decoder_context_) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
     // VPX デコーダーは decoder_context_ を使わないのでここでクリーンアップ
     cleanup_vpx_decoder();
 #endif
@@ -339,7 +339,7 @@ void VideoDecoder::cleanup_decoder() {
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
       cleanup_vpx_decoder();
 #endif
       break;
@@ -368,7 +368,7 @@ bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
 #endif
     case VideoCodec::VP8:
     case VideoCodec::VP9:
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
       return decode_vpx(chunk);
 #else
       if (error_callback_) {
@@ -390,7 +390,7 @@ void VideoDecoder::flush_dav1d() {
 // 分割されたファイルをインクルード
 #include "video_decoder_apple_video_toolbox.cpp"
 #include "video_decoder_dav1d.cpp"
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
 #include "video_decoder_vpx.cpp"
 #endif
 

@@ -123,7 +123,7 @@ void VideoEncoder::configure(nb::dict config_dict) {
     throw std::runtime_error("AVC/HEVC not supported on this platform");
 #endif
   } else if (is_vp8_codec() || is_vp9_codec()) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
     init_vpx_encoder();
 #else
     throw std::runtime_error("VP8/VP9 not supported on this platform");
@@ -178,7 +178,7 @@ bool VideoEncoder::uses_videotoolbox() const {
 // 分割されたファイルをインクルード
 #include "video_encoder_aom.cpp"
 #include "video_encoder_apple_video_toolbox.cpp"
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
 #include "video_encoder_vpx.cpp"
 #endif
 
@@ -418,7 +418,9 @@ void VideoEncoder::close() {
     CFRelease(s);
     vt_session_ = nullptr;
   }
+#endif
 
+#if defined(__APPLE__) || defined(__linux__)
   // VPX エンコーダーが存在する場合はクリーンアップ
   cleanup_vpx_encoder();
 #endif
@@ -445,8 +447,8 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 #endif
     } else if (std::holds_alternative<VP8CodecParameters>(codec_params) ||
                std::holds_alternative<VP9CodecParameters>(codec_params)) {
-#if defined(__APPLE__)
-      supported = true;  // macOS で libvpx をサポート
+#if defined(__APPLE__) || defined(__linux__)
+      supported = true;  // macOS / Linux で libvpx をサポート
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -551,7 +553,7 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     init_videotoolbox_encoder();
   }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
   if ((is_vp8_codec() || is_vp9_codec()) && !vpx_encoder_) {
     init_vpx_encoder();
   }
@@ -574,13 +576,13 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     throw std::runtime_error("AVC/HEVC not supported on this platform");
 #endif
   } else if (is_vp8_codec()) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
     encode_frame_vpx(*task.frame, task.keyframe, task.vp8_quantizer);
 #else
     throw std::runtime_error("VP8 not supported on this platform");
 #endif
   } else if (is_vp9_codec()) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
     encode_frame_vpx(*task.frame, task.keyframe, task.vp9_quantizer);
 #else
     throw std::runtime_error("VP9 not supported on this platform");
