@@ -276,8 +276,7 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
     // NVIDIA Video Codec SDK でサポートされているかチェック
 #if defined(NVIDIA_CUDA_TOOLKIT)
     if (config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
-      // NVDEC はエンコード/デコード: AV1, AVC, HEVC
-      // デコードのみ: VP8, VP9
+      // NVDEC でサポートされているコーデック: AV1, AVC, HEVC, VP8, VP9
       if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
           codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
           codec == VideoCodec::VP9) {
