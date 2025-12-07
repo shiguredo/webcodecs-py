@@ -16,6 +16,12 @@ VideoCodec VideoDecoder::string_to_codec(const std::string& codec) {
   if (codec.length() >= 5 &&
       (codec.substr(0, 5) == "hvc1." || codec.substr(0, 5) == "hev1."))
     return VideoCodec::H265;
+  // VP8
+  if (codec == "vp8")
+    return VideoCodec::VP8;
+  // VP9 (vp09.PP.LL.DD)
+  if (codec.length() >= 5 && codec.substr(0, 5) == "vp09.")
+    return VideoCodec::VP9;
   throw std::runtime_error("Unknown codec: " + codec);
 }
 
@@ -259,6 +265,14 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
         break;
+      case VideoCodec::VP8:
+      case VideoCodec::VP9:
+#if defined(__APPLE__)
+        supported = true;  // macOS で libvpx をサポート
+#else
+        supported = false;  // 他のプラットフォームではまだサポートされていない
+#endif
+        break;
       default:
         supported = false;
         break;
@@ -284,6 +298,14 @@ void VideoDecoder::init_decoder() {
       throw std::runtime_error("H.264/H.265 not supported on this platform");
 #endif
       break;
+    case VideoCodec::VP8:
+    case VideoCodec::VP9:
+#if defined(__APPLE__)
+      init_vpx_decoder();
+#else
+      throw std::runtime_error("VP8/VP9 not supported on this platform");
+#endif
+      break;
     default:
       throw std::runtime_error("Unsupported codec");
   }
@@ -297,6 +319,10 @@ void VideoDecoder::cleanup_decoder() {
   }
 
   if (!decoder_context_) {
+#if defined(__APPLE__)
+    // VPX デコーダーは decoder_context_ を使わないのでここでクリーンアップ
+    cleanup_vpx_decoder();
+#endif
     return;
   }
 
@@ -309,6 +335,12 @@ void VideoDecoder::cleanup_decoder() {
     case VideoCodec::H265:
 #if defined(__APPLE__)
       cleanup_videotoolbox_decoder();
+#endif
+      break;
+    case VideoCodec::VP8:
+    case VideoCodec::VP9:
+#if defined(__APPLE__)
+      cleanup_vpx_decoder();
 #endif
       break;
     default:
@@ -334,6 +366,17 @@ bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
       }
       return false;
 #endif
+    case VideoCodec::VP8:
+    case VideoCodec::VP9:
+#if defined(__APPLE__)
+      return decode_vpx(chunk);
+#else
+      if (error_callback_) {
+        nb::gil_scoped_acquire gil;
+        error_callback_("VP8/VP9 not supported on this platform");
+      }
+      return false;
+#endif
     default:
       return false;
   }
@@ -347,6 +390,9 @@ void VideoDecoder::flush_dav1d() {
 // 分割されたファイルをインクルード
 #include "video_decoder_apple_video_toolbox.cpp"
 #include "video_decoder_dav1d.cpp"
+#if defined(__APPLE__)
+#include "video_decoder_vpx.cpp"
+#endif
 
 // ワーカースレッドの開始
 void VideoDecoder::start_worker() {

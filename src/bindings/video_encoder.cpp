@@ -122,6 +122,12 @@ void VideoEncoder::configure(nb::dict config_dict) {
 #else
     throw std::runtime_error("AVC/HEVC not supported on this platform");
 #endif
+  } else if (is_vp8_codec() || is_vp9_codec()) {
+#if defined(__APPLE__)
+    init_vpx_encoder();
+#else
+    throw std::runtime_error("VP8/VP9 not supported on this platform");
+#endif
   }
 
   // ワーカースレッドの開始
@@ -152,6 +158,14 @@ bool VideoEncoder::is_hevc_codec() const {
           config_.codec.substr(0, 5) == "hev1.");
 }
 
+bool VideoEncoder::is_vp8_codec() const {
+  return config_.codec == "vp8";
+}
+
+bool VideoEncoder::is_vp9_codec() const {
+  return config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "vp09.";
+}
+
 bool VideoEncoder::uses_videotoolbox() const {
 #if defined(__APPLE__)
   return (is_avc_codec() || is_hevc_codec()) &&
@@ -164,6 +178,9 @@ bool VideoEncoder::uses_videotoolbox() const {
 // 分割されたファイルをインクルード
 #include "video_encoder_aom.cpp"
 #include "video_encoder_apple_video_toolbox.cpp"
+#if defined(__APPLE__)
+#include "video_encoder_vpx.cpp"
+#endif
 
 void VideoEncoder::encode(const VideoFrame& frame, bool keyframe) {
   EncodeOptions options;
@@ -227,6 +244,24 @@ void VideoEncoder::encode(const VideoFrame& frame,
       throw nb::value_error("quantizer must be in range 0-63");
     }
     task.av1_quantizer = q;
+  }
+
+  // VP8 オプションを設定
+  if (options.vp8.has_value() && options.vp8->quantizer.has_value()) {
+    uint16_t q = options.vp8->quantizer.value();
+    if (q > 63) {
+      throw nb::value_error("VP8 quantizer must be in range 0-63");
+    }
+    task.vp8_quantizer = q;
+  }
+
+  // VP9 オプションを設定
+  if (options.vp9.has_value() && options.vp9->quantizer.has_value()) {
+    uint16_t q = options.vp9->quantizer.value();
+    if (q > 63) {
+      throw nb::value_error("VP9 quantizer must be in range 0-63");
+    }
+    task.vp9_quantizer = q;
   }
 
   // タスクをキューに追加
@@ -383,6 +418,9 @@ void VideoEncoder::close() {
     CFRelease(s);
     vt_session_ = nullptr;
   }
+
+  // VPX エンコーダーが存在する場合はクリーンアップ
+  cleanup_vpx_encoder();
 #endif
 
   state_ = CodecState::CLOSED;
@@ -402,6 +440,13 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
                std::holds_alternative<HEVCCodecParameters>(codec_params)) {
 #if defined(__APPLE__)
       supported = true;  // macOS で VideoToolbox をサポート
+#else
+      supported = false;  // 他のプラットフォームではまだサポートされていない
+#endif
+    } else if (std::holds_alternative<VP8CodecParameters>(codec_params) ||
+               std::holds_alternative<VP9CodecParameters>(codec_params)) {
+#if defined(__APPLE__)
+      supported = true;  // macOS で libvpx をサポート
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -506,6 +551,12 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     init_videotoolbox_encoder();
   }
 
+#if defined(__APPLE__)
+  if ((is_vp8_codec() || is_vp9_codec()) && !vpx_encoder_) {
+    init_vpx_encoder();
+  }
+#endif
+
   // バインディング層で既に GIL を解放しているため、ここでは解放しない
   // nb::gil_scoped_release gil_release;
 
@@ -521,6 +572,18 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     encode_frame_videotoolbox(*task.frame, task.keyframe);
 #else
     throw std::runtime_error("AVC/HEVC not supported on this platform");
+#endif
+  } else if (is_vp8_codec()) {
+#if defined(__APPLE__)
+    encode_frame_vpx(*task.frame, task.keyframe, task.vp8_quantizer);
+#else
+    throw std::runtime_error("VP8 not supported on this platform");
+#endif
+  } else if (is_vp9_codec()) {
+#if defined(__APPLE__)
+    encode_frame_vpx(*task.frame, task.keyframe, task.vp9_quantizer);
+#else
+    throw std::runtime_error("VP9 not supported on this platform");
 #endif
   }
 }

@@ -310,6 +310,64 @@ else()
     )
 endif()
 
+# ========== libvpx (macOS のみ) ==========
+if(APPLE)
+    # VPX の設定を解析
+    string(JSON VPX_VERSION GET ${DEPS_JSON} libvpx version)
+    string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx repository)
+    set(VPX_GIT_TAG "v${VPX_VERSION}")
+
+    message(STATUS "Setting up libvpx...")
+    set(VPX_SOURCE_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/source")
+    set(VPX_BUILD_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/build")
+    set(VPX_INSTALL_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/install")
+
+    set(VPX_LIB ${VPX_INSTALL_DIR}/lib/libvpx.a)
+
+    # アーキテクチャに応じたターゲットを設定
+    # darwin24 = macOS 15 を使用（最も互換性が高い）
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(VPX_TARGET "arm64-darwin24-gcc")
+    else()
+        set(VPX_TARGET "x86_64-darwin24-gcc")
+    endif()
+
+    if(EXISTS ${VPX_LIB})
+        message(STATUS "libvpx already built: ${VPX_LIB}")
+        add_custom_target(libvpx_build)
+    else()
+        message(STATUS "Building libvpx...")
+        ExternalProject_Add(
+            libvpx_build
+            GIT_REPOSITORY ${VPX_GIT_REPOSITORY}
+            GIT_TAG ${VPX_GIT_TAG}
+            GIT_SHALLOW TRUE
+            SOURCE_DIR ${VPX_SOURCE_DIR}
+            BINARY_DIR ${VPX_BUILD_DIR}
+            STAMP_DIR ${VPX_BUILD_DIR}/stamp
+            TMP_DIR ${VPX_BUILD_DIR}/tmp
+            UPDATE_COMMAND ""
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            CONFIGURE_COMMAND ${VPX_SOURCE_DIR}/configure
+                --prefix=${VPX_INSTALL_DIR}
+                --target=${VPX_TARGET}
+                --enable-pic
+                --enable-vp8
+                --enable-vp9
+                --enable-vp9-highbitdepth
+                --enable-static
+                --disable-shared
+                --disable-examples
+                --disable-tools
+                --disable-docs
+                --disable-unit-tests
+            BUILD_COMMAND make -j ${PARALLEL_JOBS}
+            INSTALL_COMMAND make install
+            BUILD_BYPRODUCTS ${VPX_LIB}
+        )
+    endif()
+endif()
+
 # メインモジュールを作成
 # 注意: video_encoder_*.cpp と video_decoder_*.cpp ファイルは
 # video_encoder.cpp と video_decoder.cpp に #include されるため、
@@ -339,6 +397,9 @@ nanobind_add_module(
 
 # ビルド順序を保証するため依存関係を追加
 add_dependencies(_webcodecs_py opus_build flac_build libaom_build libyuv_build dav1d_build)
+if(APPLE)
+    add_dependencies(_webcodecs_py libvpx_build)
+endif()
 
 # インクルードディレクトリ
 target_include_directories(_webcodecs_py PRIVATE
@@ -349,6 +410,11 @@ target_include_directories(_webcodecs_py PRIVATE
     ${DAV1D_INSTALL_DIR}/include
     ${YUV_INSTALL_DIR}/include
 )
+if(APPLE)
+    target_include_directories(_webcodecs_py PRIVATE
+        ${VPX_INSTALL_DIR}/include
+    )
+endif()
 
 # ライブラリをリンク
 # Windows では絶対パスを明確に指定
@@ -373,9 +439,10 @@ else()
     )
 endif()
 
-# macOS フレームワーク
+# macOS フレームワークと libvpx
 if(APPLE)
     target_link_libraries(_webcodecs_py PRIVATE
+        ${VPX_LIB}
         "-framework CoreFoundation"
         "-framework CoreVideo"
         "-framework VideoToolbox"
