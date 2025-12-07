@@ -116,7 +116,7 @@ def test_vp8_encode_decode_roundtrip():
     }
     encoder.configure(enc_config)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
@@ -180,7 +180,7 @@ def test_vp8_encode_decode_multiple_frames():
 
     for i in range(num_frames):
         f = _make_test_frame(width, height, i)
-        encoder.encode(f, {"keyFrame": (i == 0)})
+        encoder.encode(f, {"key_frame": (i == 0)})
         f.close()
 
     encoder.flush()
@@ -236,7 +236,7 @@ def test_vp8_encode_with_quantizer():
     }
     encoder.configure(enc_config)
 
-    options: VideoEncoderEncodeOptions = {"keyFrame": True, "vp8": {"quantizer": 30}}
+    options: VideoEncoderEncodeOptions = {"key_frame": True, "vp8": {"quantizer": 30}}
     encoder.encode(frame, options)
     encoder.flush()
     frame.close()
@@ -325,7 +325,7 @@ def test_vp9_encode_decode_roundtrip():
     }
     encoder.configure(enc_config)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
@@ -389,7 +389,7 @@ def test_vp9_encode_decode_multiple_frames():
 
     for i in range(num_frames):
         f = _make_test_frame(width, height, i)
-        encoder.encode(f, {"keyFrame": (i == 0)})
+        encoder.encode(f, {"key_frame": (i == 0)})
         f.close()
 
     encoder.flush()
@@ -445,7 +445,7 @@ def test_vp9_encode_with_quantizer():
     }
     encoder.configure(enc_config)
 
-    options: VideoEncoderEncodeOptions = {"keyFrame": True, "vp9": {"quantizer": 30}}
+    options: VideoEncoderEncodeOptions = {"key_frame": True, "vp9": {"quantizer": 30}}
     encoder.encode(frame, options)
     encoder.flush()
     frame.close()
@@ -544,7 +544,7 @@ def test_vp9_quantizer_values():
         encoder.configure(config)
 
         frame = _make_test_frame(width, height, 0)
-        encoder.encode(frame, {"keyFrame": True, "vp9": {"quantizer": quantizer_value}})
+        encoder.encode(frame, {"key_frame": True, "vp9": {"quantizer": quantizer_value}})
         encoder.flush()
         frame.close()
         encoder.close()
@@ -586,7 +586,7 @@ def test_vp8_cbr_mode():
     }
     encoder.configure(enc_config)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
@@ -620,7 +620,7 @@ def test_vp9_cbr_mode():
     }
     encoder.configure(enc_config)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 

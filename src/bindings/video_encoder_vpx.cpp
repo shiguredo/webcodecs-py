@@ -83,7 +83,8 @@ void VideoEncoder::init_vpx_encoder() {
   vpx_config_.rc_resize_allowed = 0;
 
   // VP9 の場合、プロファイルとビット深度を設定
-  if (is_vp9_codec() && std::holds_alternative<VP9CodecParameters>(codec_params_)) {
+  if (is_vp9_codec() &&
+      std::holds_alternative<VP9CodecParameters>(codec_params_)) {
     const auto& vp9_params = std::get<VP9CodecParameters>(codec_params_);
     vpx_config_.g_profile = vp9_params.profile;
 

@@ -222,7 +222,7 @@ class MP4Writer:
         self.muxer.__enter__()
 
     def set_description(self, description: bytes):
-        """metadata.decoderConfig.description を設定する (avcC/hvcC)"""
+        """metadata.decoder_config.description を設定する (avcC/hvcC)"""
         self.description = description
 
     def write(self, chunk_data: bytes, is_keyframe: bool):
@@ -247,10 +247,10 @@ class MP4Writer:
                     seq_tier_0=0,  # Main tier
                 )
             elif self.codec == "h264":
-                # H.264: metadata.decoderConfig.description (avcC) を使用
+                # H.264: metadata.decoder_config.description (avcC) を使用
                 if self.description is None:
                     raise RuntimeError(
-                        "H.264: metadata.decoderConfig.description が設定されていません"
+                        "H.264: metadata.decoder_config.description が設定されていません"
                     )
                 (
                     profile_idc,
@@ -275,10 +275,10 @@ class MP4Writer:
                     bit_depth_chroma_minus8=bit_depth_chroma_minus8,
                 )
             elif self.codec == "h265":
-                # H.265: metadata.decoderConfig.description (hvcC) を使用
+                # H.265: metadata.decoder_config.description (hvcC) を使用
                 if self.description is None:
                     raise RuntimeError(
-                        "H.265: metadata.decoderConfig.description が設定されていません"
+                        "H.265: metadata.decoder_config.description が設定されていません"
                     )
                 profile_idc, level_idc, nalu_types, nalu_data = parse_hvcc(self.description)
                 self.sample_entry = Mp4SampleEntryHev1(
@@ -402,7 +402,7 @@ def main():
         nonlocal encoded_frame_count
         # metadata から description を取得 (キーフレーム時のみ提供される)
         if metadata is not None:
-            decoder_config = metadata.get("decoderConfig")
+            decoder_config = metadata.get("decoder_config")
             if decoder_config is not None:
                 description = decoder_config.get("description")
                 if description is not None:
@@ -540,7 +540,7 @@ def main():
             with VideoFrame(i420_buffer, i420_init) as i420_frame:
                 # エンコード（最初のフレームと 3 秒ごとにキーフレームを強制）
                 keyframe = frame_count == 0 or frame_count % (fps * 3) == 0
-                encoder.encode(i420_frame, {"keyFrame": keyframe})
+                encoder.encode(i420_frame, {"key_frame": keyframe})
 
             timestamp += frame_duration
 

@@ -182,7 +182,7 @@ def test_h264_encode_decode():
         }
         frame = VideoFrame(data, init)
         test_frames.append(frame)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
 
@@ -266,7 +266,7 @@ def test_h265_encode_decode():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, init)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -366,7 +366,7 @@ def test_h264_decoder_only():
         "timestamp": 0,
     }
     frame = VideoFrame(data, frame_init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
 
     assert test_chunk is not None, "テスト用チャンクが生成されませんでした"
@@ -439,7 +439,7 @@ def test_h265_decoder_with_hevc_codec_string():
         "timestamp": 0,
     }
     frame = VideoFrame(data, frame_init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
 
     assert test_chunk is not None
@@ -495,7 +495,7 @@ def test_nv12_frame_encode_decode():
         "timestamp": 0,
     }
     frame = VideoFrame(data, frame_init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
 
     assert len(encoded_chunks) > 0, "NV12 フレームのエンコードに失敗"
@@ -573,7 +573,7 @@ def test_keyframe_and_delta_frames():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, frame_init)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -678,7 +678,7 @@ def test_parallel_h264_decode():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, frame_init)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -760,7 +760,7 @@ def test_video_toolbox_basic_encode():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, init)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -808,7 +808,7 @@ def test_video_toolbox_keyframe_control():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, init)
-        encoder.encode(frame, {"keyFrame": i == 0 or i == 5})
+        encoder.encode(frame, {"key_frame": i == 0 or i == 5})
         frame.close()
 
     encoder.flush()
@@ -855,7 +855,7 @@ def test_video_toolbox_minimum_setup():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -900,7 +900,7 @@ def test_video_toolbox_h265_encode():
             "timestamp": i * 33333,
         }
         frame = VideoFrame(data, init)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -945,7 +945,7 @@ def test_video_toolbox_nv12_input():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -988,7 +988,7 @@ def test_video_toolbox_software_fallback():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
@@ -1086,7 +1086,7 @@ def test_1080p_with_correct_level():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1131,7 +1131,7 @@ def test_hevc_main10_profile():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1177,7 +1177,7 @@ def test_hevc_encoder_annexb_format():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1233,7 +1233,7 @@ def test_hevc_encoder_hevc_format():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1292,7 +1292,7 @@ def test_h264_encoder_annexb_format():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1349,7 +1349,7 @@ def test_h264_encoder_avc_format():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     frame.close()
 
     encoder.flush()
@@ -1410,9 +1410,9 @@ def test_h264_encoder_avc_quantizer():
     frame = VideoFrame(data, init)
 
     # avc.quantizer オプションを使用してエンコード（エラーなく受け入れられることを確認）
-    encoder.encode(frame, {"keyFrame": True, "avc": {"quantizer": 10}})
-    encoder.encode(frame, {"keyFrame": False, "avc": {"quantizer": 30}})
-    encoder.encode(frame, {"keyFrame": False, "avc": {"quantizer": 51}})
+    encoder.encode(frame, {"key_frame": True, "avc": {"quantizer": 10}})
+    encoder.encode(frame, {"key_frame": False, "avc": {"quantizer": 30}})
+    encoder.encode(frame, {"key_frame": False, "avc": {"quantizer": 51}})
     encoder.flush()
     encoder.close()
 
@@ -1456,7 +1456,7 @@ def test_h264_encoder_avc_quantizer_invalid_range():
 
     # quantizer=52 は範囲外 (0-51)
     with pytest.raises(ValueError, match="AVC quantizer must be in range 0-51"):
-        encoder.encode(frame, {"keyFrame": True, "avc": {"quantizer": 52}})
+        encoder.encode(frame, {"key_frame": True, "avc": {"quantizer": 52}})
 
     frame.close()
     encoder.close()
@@ -1499,9 +1499,9 @@ def test_h265_encoder_hevc_quantizer():
     frame = VideoFrame(data, init)
 
     # hevc.quantizer オプションを使用してエンコード（エラーなく受け入れられることを確認）
-    encoder.encode(frame, {"keyFrame": True, "hevc": {"quantizer": 10}})
-    encoder.encode(frame, {"keyFrame": False, "hevc": {"quantizer": 30}})
-    encoder.encode(frame, {"keyFrame": False, "hevc": {"quantizer": 51}})
+    encoder.encode(frame, {"key_frame": True, "hevc": {"quantizer": 10}})
+    encoder.encode(frame, {"key_frame": False, "hevc": {"quantizer": 30}})
+    encoder.encode(frame, {"key_frame": False, "hevc": {"quantizer": 51}})
     encoder.flush()
     encoder.close()
 
@@ -1545,7 +1545,7 @@ def test_h265_encoder_hevc_quantizer_invalid_range():
 
     # quantizer=52 は範囲外 (0-51)
     with pytest.raises(ValueError, match="HEVC quantizer must be in range 0-51"):
-        encoder.encode(frame, {"keyFrame": True, "hevc": {"quantizer": 52}})
+        encoder.encode(frame, {"key_frame": True, "hevc": {"quantizer": 52}})
 
     frame.close()
     encoder.close()
@@ -1597,7 +1597,7 @@ def test_h264_decode_multiple_delta_frames():
         frame = VideoFrame(data, init)
         test_frames.append(frame)
         # 最初のフレームのみキーフレーム
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
 
@@ -1697,7 +1697,7 @@ def test_h265_decode_multiple_delta_frames():
         frame = VideoFrame(data, init)
         test_frames.append(frame)
         # 最初のフレームのみキーフレーム
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
 

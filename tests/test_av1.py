@@ -145,7 +145,7 @@ def test_av1_encode_decode_roundtrip_small_frame():
     }
     encoder.configure(enc_config)
 
-    encoder.encode(frame, {"keyFrame": True})  # キーフレームを強制
+    encoder.encode(frame, {"key_frame": True})  # キーフレームを強制
     encoder.flush()
     frame.close()
 
@@ -209,7 +209,7 @@ def test_av1_encode_decode_multiple_frames():
 
     for i in range(num_frames):
         f = _make_test_frame(width, height, i)
-        encoder.encode(f, {"keyFrame": (i == 0)})
+        encoder.encode(f, {"key_frame": (i == 0)})
         f.close()
 
     encoder.flush()
@@ -286,7 +286,7 @@ def test_av1_encode_with_quantizer():
     encoder.configure(enc_config)
 
     # av1.quantizer オプションを指定してエンコード
-    options: VideoEncoderEncodeOptions = {"keyFrame": True, "av1": {"quantizer": 30}}
+    options: VideoEncoderEncodeOptions = {"key_frame": True, "av1": {"quantizer": 30}}
     encoder.encode(frame, options)
     encoder.flush()
     frame.close()
@@ -324,7 +324,7 @@ def test_av1_encode_quantizer_range():
         encoder.configure(config)
 
         frame = _make_test_frame(width, height, 0)
-        encoder.encode(frame, {"keyFrame": True, "av1": {"quantizer": quantizer_value}})
+        encoder.encode(frame, {"key_frame": True, "av1": {"quantizer": quantizer_value}})
         encoder.flush()
         frame.close()
         encoder.close()
@@ -366,7 +366,7 @@ def test_av1_encode_quantizer_invalid_range():
 
     # 範囲外の quantizer (64 以上) でエラー
     with pytest.raises(ValueError, match="quantizer must be in range 0-63"):
-        encoder.encode(frame, {"keyFrame": True, "av1": {"quantizer": 64}})
+        encoder.encode(frame, {"key_frame": True, "av1": {"quantizer": 64}})
 
     frame.close()
     encoder.close()
