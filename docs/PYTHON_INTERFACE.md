@@ -997,10 +997,9 @@ config_av1: VideoEncoderConfig = {
 
 **NVIDIA Video Codec SDK の要件**:
 
-- NVIDIA GPU（GTX 10 シリーズ以降）
-- CUDA Toolkit がインストールされていること
+- NVIDIA GPU
 - NVIDIA ドライバーがインストールされていること
-- Ubuntu のみ対応（macOS / Windows は非対応）
+- Ubuntu のみ対応
 - ビルド時に `CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON"` の指定が必要
 
 #### LatencyMode
