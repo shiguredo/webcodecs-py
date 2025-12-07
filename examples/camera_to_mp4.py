@@ -447,7 +447,7 @@ def main():
                 # エンコード（最初のフレームと 20 秒ごとにキーフレームを強制）
                 # WebCodecs API ではアプリケーション側で明示的にキーフレームを制御する
                 keyframe = frame_count == 0 or frame_count % (args.fps * 20) == 0
-                encoder.encode(video_frame, {"keyFrame": keyframe})
+                encoder.encode(video_frame, {"key_frame": keyframe})
 
             frame_count += 1
             timestamp += frame_duration

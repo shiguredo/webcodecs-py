@@ -189,7 +189,7 @@ Support 系 (is_config_supported() の戻り値):
 Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
-- `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoderConfig
+- `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
 
 ### 6. Promise の代替
 
@@ -685,7 +685,7 @@ print(result["capture_time"])  # 1234567890.0
 | `color_space` | o | o | o | VideoColorSpace を返す |
 | `metadata()` | o | o | o | VideoFrameMetadata 型の dict を返す |
 | `allocation_size(options)` | o | o | o | copy_to() に必要なバッファサイズを返す |
-| `copy_to(destination, options)` | o | * | o | destination に書き込み、PlaneLayout のリストを返す（format 指定で変換も可能、colorSpace オプションは未実装） |
+| `copy_to(destination, options)` | o | * | o | destination に書き込み、PlaneLayout のリストを返す（format 指定で変換も可能、color_space オプションは未実装） |
 | `clone()` | o | o | o | すべてのプロパティ（metadata 含む）をコピー |
 | `close()` | o | o | o | |
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
@@ -734,7 +734,7 @@ print(result["capture_time"])  # 1234567890.0
 | `encode_queue_size` | o | o | o | |
 | `on_dequeue` | o | o | o | EventHandler |
 | `configure(config)` | o | o | o | |
-| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (keyFrame, av1.quantizer, avc.quantizer, hevc.quantizer, vp8.quantizer, vp9.quantizer) |
+| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (key_frame, av1.quantizer, avc.quantizer, hevc.quantizer, vp8.quantizer, vp9.quantizer) |
 | `flush()` | o | o | o | |
 | `reset()` | o | o | o | |
 | `close()` | o | o | o | |
@@ -750,11 +750,11 @@ print(result["capture_time"])  # 1234567890.0
 def on_output(chunk, metadata=None):
     # metadata はキーフレーム時のみ提供される
     if metadata is not None:
-        decoder_config = metadata.get("decoderConfig")
+        decoder_config = metadata.get("decoder_config")
         if decoder_config is not None:
             # codec: str
-            # codedWidth: int (オプション)
-            # codedHeight: int (オプション)
+            # coded_width: int (オプション)
+            # coded_height: int (オプション)
             # description: bytes (H.264 では avcC、H.265 では hvcC)
             description = decoder_config.get("description")
 ```
@@ -1163,7 +1163,7 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 | `SvcOutputMetadata` | SVC サポート未実装 |
 | `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
 
-**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoderConfig` を含む)。
+**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
 
 ### 未実装の列挙型
 

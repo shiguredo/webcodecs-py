@@ -628,17 +628,17 @@ void VideoEncoder::handle_output(
         nb::dict decoder_config_dict;
         decoder_config_dict["codec"] = config.codec;
         if (config.coded_width.has_value()) {
-          decoder_config_dict["codedWidth"] = config.coded_width.value();
+          decoder_config_dict["coded_width"] = config.coded_width.value();
         }
         if (config.coded_height.has_value()) {
-          decoder_config_dict["codedHeight"] = config.coded_height.value();
+          decoder_config_dict["coded_height"] = config.coded_height.value();
         }
         if (config.description.has_value()) {
           const auto& desc = config.description.value();
           decoder_config_dict["description"] = nb::bytes(
               reinterpret_cast<const char*>(desc.data()), desc.size());
         }
-        metadata_dict["decoderConfig"] = decoder_config_dict;
+        metadata_dict["decoder_config"] = decoder_config_dict;
       }
 
       // callback を呼び出す
@@ -664,7 +664,7 @@ void init_video_encoder(nb::module_& m) {
       .def("configure", &VideoEncoder::configure, "config"_a,
            nb::sig("def configure(self, config: webcodecs.VideoEncoderConfig, "
                    "/) -> None"))
-      // WebCodecs 互換: encode(frame) または encode(frame, {"keyFrame": True})
+      // WebCodecs 互換: encode(frame) または encode(frame, {"key_frame": True})
       .def(
           "encode",
           [](VideoEncoder& self, const VideoFrame& frame) {
@@ -678,8 +678,8 @@ void init_video_encoder(nb::module_& m) {
             VideoEncoder::EncodeOptions encode_options;
 
             // dict アクセスには GIL が必要なので、ここでは解放しない
-            if (options.contains("keyFrame")) {
-              encode_options.keyframe = nb::cast<bool>(options["keyFrame"]);
+            if (options.contains("key_frame")) {
+              encode_options.keyframe = nb::cast<bool>(options["key_frame"]);
             }
 
             // AV1 オプションを解析

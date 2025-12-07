@@ -54,9 +54,8 @@ bool VideoDecoder::decode_vpx(const EncodedVideoChunk& chunk) {
 
   auto pkt = chunk.data_vector();
 
-  vpx_codec_err_t res = vpx_codec_decode(ctx, pkt.data(),
-                                         static_cast<unsigned int>(pkt.size()),
-                                         nullptr, 0);
+  vpx_codec_err_t res = vpx_codec_decode(
+      ctx, pkt.data(), static_cast<unsigned int>(pkt.size()), nullptr, 0);
   if (res != VPX_CODEC_OK) {
     return false;
   }
@@ -93,8 +92,8 @@ bool VideoDecoder::decode_vpx(const EncodedVideoChunk& chunk) {
       // Y プレーン
       uint8_t* y_dst = frame->mutable_plane_ptr(0);
       for (uint32_t row = 0; row < frame_height; ++row) {
-        memcpy(y_dst + row * frame_width,
-               img->planes[0] + row * img->stride[0], frame_width);
+        memcpy(y_dst + row * frame_width, img->planes[0] + row * img->stride[0],
+               frame_width);
       }
 
       // U プレーン
