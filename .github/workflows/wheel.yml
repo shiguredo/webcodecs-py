@@ -114,7 +114,7 @@ jobs:
         if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel
         env:
-          NVIDIA_CUDA_TOOLKIT: "1"
+          NVIDIA_CUDA_TOOLKIT: true
 
       # arm64 の場合は通常ビルド
       - name: Build wheel (arm64)
