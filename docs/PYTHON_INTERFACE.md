@@ -410,7 +410,7 @@ config: VideoEncoderConfig = {
 encoder.configure(config)
 ```
 
-### VideoEncoder の例 (VP8/VP9 - macOS / Linux)
+### VideoEncoder の例 (VP8/VP9 - macOS / Ubuntu)
 
 ```python
 from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
@@ -1275,7 +1275,7 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ
-   - libvpx (VP8/VP9) は macOS / Linux
+   - libvpx (VP8/VP9) は macOS / Ubuntu
 1. **H.264/H.265 ビットストリームフォーマット**
    - **VideoDecoder は Annex B 形式のみ対応**
      - スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニット

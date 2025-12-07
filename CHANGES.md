@@ -11,7 +11,7 @@
 
 ## develop
 
-- [ADD] VP8/VP9 エンコーダー/デコーダーを追加する (macOS / Linux)
+- [ADD] VP8/VP9 エンコーダー/デコーダーを追加する (macOS / Ubuntu)
   - libvpx 1.15.2 を使用
   - VP9 Profile 0/1/2/3 に対応 (10/12-bit 含む)
   - @voluntas
