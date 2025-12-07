@@ -473,7 +473,7 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 #if defined(__APPLE__)
       supported = true;  // macOS で VideoToolbox をサポート
 #elif defined(NVIDIA_CUDA_TOOLKIT)
-      // NVIDIA Video Codec SDK が有効な場合は nvidia_video_codec を使用
+      // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
       supported = config.hardware_acceleration_engine == HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない

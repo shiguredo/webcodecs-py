@@ -21,7 +21,7 @@ else()
 endif()
 
 # NVIDIA Video Codec SDK の設定
-# CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON" uv build --wheel でビルド
+# ビルド方法: NVIDIA_CUDA_TOOLKIT=1 uv build --wheel
 option(NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
 
 # NVIDIA Video Codec SDK のパス設定

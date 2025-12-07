@@ -1000,7 +1000,7 @@ config_av1: VideoEncoderConfig = {
 - NVIDIA GPU
 - NVIDIA ドライバーがインストールされていること
 - Ubuntu のみ対応
-- ビルド時に `CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON"` の指定が必要
+- ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
 
 #### LatencyMode
 
@@ -1261,7 +1261,7 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 *ハードウェアアクセラレーション使用
 
-**注**: NVIDIA Video Codec SDK (NVENC/NVDEC) を使用するには、ビルド時に `CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON"` を指定する必要があります。
+**注**: NVIDIA Video Codec SDK (NVENC/NVDEC) を使用するには、ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` を実行する必要があります。
 
 **VP9 プロファイル対応状況**:
 
