@@ -109,8 +109,18 @@ jobs:
       - name: Install meson
         run: uv tool install meson
 
-      - name: Build wheel
+      # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
+      - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
+        if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel
+        env:
+          NVIDIA_CUDA_TOOLKIT: "1"
+
+      # arm64 の場合は通常ビルド
+      - name: Build wheel (arm64)
+        if: matrix.platform.arch == 'arm64'
+        run: uv build --wheel
+
       - name: Repair wheel with auditwheel
         shell: bash
         run: |

@@ -56,6 +56,11 @@ verbose = false
 version = ">=4.1"
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
+# 環境変数 NVIDIA_CUDA_TOOLKIT=1 が設定されている場合に NVIDIA Video Codec SDK を有効にする
+[[tool.scikit-build.overrides]]
+if.env.NVIDIA_CUDA_TOOLKIT = true
+cmake.args = ["-DCMAKE_BUILD_TYPE=Release", "-DNVIDIA_CUDA_TOOLKIT=ON"]
+
 [tool.scikit-build.ninja]
 version = ">=1.13"
 
