@@ -149,7 +149,7 @@ init: VideoFrameBufferInit = {
 
 # with 文で VideoFrame を使用（自動的に close される）
 with VideoFrame(frame_data, init) as frame:
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
 
 encoder.flush()
 

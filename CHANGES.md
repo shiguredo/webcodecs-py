@@ -11,6 +11,13 @@
 
 ## develop
 
+- [CHANGE] dict key の命名規則を camelCase から snake_case に統一する
+  - `keyFrame` → `key_frame`
+  - `colorSpace` → `color_space`
+  - `codedWidth` → `coded_width`
+  - `codedHeight` → `coded_height`
+  - `decoderConfig` → `decoder_config`
+  - @voluntas
 - [ADD] VP8/VP9 エンコーダー/デコーダーを追加する (macOS / Ubuntu)
   - libvpx 1.15.2 を使用
   - VP9 Profile 0/1/2/3 に対応 (10/12-bit 含む)
@@ -21,9 +28,9 @@
   - `__enter__` / `__exit__` を実装し、with 文で自動的に close() が呼ばれるようにする
   - @voluntas
 - [ADD] VideoEncoder の output callback で EncodedVideoChunkMetadata をサポートする
-  - WebCodecs API 準拠で、キーフレーム時に decoderConfig を含む metadata を提供する
+  - WebCodecs API 準拠で、キーフレーム時に decoder_config を含む metadata を提供する
   - @voluntas
-- [ADD] VideoToolbox エンコーダーでキーフレーム時に decoderConfig.description (avcC/hvcC) を提供する
+- [ADD] VideoToolbox エンコーダーでキーフレーム時に decoder_config.description (avcC/hvcC) を提供する
   - @voluntas
 - [UPDATE] nanobind の dict.get() を使用してオプションフィールドの取得を簡潔化する
   - @voluntas
@@ -37,7 +44,7 @@
 - [ADD] tests/benchmarks/ にベンチマークテストを追加する
   - bench_ prefix を持つファイルのみがベンチマークとして実行される
   - @voluntas
-- [UPDATE] examples/blend2d_to_mp4.py で metadata.decoderConfig.description を使用して MP4 を生成するように修正する
+- [UPDATE] examples/blend2d_to_mp4.py で metadata.decoder_config.description を使用して MP4 を生成するように修正する
   - @voluntas
 - [UPDATE] examples/blend2d_to_mp4.py で H.264 High Profile Level 5.1 に対応する
   - @voluntas

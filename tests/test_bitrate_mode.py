@@ -51,7 +51,7 @@ def test_bitrate_mode_constant():
     }
     frame = VideoFrame(data, init)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     encoder.close()
 
@@ -93,7 +93,7 @@ def test_bitrate_mode_variable():
     }
     frame = VideoFrame(data, init)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     encoder.close()
 
@@ -135,7 +135,7 @@ def test_bitrate_mode_quantizer():
     }
     frame = VideoFrame(data, init)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     encoder.close()
 
@@ -177,7 +177,7 @@ def test_bitrate_mode_default():
     }
     frame = VideoFrame(data, init)
 
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     encoder.close()
 

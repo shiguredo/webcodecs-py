@@ -66,7 +66,7 @@ def test_parallel_encode_decode_queue_size():
     # 5つのフレームをエンコード
     for i in range(5):
         frame = create_test_frame(width, height, i * 1000)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -136,7 +136,7 @@ def test_concurrent_encode_decode():
         for i in range(num_frames):
             timestamp = thread_id * 10000 + i * 1000
             frame = create_test_frame(width, height, timestamp)
-            encoder.encode(frame, {"keyFrame": i == 0})
+            encoder.encode(frame, {"key_frame": i == 0})
             frame.close()
 
     # 3つのスレッドから同時にエンコード
@@ -224,7 +224,7 @@ def test_encode_decode_without_waiting():
 
     for i in range(10):
         frame = create_test_frame(width, height, i * 1000)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -312,7 +312,7 @@ def test_encode_decode_callbacks():
 
     for i in range(5):
         frame = create_test_frame(width, height, i * 1000)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -399,7 +399,7 @@ def test_encode_decode_frame_ordering():
         timestamp = i * 1000
         expected_timestamps.append(timestamp)
         frame = create_test_frame(width, height, timestamp)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
         frame.close()
 
     encoder.flush()
@@ -482,7 +482,7 @@ def test_parallel_encode_decode_with_keyframes():
         frames_to_encode.append(frame)
         # 最初と5番目をキーフレームに
         is_keyframe = i == 0 or i == 5
-        encoder.encode(frame, {"keyFrame": is_keyframe})
+        encoder.encode(frame, {"key_frame": is_keyframe})
         frame.close()
 
     encoder.flush()

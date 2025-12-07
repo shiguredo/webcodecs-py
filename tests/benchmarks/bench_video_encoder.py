@@ -187,7 +187,7 @@ class TestVideoEncoderH264:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -226,7 +226,7 @@ class TestVideoEncoderH264:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -269,7 +269,7 @@ class TestVideoEncoderH265:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -308,7 +308,7 @@ class TestVideoEncoderH265:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -368,7 +368,7 @@ class TestEndToEndPipeline:
             )
 
             # エンコード
-            encoder.encode(i420_frame, {"keyFrame": frame_number[0] % 30 == 0})
+            encoder.encode(i420_frame, {"key_frame": frame_number[0] % 30 == 0})
             encoder.flush()
 
             frame_number[0] += 1
@@ -420,7 +420,7 @@ class TestEndToEndPipeline:
                 i420_buffer, width, height, VideoPixelFormat.I420, frame_number[0] * 33333
             )
 
-            encoder.encode(i420_frame, {"keyFrame": frame_number[0] % 30 == 0})
+            encoder.encode(i420_frame, {"key_frame": frame_number[0] % 30 == 0})
             encoder.flush()
 
             frame_number[0] += 1
@@ -464,7 +464,7 @@ class TestFlushOverhead:
 
         def encode_only():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             timestamp[0] += 33333
 
         benchmark(encode_only)
@@ -503,7 +503,7 @@ class TestFlushOverhead:
 
         def encode_only():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             timestamp[0] += 33333
 
         benchmark(encode_only)
@@ -547,7 +547,7 @@ class TestH264ProfileComparison:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -587,7 +587,7 @@ class TestH264ProfileComparison:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -627,7 +627,7 @@ class TestH264ProfileComparison:
 
         def encode_one_frame():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -670,14 +670,14 @@ class TestWarmupEffect:
         # ウォームアップ: 最初の 5 フレームをエンコード
         for i in range(5):
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, i * 33333)
-            encoder.encode(frame, {"keyFrame": i == 0})
+            encoder.encode(frame, {"key_frame": i == 0})
         encoder.flush()
 
         timestamp = [5 * 33333]
 
         def encode_after_warmup():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -716,14 +716,14 @@ class TestWarmupEffect:
         # ウォームアップ: 最初の 5 フレームをエンコード
         for i in range(5):
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, i * 33333)
-            encoder.encode(frame, {"keyFrame": i == 0})
+            encoder.encode(frame, {"key_frame": i == 0})
         encoder.flush()
 
         timestamp = [5 * 33333]
 
         def encode_after_warmup():
             frame = create_video_frame(data, width, height, VideoPixelFormat.I420, timestamp[0])
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
             timestamp[0] += 33333
 
@@ -768,7 +768,7 @@ class TestBatchEncoding:
             # 30 フレームをエンコード
             for i in range(30):
                 frame = create_video_frame(data, width, height, VideoPixelFormat.I420, i * 33333)
-                encoder.encode(frame, {"keyFrame": i == 0})
+                encoder.encode(frame, {"key_frame": i == 0})
 
             encoder.flush()
             encoder.close()
@@ -809,7 +809,7 @@ class TestBatchEncoding:
 
             for i in range(30):
                 frame = create_video_frame(data, width, height, VideoPixelFormat.I420, i * 33333)
-                encoder.encode(frame, {"keyFrame": i == 0})
+                encoder.encode(frame, {"key_frame": i == 0})
 
             encoder.flush()
             encoder.close()

@@ -281,7 +281,7 @@ class VideoFrameCopyToOptions(TypedDict, total=False):
     rect: DOMRect | None
     layout: list[PlaneLayout] | None
     format: VideoPixelFormat | None
-    colorSpace: str | None
+    color_space: str | None
 
 
 # VideoEncoder.encode() のオプション
@@ -310,7 +310,7 @@ class VideoEncoderEncodeOptions(TypedDict, total=False):
     """VideoEncoder.encode() のオプション"""
 
     # キーフレームを強制
-    keyFrame: bool | None
+    key_frame: bool | None
     # AV1 固有のオプション
     av1: VideoEncoderEncodeOptionsForAv1 | None
     # AVC 固有のオプション
@@ -350,22 +350,22 @@ class AudioDecoderSupport(TypedDict):
 
 # Metadata 型定義 (VideoEncoder output callback の第 2 引数)
 class EncodedVideoChunkMetadataDecoderConfig(TypedDict, total=False):
-    """EncodedVideoChunkMetadata の decoderConfig (WebCodecs API 準拠)"""
+    """EncodedVideoChunkMetadata の decoder_config"""
 
     codec: str
-    codedWidth: int
-    codedHeight: int
+    coded_width: int
+    coded_height: int
     # avcC / hvcC / av1C などのコーデック固有データ
     description: bytes
 
 
 class EncodedVideoChunkMetadata(TypedDict, total=False):
-    """VideoEncoder の output callback で提供される metadata (WebCodecs API 準拠)
+    """VideoEncoder の output callback で提供される metadata
 
-    キーフレーム時のみ decoderConfig が含まれる。
+    キーフレーム時のみ decoder_config が含まれる。
     """
 
-    decoderConfig: EncodedVideoChunkMetadataDecoderConfig
+    decoder_config: EncodedVideoChunkMetadataDecoderConfig
 
 
 def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:

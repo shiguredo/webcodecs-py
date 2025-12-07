@@ -60,9 +60,9 @@ struct VP8CodecParameters {
 // VP9 コーデックパラメータ
 // フォーマット: vp09.PP.LL.DD[.CC.CP.TC.MC.FF]
 struct VP9CodecParameters {
-  uint8_t profile;     // 0-3
-  uint8_t level;       // レベル（10-62）
-  uint8_t bit_depth;   // 8, 10, 12
+  uint8_t profile;    // 0-3
+  uint8_t level;      // レベル（10-62）
+  uint8_t bit_depth;  // 8, 10, 12
   std::optional<uint8_t> chroma_subsampling;
   std::optional<uint8_t> color_primaries;
   std::optional<uint8_t> transfer_characteristics;
