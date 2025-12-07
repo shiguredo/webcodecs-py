@@ -210,7 +210,73 @@ HEVCCodecParameters parse_hevc_codec_string(const std::string& codec_string) {
   return params;
 }
 
+VP8CodecParameters parse_vp8_codec_string(const std::string& codec_string) {
+  // フォーマット: "vp8"
+  if (codec_string != "vp8") {
+    throw std::invalid_argument("Invalid VP8 codec string: " + codec_string);
+  }
+
+  return VP8CodecParameters();
+}
+
+VP9CodecParameters parse_vp9_codec_string(const std::string& codec_string) {
+  // フォーマット: vp09.PP.LL.DD[.CC.CP.TC.MC.FF]
+  // 例: "vp09.00.10.08" (Profile 0, Level 1.0, 8-bit)
+
+  if (codec_string.substr(0, 5) != "vp09.") {
+    throw std::invalid_argument("Invalid VP9 codec string: " + codec_string);
+  }
+
+  auto parts = split_string(codec_string, '.');
+  if (parts.size() < 4) {
+    throw std::invalid_argument("Invalid VP9 codec string format: " +
+                                codec_string);
+  }
+
+  VP9CodecParameters params;
+
+  // Profile (PP)
+  params.profile = dec_to_uint8(parts[1]);
+  if (params.profile > 3) {
+    throw std::invalid_argument("Invalid VP9 profile: " + parts[1]);
+  }
+
+  // Level (LL)
+  params.level = dec_to_uint8(parts[2]);
+
+  // Bit Depth (DD)
+  params.bit_depth = dec_to_uint8(parts[3]);
+  if (params.bit_depth != 8 && params.bit_depth != 10 &&
+      params.bit_depth != 12) {
+    throw std::invalid_argument("Invalid VP9 bit depth: " + parts[3]);
+  }
+
+  // オプションパラメータ
+  if (parts.size() >= 5) {
+    params.chroma_subsampling = dec_to_uint8(parts[4]);
+  }
+  if (parts.size() >= 6) {
+    params.color_primaries = dec_to_uint8(parts[5]);
+  }
+  if (parts.size() >= 7) {
+    params.transfer_characteristics = dec_to_uint8(parts[6]);
+  }
+  if (parts.size() >= 8) {
+    params.matrix_coefficients = dec_to_uint8(parts[7]);
+  }
+  if (parts.size() >= 9) {
+    params.video_full_range_flag = dec_to_uint8(parts[8]);
+  }
+
+  return params;
+}
+
 CodecParameters parse_codec_string(const std::string& codec_string) {
+  // VP8 は特殊ケース（3文字のみ）
+  if (codec_string == "vp8") {
+    return parse_vp8_codec_string(codec_string);
+  }
+
   if (codec_string.length() < 5) {
     throw std::invalid_argument("Invalid codec string: " + codec_string);
   }
@@ -223,6 +289,8 @@ CodecParameters parse_codec_string(const std::string& codec_string) {
     return parse_avc_codec_string(codec_string);
   } else if (prefix == "hvc1." || prefix == "hev1.") {
     return parse_hevc_codec_string(codec_string);
+  } else if (prefix == "vp09.") {
+    return parse_vp9_codec_string(codec_string);
   } else {
     throw std::invalid_argument("Unsupported codec string: " + codec_string);
   }

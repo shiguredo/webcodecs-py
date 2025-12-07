@@ -239,29 +239,98 @@ def test_video_frame_rotation_flip():
 
 
 def test_video_frame_metadata():
-    """metadata を指定した VideoFrame の作成"""
+    """metadata を指定した VideoFrame の作成と TypedDict の型チェック"""
+    from webcodecs import VideoFrameMetadata
+
     width, height = 640, 480
     data_size = width * height * 3 // 2
     data = np.zeros(data_size, dtype=np.uint8)
+
+    metadata: VideoFrameMetadata = {
+        "capture_time": 1234567890.0,
+        "receive_time": 1234567891.0,
+        "rtp_timestamp": 12345,
+    }
 
     init: VideoFrameBufferInit = {
         "format": VideoPixelFormat.I420,
         "coded_width": width,
         "coded_height": height,
         "timestamp": 0,
-        "metadata": {
-            "processingDuration": 1500,
-            "captureTime": 1234567890000,
-        },
+        "metadata": metadata,
     }
 
     frame = VideoFrame(data, init)
 
-    metadata = frame.metadata()
-    assert "processingDuration" in metadata
-    assert metadata["processingDuration"] == 1500
-    assert "captureTime" in metadata
-    assert metadata["captureTime"] == 1234567890000
+    result = frame.metadata()
+    assert result["capture_time"] == 1234567890.0
+    assert result["receive_time"] == 1234567891.0
+    assert result["rtp_timestamp"] == 12345
+
+    frame.close()
+
+
+def test_video_frame_clone_with_metadata():
+    """clone() で metadata がコピーされることを確認"""
+    width, height = 640, 480
+    data = np.zeros(width * height * 3 // 2, dtype=np.uint8)
+
+    from webcodecs import VideoFrameMetadata
+
+    metadata: VideoFrameMetadata = {
+        "capture_time": 1234567890.0,
+        "rtp_timestamp": 12345,
+    }
+
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+        "metadata": metadata,
+    }
+
+    frame = VideoFrame(data, init)
+    cloned = frame.clone()
+
+    # metadata がコピーされているか確認
+    cloned_metadata = cloned.metadata()
+    assert cloned_metadata["capture_time"] == 1234567890.0
+    assert cloned_metadata["rtp_timestamp"] == 12345
+
+    frame.close()
+    cloned.close()
+
+
+def test_video_frame_copy_to_with_metadata():
+    """copy_to() でフォーマット変換しても metadata が保持されることを確認"""
+    width, height = 640, 480
+    data = np.zeros(width * height * 3 // 2, dtype=np.uint8)
+
+    from webcodecs import VideoFrameMetadata
+
+    metadata: VideoFrameMetadata = {
+        "capture_time": 1234567890.0,
+    }
+
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+        "metadata": metadata,
+    }
+
+    frame = VideoFrame(data, init)
+
+    # RGBA に変換
+    rgba_size = frame.allocation_size({"format": VideoPixelFormat.RGBA})
+    rgba_buffer = np.zeros(rgba_size, dtype=np.uint8)
+    frame.copy_to(rgba_buffer, {"format": VideoPixelFormat.RGBA})
+
+    # 元のフレームの metadata は保持されている
+    result = frame.metadata()
+    assert result["capture_time"] == 1234567890.0
 
     frame.close()
 
