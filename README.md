@@ -23,13 +23,9 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 ## 特徴
 
 - WebCodecs API の Python バインディング
-- Opus、FLAC、AAC、AV1、H.264、H.265 コーデックをサポート
-  - AAC は macOS の AudioToolbox を利用
-  - H.264 と H.265 は macOS の VideoToolbox を利用
-- クロスプラットフォーム対応
-  - macOS
-  - Ubuntu
-  - Windows
+- Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
+  - H.264、H.265、AAC は macOS でのみ利用可能
+- Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 
@@ -174,6 +170,10 @@ encoder.close()
   - <https://github.com/xiph/flac>
 - AAC
   - <https://developer.apple.com/documentation/audiotoolbox>
+- VP8
+  - <https://chromium.googlesource.com/webm/libvpx>
+- VP9
+  - <https://chromium.googlesource.com/webm/libvpx>
 - AV1
   - <https://aomedia.googlesource.com/aom>
   - <https://github.com/videolan/dav1d>
