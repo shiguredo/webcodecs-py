@@ -17,6 +17,11 @@
 #include <aom/aom_codec.h>
 #include <aom/aom_encoder.h>
 #include <aom/aomcx.h>
+#if defined(__APPLE__) || defined(__linux__)
+#include <vpx/vp8cx.h>
+#include <vpx/vpx_codec.h>
+#include <vpx/vpx_encoder.h>
+#endif
 #include "codec_parser.h"
 #include "webcodecs_types.h"
 
@@ -50,12 +55,24 @@ class VideoEncoder {
     std::optional<uint16_t> quantizer;  // 0-51 の範囲
   };
 
+  // VP8 エンコードオプション
+  struct VP8EncodeOptions {
+    std::optional<uint16_t> quantizer;  // 0-63 の範囲
+  };
+
+  // VP9 エンコードオプション
+  struct VP9EncodeOptions {
+    std::optional<uint16_t> quantizer;  // 0-63 の範囲
+  };
+
   // エンコードオプション
   struct EncodeOptions {
     bool keyframe = false;
     std::optional<AV1EncodeOptions> av1;
     std::optional<AVCEncodeOptions> avc;
     std::optional<HEVCEncodeOptions> hevc;
+    std::optional<VP8EncodeOptions> vp8;
+    std::optional<VP9EncodeOptions> vp9;
   };
 
   // エンコードタスクを表す構造体
@@ -65,6 +82,8 @@ class VideoEncoder {
     std::optional<uint16_t> av1_quantizer;   // AV1 の quantizer オプション
     std::optional<uint16_t> avc_quantizer;   // AVC の quantizer オプション
     std::optional<uint16_t> hevc_quantizer;  // HEVC の quantizer オプション
+    std::optional<uint16_t> vp8_quantizer;   // VP8 の quantizer オプション
+    std::optional<uint16_t> vp9_quantizer;   // VP9 の quantizer オプション
     uint64_t sequence_number;                // タスクの順序を保持
   };
 
@@ -160,6 +179,20 @@ class VideoEncoder {
   CFStringRef get_hevc_profile_level();
 #endif
 
+#if defined(__APPLE__) || defined(__linux__)
+  // libvpx エンコーダー
+  void init_vpx_encoder();
+  void cleanup_vpx_encoder();
+  void encode_frame_vpx(const VideoFrame& frame,
+                        bool keyframe,
+                        std::optional<uint16_t> quantizer = std::nullopt);
+
+  vpx_codec_ctx_t* vpx_encoder_ = nullptr;
+  vpx_codec_enc_cfg_t vpx_config_;
+  const vpx_codec_iface_t* vpx_iface_ = nullptr;
+  std::mutex vpx_mutex_;
+#endif
+
   // 並列処理のためのメソッド
   void worker_loop();  // ワーカースレッドのメインループ
   void process_encode_task(const EncodeTask& task);  // タスクの処理
@@ -170,6 +203,8 @@ class VideoEncoder {
   bool is_av1_codec() const;
   bool is_avc_codec() const;
   bool is_hevc_codec() const;
+  bool is_vp8_codec() const;
+  bool is_vp9_codec() const;
   bool uses_videotoolbox() const;
 
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)

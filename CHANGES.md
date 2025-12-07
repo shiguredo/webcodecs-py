@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] VP8/VP9 エンコーダー/デコーダーを追加する (macOS / Ubuntu)
+  - libvpx 1.15.2 を使用
+  - VP9 Profile 0/1/2/3 に対応 (10/12-bit 含む)
+  - @voluntas
 - [ADD] Python 3.12 に対応する
   - @voluntas
 - [ADD] AudioData と VideoFrame でコンテキストマネージャー (with 文) をサポートする
