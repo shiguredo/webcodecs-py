@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-11-30
+- 最終更新: 2025-12-07
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -176,6 +176,8 @@ Options 系:
 - `VideoEncoderEncodeOptionsForAv1` - AV1 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForAvc` - AVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForHevc` - HEVC 固有のエンコードオプション
+- `VideoEncoderEncodeOptionsForVp8` - VP8 固有のエンコードオプション
+- `VideoEncoderEncodeOptionsForVp9` - VP9 固有のエンコードオプション
 
 Support 系 (is_config_supported() の戻り値):
 
@@ -406,6 +408,51 @@ config: VideoEncoderConfig = {
     "bitrate": 1000000,
 }
 encoder.configure(config)
+```
+
+### VideoEncoder の例 (VP8/VP9 - macOS / Ubuntu)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk):
+    print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# VP8 の場合
+config_vp8: VideoEncoderConfig = {
+    "codec": "vp8",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+}
+
+# VP9 の場合 (Profile 0, 8-bit)
+config_vp9: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+}
+
+# VP9 Profile 2 (10-bit) の場合
+config_vp9_10bit: VideoEncoderConfig = {
+    "codec": "vp09.02.10.10",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+}
+
+encoder.configure(config_vp9)
 ```
 
 ## 実装済みインターフェース
@@ -687,7 +734,7 @@ print(result["capture_time"])  # 1234567890.0
 | `encode_queue_size` | o | o | o | |
 | `on_dequeue` | o | o | o | EventHandler |
 | `configure(config)` | o | o | o | |
-| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (keyFrame, av1.quantizer, avc.quantizer, hevc.quantizer) |
+| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (keyFrame, av1.quantizer, avc.quantizer, hevc.quantizer, vp8.quantizer, vp9.quantizer) |
 | `flush()` | o | o | o | |
 | `reset()` | o | o | o | |
 | `close()` | o | o | o | |
@@ -1042,7 +1089,9 @@ capabilities = get_video_codec_capabilities()
 #         "available": True,
 #         "platform": "all",
 #         "codecs": {
-#             "av01": {"encoder": True, "decoder": True}
+#             "av01": {"encoder": True, "decoder": True},
+#             "vp8": {"encoder": True, "decoder": True},
+#             "vp09": {"encoder": True, "decoder": True}
 #         }
 #     },
 #     HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX: {
@@ -1086,10 +1135,13 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - `av01` - AV1 (WebCodecs 標準)
 - `avc1` - H.264 (WebCodecs 標準、`h264` ではない)
 - `hvc1` - H.265/HEVC (WebCodecs 標準、`h265` や `hevc` ではない)
+- `vp8` - VP8 (WebCodecs 標準)
+- `vp09` - VP9 (WebCodecs 標準、`vp9` ではない)
 
 **実装詳細**:
 
 - macOS では VideoToolbox の実際の利用可能性を `VTCompressionSessionCreate()` で確認
+- macOS では libvpx による VP8/VP9 が利用可能
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
@@ -1128,8 +1180,19 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 | AV1 | o | o | libaom / dav1d | All |
 | H.264 | o | o | VideoToolbox* | macOS |
 | H.265 | o | o | VideoToolbox* | macOS |
+| VP8 | o | o | libvpx | macOS |
+| VP9 | o | o | libvpx | macOS |
 
 *ハードウェアアクセラレーション使用
+
+**VP9 プロファイル対応状況**:
+
+| Profile | ビット深度 | クロマサブサンプリング | 対応状況 |
+|---------|-----------|---------------------|---------|
+| 0 | 8-bit | 4:2:0 | o |
+| 1 | 8-bit | 4:2:2, 4:4:4 | o |
+| 2 | 10/12-bit | 4:2:0 | o |
+| 3 | 10/12-bit | 4:2:2, 4:4:4 | o |
 
 ### Audio コーデック
 
@@ -1212,6 +1275,7 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ
+   - libvpx (VP8/VP9) は macOS / Ubuntu
 1. **H.264/H.265 ビットストリームフォーマット**
    - **VideoDecoder は Annex B 形式のみ対応**
      - スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニット

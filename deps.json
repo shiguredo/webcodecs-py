@@ -7,6 +7,10 @@
     "version": "1.5.0",
     "repository": "https://github.com/xiph/flac"
   },
+  "libvpx": {
+    "version": "1.15.2",
+    "repository": "https://chromium.googlesource.com/webm/libvpx"
+  },
   "libaom": {
     "version": "3.13.1",
     "repository": "https://aomedia.googlesource.com/aom"
