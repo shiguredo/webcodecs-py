@@ -12,11 +12,11 @@
 ## develop
 
 - [CHANGE] dict key の命名規則を camelCase から snake_case に統一する
-  - `keyFrame` → `key_frame`
-  - `colorSpace` → `color_space`
-  - `codedWidth` → `coded_width`
-  - `codedHeight` → `coded_height`
-  - `decoderConfig` → `decoder_config`
+  - `keyFrame` -> `key_frame`
+  - `colorSpace` -> `color_space`
+  - `codedWidth` -> `coded_width`
+  - `codedHeight` -> `coded_height`
+  - `decoderConfig` -> `decoder_config`
   - @voluntas
 - [ADD] VP8/VP9 エンコーダー/デコーダーを追加する (macOS / Ubuntu)
   - libvpx 1.15.2 を使用
