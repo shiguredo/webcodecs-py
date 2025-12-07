@@ -507,20 +507,10 @@ if(APPLE)
 endif()
 
 # NVIDIA Video Codec SDK ライブラリ (Ubuntu のみ対応)
+# CUDA ライブラリは dlopen で動的にロードするため、直接リンクしない
+# これにより、GPU がない環境でもモジュールをインポートできる
 if(NVIDIA_CUDA_TOOLKIT)
-    target_link_libraries(_webcodecs_py PRIVATE
-        CUDA::cuda_driver
-        CUDA::cudart_static
-    )
-    # libnvcuvid.so と libnvidia-encode.so を動的リンク
-    find_library(NVCUVID_LIB nvcuvid PATHS /usr/local/cuda/lib64/stubs /usr/lib/x86_64-linux-gnu)
-    find_library(NVENC_LIB nvidia-encode PATHS /usr/local/cuda/lib64/stubs /usr/lib/x86_64-linux-gnu)
-    if(NVCUVID_LIB)
-        target_link_libraries(_webcodecs_py PRIVATE ${NVCUVID_LIB})
-    endif()
-    if(NVENC_LIB)
-        target_link_libraries(_webcodecs_py PRIVATE ${NVENC_LIB})
-    endif()
+    # dlopen/dlsym に必要
     target_link_libraries(_webcodecs_py PRIVATE dl)
 endif()
 

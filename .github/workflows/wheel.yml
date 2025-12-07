@@ -110,6 +110,7 @@ jobs:
         run: uv tool install meson
 
       # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
+      # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
       - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
         if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel

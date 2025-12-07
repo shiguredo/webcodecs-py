@@ -11,6 +11,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "../dyn/cuda.h"
+#include "../dyn/nvenc.h"
 #include "encoded_video_chunk.h"
 #include "video_frame.h"
 
@@ -28,7 +30,7 @@ NV_ENCODE_API_FUNCTION_LIST* load_nvenc_api() {
   }
 
   nvenc_funcs.version = NV_ENCODE_API_FUNCTION_LIST_VER;
-  NVENCSTATUS status = NvEncodeAPICreateInstance(&nvenc_funcs);
+  NVENCSTATUS status = dyn::NvEncodeAPICreateInstance(&nvenc_funcs);
   if (status != NV_ENC_SUCCESS) {
     throw std::runtime_error("Failed to create NVENC API instance");
   }
@@ -99,15 +101,20 @@ void VideoEncoder::init_nvenc_encoder() {
     return;
   }
 
+  // CUDA ライブラリがロード可能かチェック
+  if (!dyn::DynModule::IsLoadable(dyn::CUDA_SO)) {
+    throw std::runtime_error("CUDA library is not available");
+  }
+
   // CUDA の初期化
-  CUresult cu_result = cuInit(0);
+  CUresult cu_result = dyn::cuInit(0);
   if (cu_result != CUDA_SUCCESS) {
     throw std::runtime_error("Failed to initialize CUDA");
   }
 
   // CUDA デバイスを取得
   CUdevice cu_device;
-  cu_result = cuDeviceGet(&cu_device, 0);
+  cu_result = dyn::cuDeviceGet(&cu_device, 0);
   if (cu_result != CUDA_SUCCESS) {
     throw std::runtime_error("Failed to get CUDA device");
   }
@@ -115,7 +122,7 @@ void VideoEncoder::init_nvenc_encoder() {
   // CUDA コンテキストを作成
   CUcontext cu_context;
   CUctxCreateParams ctx_params = {};
-  cu_result = cuCtxCreate(&cu_context, &ctx_params, 0, cu_device);
+  cu_result = dyn::cuCtxCreate(&cu_context, &ctx_params, 0, cu_device);
   if (cu_result != CUDA_SUCCESS) {
     throw std::runtime_error("Failed to create CUDA context");
   }
@@ -135,7 +142,7 @@ void VideoEncoder::init_nvenc_encoder() {
   NVENCSTATUS status =
       nvenc_api_->nvEncOpenEncodeSessionEx(&session_params, &encoder);
   if (status != NV_ENC_SUCCESS) {
-    cuCtxDestroy(cu_context);
+    dyn::cuCtxDestroy(cu_context);
     nvenc_cuda_context_ = nullptr;
     throw std::runtime_error("Failed to open NVENC encode session");
   }
@@ -392,7 +399,7 @@ void VideoEncoder::cleanup_nvenc_encoder() {
 
   // CUDA コンテキストを破棄
   if (nvenc_cuda_context_) {
-    cuCtxDestroy(static_cast<CUcontext>(nvenc_cuda_context_));
+    dyn::cuCtxDestroy(static_cast<CUcontext>(nvenc_cuda_context_));
     nvenc_cuda_context_ = nullptr;
   }
 
