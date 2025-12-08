@@ -180,6 +180,10 @@ class VideoDecoder {
   void* vpl_loader_ = nullptr;
   void* vpl_session_ = nullptr;
   std::vector<uint8_t> vpl_bitstream_buffer_;
+  std::vector<uint8_t> vpl_surface_buffer_;
+  void* vpl_bitstream_ = nullptr;
+  void* vpl_surface_pool_ = nullptr;
+  bool vpl_initialized_ = false;
 
   // Intel VPL 関連のメソッド
   void init_intel_vpl_decoder();

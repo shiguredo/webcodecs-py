@@ -241,8 +241,11 @@ class VideoEncoder {
   void* vpl_loader_ = nullptr;
   void* vpl_session_ = nullptr;
   std::vector<uint8_t> vpl_bitstream_buffer_;
-  // SPS/PPS から生成した avcC/hvcC 形式の description
   std::vector<uint8_t> vpl_description_;
+  std::vector<uint8_t> vpl_surface_buffer_;
+  void* vpl_frame_info_ = nullptr;
+  void* vpl_bitstream_ = nullptr;
+  void* vpl_surface_pool_ = nullptr;
 
   // Intel VPL 関連のメソッド
   void init_intel_vpl_encoder();
@@ -251,7 +254,6 @@ class VideoEncoder {
                               std::optional<uint16_t> quantizer = std::nullopt);
   void flush_intel_vpl_encoder();
   void cleanup_intel_vpl_encoder();
-  // SPS/PPS から avcC/hvcC を生成
   void build_vpl_description(const uint8_t* sps,
                              uint16_t sps_size,
                              const uint8_t* pps,

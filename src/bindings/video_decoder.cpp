@@ -197,6 +197,25 @@ void VideoDecoder::flush() {
       });
     }
     flush_intel_vpl();
+
+    // 出力バッファに残っているフレームを全て出力
+    std::vector<std::unique_ptr<VideoFrame>> frames_to_output;
+    {
+      std::lock_guard<std::mutex> lock(output_mutex_);
+      for (auto& pair : output_buffer_) {
+        frames_to_output.push_back(std::move(pair.second));
+      }
+      output_buffer_.clear();
+    }
+
+    // コールバックを呼び出す（GIL を取得）
+    if (output_callback_ && !frames_to_output.empty()) {
+      nb::gil_scoped_acquire gil;
+      for (auto& frame : frames_to_output) {
+        output_callback_(std::move(frame));
+      }
+    }
+
     return;
   }
 #endif
@@ -305,8 +324,11 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 #if defined(__linux__)
     if (config.hardware_acceleration_engine ==
         HardwareAccelerationEngine::INTEL_VPL) {
-      // Intel VPL でサポートされているコーデック: AVC, HEVC
-      if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
+      // Intel VPL でサポートされているコーデック: AVC, HEVC, AV1
+      if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::AV1) {
+        // ハードウェアがサポートしているか実際に確認する必要がある
+        // 今は true を返すが、実際のハードウェアサポートは初期化時にチェックされる
         return VideoDecoderSupport(true, config);
       }
     }

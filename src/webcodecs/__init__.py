@@ -175,6 +175,8 @@ class VideoDecoderConfig(TypedDict):
     color_space: NotRequired[str | None]
     rotation: NotRequired[int | None]
     flip: NotRequired[bool | None]
+    # 独自拡張
+    hardware_acceleration_engine: NotRequired[HardwareAccelerationEngine | None]
 
 
 class OpusEncoderConfig(TypedDict):

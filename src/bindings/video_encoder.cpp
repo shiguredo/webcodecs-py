@@ -497,9 +497,12 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 #if defined(__linux__)
     if (config.hardware_acceleration_engine ==
         HardwareAccelerationEngine::INTEL_VPL) {
-      // Intel VPL は AVC, HEVC をサポート
+      // Intel VPL は AVC, HEVC, AV1 をサポート
       if (std::holds_alternative<AVCCodecParameters>(codec_params) ||
-          std::holds_alternative<HEVCCodecParameters>(codec_params)) {
+          std::holds_alternative<HEVCCodecParameters>(codec_params) ||
+          std::holds_alternative<AV1CodecParameters>(codec_params)) {
+        // ハードウェアがサポートしているか実際に確認する必要がある
+        // 今は true を返すが、実際のハードウェアサポートは初期化時にチェックされる
         return VideoEncoderSupport(true, config);
       }
     }

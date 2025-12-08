@@ -12,6 +12,7 @@
 
 #include "../dyn/vpl.h"
 #include "encoded_video_chunk.h"
+#include "intel_vpl_helpers.h"
 #include "video_frame.h"
 
 namespace nb = nanobind;
@@ -19,22 +20,9 @@ namespace nb = nanobind;
 // SPS/PPS バッファサイズ
 static constexpr size_t MAX_SPS_SIZE = 256;
 static constexpr size_t MAX_PPS_SIZE = 256;
-// HEVC の VPS バッファサイズ
 static constexpr size_t MAX_VPS_SIZE = 256;
 
 namespace {
-
-// コーデック ID を取得するヘルパー
-mfxU32 get_codec_id(const std::string& codec) {
-  if (codec.length() >= 5 &&
-      (codec.substr(0, 5) == "avc1." || codec.substr(0, 5) == "avc3.")) {
-    return MFX_CODEC_AVC;
-  } else if (codec.length() >= 5 &&
-             (codec.substr(0, 5) == "hvc1." || codec.substr(0, 5) == "hev1.")) {
-    return MFX_CODEC_HEVC;
-  }
-  throw std::runtime_error("Unsupported codec for Intel VPL: " + codec);
-}
 
 // H.264 プロファイルを取得するヘルパー
 mfxU16 get_avc_profile(const CodecParameters& codec_params) {
@@ -68,11 +56,6 @@ mfxU16 get_hevc_profile(const CodecParameters& codec_params) {
     }
   }
   return MFX_PROFILE_HEVC_MAIN;
-}
-
-// 16 バイトアライメント
-mfxU16 align16(mfxU16 value) {
-  return (value + 15) & ~15;
 }
 
 }  // namespace
@@ -114,7 +97,7 @@ void VideoEncoder::init_intel_vpl_encoder() {
   }
 
   // コーデック ID を設定
-  mfxU32 codec_id = get_codec_id(config_.codec);
+  mfxU32 codec_id = intel_vpl::get_codec_id(config_.codec);
   mfxVariant codec_value = {};
   codec_value.Type = MFX_VARIANT_TYPE_U32;
   codec_value.Data.U32 = codec_id;
@@ -147,9 +130,9 @@ void VideoEncoder::init_intel_vpl_encoder() {
   encode_params.mfx.FrameInfo.FourCC = MFX_FOURCC_NV12;
   encode_params.mfx.FrameInfo.ChromaFormat = MFX_CHROMAFORMAT_YUV420;
   encode_params.mfx.FrameInfo.Width =
-      align16(static_cast<mfxU16>(config_.width));
+      intel_vpl::align16(static_cast<mfxU16>(config_.width));
   encode_params.mfx.FrameInfo.Height =
-      align16(static_cast<mfxU16>(config_.height));
+      intel_vpl::align16(static_cast<mfxU16>(config_.height));
   encode_params.mfx.FrameInfo.CropX = 0;
   encode_params.mfx.FrameInfo.CropY = 0;
   encode_params.mfx.FrameInfo.CropW = static_cast<mfxU16>(config_.width);
@@ -159,8 +142,6 @@ void VideoEncoder::init_intel_vpl_encoder() {
   // プロファイルを設定
   if (codec_id == MFX_CODEC_AVC) {
     encode_params.mfx.CodecProfile = get_avc_profile(codec_params_);
-  } else if (codec_id == MFX_CODEC_HEVC) {
-    encode_params.mfx.CodecProfile = get_hevc_profile(codec_params_);
   }
 
   // レートコントロールの設定
@@ -175,20 +156,87 @@ void VideoEncoder::init_intel_vpl_encoder() {
       static_cast<mfxU16>(config_.bitrate.value_or(1000000) * 1.5 / 1000);
 
   // GOP 設定
-  encode_params.mfx.GopPicSize =
-      static_cast<mfxU16>(config_.framerate.value_or(30.0) * 2);
-  encode_params.mfx.GopRefDist = 1;
-  encode_params.mfx.IdrInterval = 0;
+  encode_params.mfx.GopPicSize = intel_vpl::VPL_GOP_SIZE;
+  encode_params.mfx.GopRefDist = intel_vpl::VPL_GOP_REF_DIST;
+  encode_params.mfx.IdrInterval = intel_vpl::VPL_IDR_INTERVAL;
 
-  // I/O パターン: システムメモリ
-  encode_params.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+  // 非同期処理の深さを 1 に設定してバッファリングを最小化
+  encode_params.AsyncDepth = 1;
+
+  // I/O パターン: システムメモリ (入出力両方)
+  encode_params.IOPattern =
+      MFX_IOPATTERN_IN_SYSTEM_MEMORY | MFX_IOPATTERN_OUT_SYSTEM_MEMORY;
+
+  // 拡張バッファを設定
+  mfxExtCodingOption ext_coding_option = {};
+  mfxExtCodingOption2 ext_coding_option2 = {};
+  mfxExtBuffer* ext_buffers[2] = {};
+  int ext_buffers_size = 0;
+
+  if (codec_id == MFX_CODEC_AVC) {
+    std::memset(&ext_coding_option, 0, sizeof(ext_coding_option));
+    ext_coding_option.Header.BufferId = MFX_EXTBUFF_CODING_OPTION;
+    ext_coding_option.Header.BufferSz = sizeof(ext_coding_option);
+    ext_coding_option.AUDelimiter = MFX_CODINGOPTION_OFF;
+    ext_coding_option.MaxDecFrameBuffering = 1;
+
+    std::memset(&ext_coding_option2, 0, sizeof(ext_coding_option2));
+    ext_coding_option2.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+    ext_coding_option2.Header.BufferSz = sizeof(ext_coding_option2);
+    ext_coding_option2.RepeatPPS = MFX_CODINGOPTION_ON;
+
+    ext_buffers[0] = reinterpret_cast<mfxExtBuffer*>(&ext_coding_option);
+    ext_buffers[1] = reinterpret_cast<mfxExtBuffer*>(&ext_coding_option2);
+    ext_buffers_size = 2;
+  } else if (codec_id == MFX_CODEC_HEVC) {
+    std::memset(&ext_coding_option2, 0, sizeof(ext_coding_option2));
+    ext_coding_option2.Header.BufferId = MFX_EXTBUFF_CODING_OPTION2;
+    ext_coding_option2.Header.BufferSz = sizeof(ext_coding_option2);
+    ext_coding_option2.RepeatPPS = MFX_CODINGOPTION_ON;
+
+    ext_buffers[0] = reinterpret_cast<mfxExtBuffer*>(&ext_coding_option2);
+    ext_buffers_size = 1;
+  }
+
+  if (ext_buffers_size > 0) {
+    encode_params.ExtParam = ext_buffers;
+    encode_params.NumExtParam = ext_buffers_size;
+  }
+
+  // パラメータを Query で検証・正規化
+  mfxVideoParam query_params = encode_params;
+  sts = dyn::MFXVideoENCODE_Query(session, &encode_params, &query_params);
+  if (sts < MFX_ERR_NONE) {
+    // HEVC の場合は IOPattern を IN_SYSTEM_MEMORY のみに変更して再試行
+    if (codec_id == MFX_CODEC_HEVC) {
+      encode_params.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
+      query_params = encode_params;
+      sts = dyn::MFXVideoENCODE_Query(session, &encode_params, &query_params);
+    }
+    if (sts < MFX_ERR_NONE) {
+      cleanup_intel_vpl_encoder();
+      throw std::runtime_error(
+          intel_vpl::make_error_message("Query encoder parameters", sts));
+    }
+  }
+  encode_params = query_params;
+
+  // サーフェス要件を取得
+  mfxFrameAllocRequest alloc_request = {};
+  sts = dyn::MFXVideoENCODE_QueryIOSurf(session, &encode_params, &alloc_request);
+  if (sts != MFX_ERR_NONE) {
+    cleanup_intel_vpl_encoder();
+    throw std::runtime_error(
+        intel_vpl::make_error_message("Query IO surface requirements", sts));
+  }
 
   // エンコーダーを初期化
   sts = dyn::MFXVideoENCODE_Init(session, &encode_params);
   if (sts != MFX_ERR_NONE && sts != MFX_WRN_PARTIAL_ACCELERATION &&
       sts != MFX_WRN_INCOMPATIBLE_VIDEO_PARAM) {
     cleanup_intel_vpl_encoder();
-    throw std::runtime_error("Failed to initialize Intel VPL encoder");
+    throw std::runtime_error(
+        intel_vpl::make_error_message("Initialize Intel VPL encoder", sts));
   }
 
   // SPS/PPS を抽出して avcC/hvcC 形式の description を生成
@@ -220,12 +268,35 @@ void VideoEncoder::init_intel_vpl_encoder() {
   }
 
   // ビットストリームバッファを確保
-  // 最大フレームサイズを推定: width * height * 1.5 (NV12) * 0.5 (圧縮率)
-  size_t buffer_size = config_.width * config_.height;
-  if (buffer_size < 512 * 1024) {
-    buffer_size = 512 * 1024;
+  mfxVideoParam out_video_params = {};
+  sts = dyn::MFXVideoENCODE_GetVideoParam(session, &out_video_params);
+  if (sts != MFX_ERR_NONE) {
+    cleanup_intel_vpl_encoder();
+    throw std::runtime_error(
+        intel_vpl::make_error_message("Get video parameters", sts));
+  }
+
+  size_t buffer_size = out_video_params.mfx.BufferSizeInKB * 1000;
+  if (buffer_size < intel_vpl::VPL_MIN_BITSTREAM_BUFFER_SIZE) {
+    buffer_size = intel_vpl::VPL_MIN_BITSTREAM_BUFFER_SIZE;
   }
   vpl_bitstream_buffer_.resize(buffer_size);
+
+  // ビットストリームを初期化
+  mfxBitstream* bitstream = new mfxBitstream{};
+  std::memset(bitstream, 0, sizeof(mfxBitstream));
+  bitstream->MaxLength = static_cast<mfxU32>(vpl_bitstream_buffer_.size());
+  bitstream->Data = vpl_bitstream_buffer_.data();
+  vpl_bitstream_ = bitstream;
+
+  // サーフェスプールを初期化
+  intel_vpl::SurfacePool* pool = new intel_vpl::SurfacePool();
+  pool->init(alloc_request.NumFrameSuggested, alloc_request.Info,
+             vpl_surface_buffer_);
+  vpl_surface_pool_ = pool;
+
+  // フレーム情報を保存
+  vpl_frame_info_ = new mfxFrameInfo(alloc_request.Info);
 }
 
 void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
@@ -244,18 +315,13 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
   }
   const VideoFrame& src = nv12 ? *nv12 : frame;
 
-  // サーフェスを取得
-  mfxFrameSurface1* surface = nullptr;
-  mfxStatus sts = dyn::MFXMemory_GetSurfaceForEncode(session, &surface);
-  if (sts != MFX_ERR_NONE || !surface) {
-    throw std::runtime_error("Failed to get Intel VPL encode surface");
-  }
+  // サーフェスプールから未使用のサーフェスを取得
+  intel_vpl::SurfacePool* pool =
+      static_cast<intel_vpl::SurfacePool*>(vpl_surface_pool_);
+  mfxFrameSurface1* surface = pool->acquire();
 
-  // サーフェスをロック
-  sts = surface->FrameInterface->Map(surface, MFX_MAP_WRITE);
-  if (sts != MFX_ERR_NONE) {
-    surface->FrameInterface->Release(surface);
-    throw std::runtime_error("Failed to map Intel VPL surface");
+  if (!surface) {
+    throw std::runtime_error("No available surface for encoding");
   }
 
   // フレームデータをコピー
@@ -264,7 +330,7 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
   const uint8_t* src_y = src.plane_ptr(0);
   const uint8_t* src_uv = src.plane_ptr(1);
   uint8_t* dst_y = surface->Data.Y;
-  uint8_t* dst_uv = surface->Data.UV;
+  uint8_t* dst_uv = surface->Data.U;
   uint32_t dst_pitch = surface->Data.Pitch;
 
   // Y プレーンをコピー
@@ -278,18 +344,15 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
     std::memcpy(dst_uv + row * dst_pitch, src_uv + row * width, width);
   }
 
-  // サーフェスをアンロック
-  surface->FrameInterface->Unmap(surface);
-
   // タイムスタンプを設定
   surface->Data.TimeStamp = frame.timestamp();
 
-  // ビットストリームを準備
-  mfxBitstream bitstream = {};
-  bitstream.Data = vpl_bitstream_buffer_.data();
-  bitstream.MaxLength = static_cast<mfxU32>(vpl_bitstream_buffer_.size());
+  // ビットストリームを取得
+  mfxBitstream* bitstream = static_cast<mfxBitstream*>(vpl_bitstream_);
+  bitstream->DataLength = 0;
+  bitstream->DataOffset = 0;
 
-  // エンコード制御（キーフレーム強制）
+  // エンコード制御
   mfxEncodeCtrl ctrl = {};
   mfxEncodeCtrl* ctrl_ptr = nullptr;
   if (keyframe) {
@@ -297,43 +360,43 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
     ctrl_ptr = &ctrl;
   }
 
-  // quantizer オプション（Intel VPL は QP 制御をサポート、今回は無視）
   (void)quantizer;
 
   // エンコード実行
   mfxSyncPoint syncp = nullptr;
-  sts = dyn::MFXVideoENCODE_EncodeFrameAsync(session, ctrl_ptr, surface,
-                                             &bitstream, &syncp);
-
-  // サーフェスを解放
-  surface->FrameInterface->Release(surface);
+  mfxStatus sts = dyn::MFXVideoENCODE_EncodeFrameAsync(session, ctrl_ptr, surface,
+                                                       bitstream, &syncp);
 
   if (sts == MFX_ERR_MORE_DATA) {
-    // さらにデータが必要（バッファリング中）
+    pool->release(surface);
     return;
   }
   if (sts != MFX_ERR_NONE && sts != MFX_WRN_DEVICE_BUSY) {
-    throw std::runtime_error("Intel VPL encode failed");
+    pool->release(surface);
+    throw std::runtime_error(intel_vpl::make_error_message("Encode", sts));
   }
 
   // 同期を待機
   if (syncp) {
-    sts = dyn::MFXVideoCORE_SyncOperation(session, syncp, 1000);
+    sts = dyn::MFXVideoCORE_SyncOperation(session, syncp,
+                                          intel_vpl::VPL_SYNC_TIMEOUT_MS);
     if (sts != MFX_ERR_NONE) {
-      throw std::runtime_error("Intel VPL sync failed");
+      pool->release(surface);
+      throw std::runtime_error(intel_vpl::make_error_message("Sync", sts));
     }
   }
 
+  pool->release(surface);
+
   // エンコード結果を取得
-  if (bitstream.DataLength > 0) {
-    bool is_keyframe = (bitstream.FrameType & MFX_FRAMETYPE_IDR) ||
-                       (bitstream.FrameType & MFX_FRAMETYPE_I);
+  if (bitstream->DataLength > 0) {
+    bool is_keyframe = (bitstream->FrameType & MFX_FRAMETYPE_IDR) ||
+                       (bitstream->FrameType & MFX_FRAMETYPE_I);
 
-    std::vector<uint8_t> payload(bitstream.DataLength);
-    std::memcpy(payload.data(), bitstream.Data + bitstream.DataOffset,
-                bitstream.DataLength);
+    std::vector<uint8_t> payload(bitstream->DataLength);
+    std::memcpy(payload.data(), bitstream->Data + bitstream->DataOffset,
+                bitstream->DataLength);
 
-    // EncodedVideoChunk を作成して出力
     auto chunk = std::make_shared<EncodedVideoChunk>(
         payload,
         is_keyframe ? EncodedVideoChunkType::KEY : EncodedVideoChunkType::DELTA,
@@ -347,7 +410,6 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
       decoder_config.codec = config_.codec;
       decoder_config.coded_width = config_.width;
       decoder_config.coded_height = config_.height;
-      // SPS/PPS から生成した avcC/hvcC を description に設定
       if (!vpl_description_.empty()) {
         decoder_config.description = vpl_description_;
       }
@@ -365,23 +427,17 @@ void VideoEncoder::flush_intel_vpl_encoder() {
   }
 
   mfxSession session = static_cast<mfxSession>(vpl_session_);
+  mfxBitstream* bitstream = static_cast<mfxBitstream*>(vpl_bitstream_);
 
-  // ビットストリームを準備
-  mfxBitstream bitstream = {};
-  bitstream.Data = vpl_bitstream_buffer_.data();
-  bitstream.MaxLength = static_cast<mfxU32>(vpl_bitstream_buffer_.size());
-
-  // surface = nullptr でフラッシュ
   mfxSyncPoint syncp = nullptr;
   mfxStatus sts;
   while (true) {
-    bitstream.DataLength = 0;
-    bitstream.DataOffset = 0;
+    bitstream->DataLength = 0;
+    bitstream->DataOffset = 0;
 
     sts = dyn::MFXVideoENCODE_EncodeFrameAsync(session, nullptr, nullptr,
-                                               &bitstream, &syncp);
+                                               bitstream, &syncp);
     if (sts == MFX_ERR_MORE_DATA) {
-      // フラッシュ完了
       break;
     }
     if (sts != MFX_ERR_NONE && sts != MFX_WRN_DEVICE_BUSY) {
@@ -389,26 +445,26 @@ void VideoEncoder::flush_intel_vpl_encoder() {
     }
 
     if (syncp) {
-      sts = dyn::MFXVideoCORE_SyncOperation(session, syncp, 1000);
+      sts = dyn::MFXVideoCORE_SyncOperation(session, syncp,
+                                            intel_vpl::VPL_FLUSH_SYNC_TIMEOUT_MS);
       if (sts != MFX_ERR_NONE) {
         break;
       }
     }
 
-    // エンコード結果を出力
-    if (bitstream.DataLength > 0) {
-      bool is_keyframe = (bitstream.FrameType & MFX_FRAMETYPE_IDR) ||
-                         (bitstream.FrameType & MFX_FRAMETYPE_I);
+    if (bitstream->DataLength > 0) {
+      bool is_keyframe = (bitstream->FrameType & MFX_FRAMETYPE_IDR) ||
+                         (bitstream->FrameType & MFX_FRAMETYPE_I);
 
-      std::vector<uint8_t> payload(bitstream.DataLength);
-      std::memcpy(payload.data(), bitstream.Data + bitstream.DataOffset,
-                  bitstream.DataLength);
+      std::vector<uint8_t> payload(bitstream->DataLength);
+      std::memcpy(payload.data(), bitstream->Data + bitstream->DataOffset,
+                  bitstream->DataLength);
 
       auto chunk = std::make_shared<EncodedVideoChunk>(
           payload,
           is_keyframe ? EncodedVideoChunkType::KEY
                       : EncodedVideoChunkType::DELTA,
-          bitstream.TimeStamp, 0);
+          bitstream->TimeStamp, 0);
 
       handle_output(current_sequence_, chunk, std::nullopt);
     }
@@ -429,8 +485,24 @@ void VideoEncoder::cleanup_intel_vpl_encoder() {
     vpl_loader_ = nullptr;
   }
 
+  if (vpl_surface_pool_) {
+    delete static_cast<intel_vpl::SurfacePool*>(vpl_surface_pool_);
+    vpl_surface_pool_ = nullptr;
+  }
+
+  if (vpl_frame_info_) {
+    delete static_cast<mfxFrameInfo*>(vpl_frame_info_);
+    vpl_frame_info_ = nullptr;
+  }
+
+  if (vpl_bitstream_) {
+    delete static_cast<mfxBitstream*>(vpl_bitstream_);
+    vpl_bitstream_ = nullptr;
+  }
+
   vpl_bitstream_buffer_.clear();
   vpl_description_.clear();
+  vpl_surface_buffer_.clear();
 }
 
 // SPS/PPS から avcC (H.264) または hvcC (HEVC) 形式の description を生成
@@ -450,7 +522,6 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     std::vector<std::pair<const uint8_t*, size_t>> nalus;
 
     // SPS バッファから NAL ユニットを抽出
-    // Intel VPL は Annex B 形式 (start code 付き) で返す
     auto extract_nalus = [](const uint8_t* data, size_t size,
                             std::vector<std::pair<const uint8_t*, size_t>>& out) {
       size_t pos = 0;
@@ -517,15 +588,12 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
         continue;
       uint8_t nal_type = (nalu.first[0] >> 1) & 0x3F;
       if (nal_type == 32 && !vps_data) {
-        // VPS
         vps_data = nalu.first;
         vps_len = nalu.second;
       } else if (nal_type == 33 && !sps_data) {
-        // SPS
         sps_data = nalu.first;
         sps_len = nalu.second;
       } else if (nal_type == 34 && !pps_data) {
-        // PPS
         pps_data = nalu.first;
         pps_len = nalu.second;
       }
@@ -542,11 +610,9 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     vpl_description_.push_back(1);
 
     // general_profile_space, general_tier_flag, general_profile_idc
-    // SPS から取得する必要があるが、簡易実装としてデフォルト値を使用
-    uint8_t profile_byte = 0x01;  // Main profile
+    uint8_t profile_byte = 0x01;
     if (sps_len > 2) {
-      // profile_tier_level は SPS の先頭付近にある
-      profile_byte = sps_data[1] & 0x1F;  // general_profile_idc の下位 5 ビット
+      profile_byte = sps_data[1] & 0x1F;
     }
     vpl_description_.push_back(profile_byte);
 
@@ -565,7 +631,7 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     vpl_description_.push_back(0x00);
 
     // general_level_idc
-    vpl_description_.push_back(0x5D);  // Level 3.1
+    vpl_description_.push_back(0x5D);
 
     // min_spatial_segmentation_idc (4 bits reserved + 12 bits)
     vpl_description_.push_back(0xF0);
@@ -575,7 +641,7 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     vpl_description_.push_back(0xFC);
 
     // chromaFormat (6 bits reserved + 2 bits)
-    vpl_description_.push_back(0xFD);  // 4:2:0
+    vpl_description_.push_back(0xFD);
 
     // bitDepthLumaMinus8 (5 bits reserved + 3 bits)
     vpl_description_.push_back(0xF8);
@@ -588,7 +654,7 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     vpl_description_.push_back(0x00);
 
     // constantFrameRate, numTemporalLayers, temporalIdNested, lengthSizeMinusOne
-    vpl_description_.push_back(0x0F);  // lengthSizeMinusOne = 3 (4 bytes)
+    vpl_description_.push_back(0x0F);
 
     // numOfArrays
     uint8_t num_arrays = 0;
@@ -602,9 +668,9 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
 
     // VPS array
     if (vps_data) {
-      vpl_description_.push_back(0xA0);  // array_completeness=1, NAL_unit_type=32
+      vpl_description_.push_back(0xA0);
       vpl_description_.push_back(0x00);
-      vpl_description_.push_back(0x01);  // numNalus = 1
+      vpl_description_.push_back(0x01);
       vpl_description_.push_back((vps_len >> 8) & 0xFF);
       vpl_description_.push_back(vps_len & 0xFF);
       vpl_description_.insert(vpl_description_.end(), vps_data,
@@ -613,9 +679,9 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
 
     // SPS array
     if (sps_data) {
-      vpl_description_.push_back(0xA1);  // array_completeness=1, NAL_unit_type=33
+      vpl_description_.push_back(0xA1);
       vpl_description_.push_back(0x00);
-      vpl_description_.push_back(0x01);  // numNalus = 1
+      vpl_description_.push_back(0x01);
       vpl_description_.push_back((sps_len >> 8) & 0xFF);
       vpl_description_.push_back(sps_len & 0xFF);
       vpl_description_.insert(vpl_description_.end(), sps_data,
@@ -624,9 +690,9 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
 
     // PPS array
     if (pps_data) {
-      vpl_description_.push_back(0xA2);  // array_completeness=1, NAL_unit_type=34
+      vpl_description_.push_back(0xA2);
       vpl_description_.push_back(0x00);
-      vpl_description_.push_back(0x01);  // numNalus = 1
+      vpl_description_.push_back(0x01);
       vpl_description_.push_back((pps_len >> 8) & 0xFF);
       vpl_description_.push_back(pps_len & 0xFF);
       vpl_description_.insert(vpl_description_.end(), pps_data,
@@ -635,12 +701,10 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
   } else {
     // avcC 形式の生成 (ISO/IEC 14496-15 Section 5.2.4.1.1)
 
-    // SPS から profile, profile_compat, level を抽出
-    // SPS は Annex B 形式で返される可能性があるため、start code をスキップ
     const uint8_t* sps_nalu = sps;
     size_t sps_nalu_size = sps_size;
 
-    // start code をスキップ (0x000001 or 0x00000001)
+    // start code をスキップ
     if (sps_size >= 4 && sps[0] == 0 && sps[1] == 0 && sps[2] == 0 &&
         sps[3] == 1) {
       sps_nalu = sps + 4;
@@ -675,37 +739,25 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     }
 
     // avcC 構造を構築
-    // SPS の NAL ヘッダー (1 byte) の後に profile_idc, constraint_flags, level_idc がある
     uint8_t profile_idc = sps_nalu[1];
     uint8_t profile_compat = sps_nalu[2];
     uint8_t level_idc = sps_nalu[3];
 
     vpl_description_.reserve(11 + sps_nalu_size + pps_nalu_size);
 
-    // configurationVersion
     vpl_description_.push_back(1);
-    // AVCProfileIndication
     vpl_description_.push_back(profile_idc);
-    // profile_compatibility
     vpl_description_.push_back(profile_compat);
-    // AVCLevelIndication
     vpl_description_.push_back(level_idc);
-    // reserved (6 bits) + lengthSizeMinusOne (2 bits) = 0xFF (4 bytes NALU length)
     vpl_description_.push_back(0xFF);
-    // reserved (3 bits) + numOfSequenceParameterSets (5 bits) = 0xE1 (1 SPS)
     vpl_description_.push_back(0xE1);
-    // sequenceParameterSetLength (big endian)
     vpl_description_.push_back((sps_nalu_size >> 8) & 0xFF);
     vpl_description_.push_back(sps_nalu_size & 0xFF);
-    // sequenceParameterSetNALUnit
     vpl_description_.insert(vpl_description_.end(), sps_nalu,
                             sps_nalu + sps_nalu_size);
-    // numOfPictureParameterSets
     vpl_description_.push_back(1);
-    // pictureParameterSetLength (big endian)
     vpl_description_.push_back((pps_nalu_size >> 8) & 0xFF);
     vpl_description_.push_back(pps_nalu_size & 0xFF);
-    // pictureParameterSetNALUnit
     vpl_description_.insert(vpl_description_.end(), pps_nalu,
                             pps_nalu + pps_nalu_size);
   }
