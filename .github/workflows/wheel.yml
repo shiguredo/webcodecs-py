@@ -45,8 +45,6 @@ jobs:
       - name: Install build dependencies
         run: |
           brew install nasm yasm
-      - name: Install meson
-        run: uv tool install meson
 
       - run: uv build --wheel --out-dir wheelhouse
       - name: Upload Artifact
@@ -106,8 +104,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential nasm yasm
-      - name: Install meson
-        run: uv tool install meson
 
       # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
       # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
@@ -161,9 +157,6 @@ jobs:
           key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
-
-      - name: Install meson
-        run: uv tool install meson
 
       - name: Build wheel
         run: uv build --wheel --out-dir wheelhouse
