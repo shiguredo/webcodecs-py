@@ -11,10 +11,14 @@
 
 ## develop
 
+## 2025.2.0
+
+**リリース日**:: 2025-12-08
+
 - [ADD] NVIDIA Video Codec SDK (NVENC/NVDEC) をサポートする
-  - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を指定可能
+  - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を指定できる
   - H.264 / HEVC / AV1 のハードウェアエンコード/デコードに対応
-  - ビルド時に CMAKE_ARGS="-DNVIDIA_CUDA_TOOLKIT=ON" の指定が必要
+  - ビルド時に `NVIDIA_CUDA_TOOLKIT=true` の環境変数指定が必要
   - Ubuntu のみ対応
   - @voluntas
 - [ADD] VideoDecoder に hardware_acceleration_engine オプションを追加する
