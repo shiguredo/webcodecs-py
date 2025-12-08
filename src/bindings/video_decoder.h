@@ -19,12 +19,26 @@
 #include "video_frame.h"
 #include "webcodecs_types.h"
 
+#if defined(NVIDIA_CUDA_TOOLKIT)
+#include <cuda.h>
+#include <cuviddec.h>
+#include <nvcuvid.h>
+#endif
+
+#if defined(__APPLE__) || defined(__linux__)
+#include <vpx/vp8dx.h>
+#include <vpx/vpx_codec.h>
+#include <vpx/vpx_decoder.h>
+#endif
+
 namespace nb = nanobind;
 
 enum class VideoCodec {
   AV1,
   H264,
   H265,
+  VP8,
+  VP9,
 };
 
 class VideoDecoder {
@@ -115,6 +129,17 @@ class VideoDecoder {
   bool decode_videotoolbox(const EncodedVideoChunk& chunk);
   void flush_videotoolbox();
 
+#if defined(__APPLE__) || defined(__linux__)
+  // libvpx デコーダー
+  void init_vpx_decoder();
+  void cleanup_vpx_decoder();
+  bool decode_vpx(const EncodedVideoChunk& chunk);
+  void flush_vpx();
+
+  void* vpx_decoder_ = nullptr;
+  std::mutex vpx_mutex_;
+#endif
+
   // 並列処理のためのメソッド
   void worker_loop();  // ワーカースレッドのメインループ
   void process_decode_task(const DecodeTask& task);  // タスクの処理
@@ -123,4 +148,30 @@ class VideoDecoder {
 
   // ユーティリティーメソッド
   static VideoCodec string_to_codec(const std::string& codec);
+
+  // NVIDIA Video Codec SDK を使用するかどうかを判定
+  bool uses_nvidia_video_codec() const;
+
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  // NVIDIA Video Codec SDK (NVDEC) 関連のメンバー
+  void* nvdec_decoder_ = nullptr;
+  void* nvdec_cuda_context_ = nullptr;
+  void* nvdec_video_parser_ = nullptr;
+  void* nvdec_video_source_ = nullptr;
+
+  // NVDEC デコード用のフレームキュー
+  std::vector<void*> nvdec_frame_queue_;
+  uint32_t nvdec_decode_surface_count_ = 0;
+
+  // NVDEC 関連のメソッド
+  void init_nvdec_decoder();
+  bool decode_nvdec(const EncodedVideoChunk& chunk);
+  void flush_nvdec();
+  void cleanup_nvdec_decoder();
+
+  // NVDEC コールバック用のメンバー関数
+  static int handle_video_sequence(void* user_data, void* video_format);
+  static int handle_decode_picture(void* user_data, void* pic_params);
+  static int handle_display_picture(void* user_data, void* disp_info);
+#endif
 };

@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include "video_frame.h"  // VideoPixelFormat の定義のため
 
+using namespace nb::literals;
+
 void VideoFrameBufferInit::validate() const {
   if (format.empty()) {
     throw std::invalid_argument("format is required");
@@ -80,15 +82,15 @@ void init_webcodecs_types(nb::module_& m) {
   // PlaneLayout クラス
   nb::class_<PlaneLayout>(m, "PlaneLayout")
       .def(nb::init<>())
-      .def(nb::init<uint32_t, uint32_t>(), nb::arg("offset"), nb::arg("stride"))
+      .def(nb::init<uint32_t, uint32_t>(), "offset"_a, "stride"_a)
       .def_rw("offset", &PlaneLayout::offset)
       .def_rw("stride", &PlaneLayout::stride);
 
   // DOMRect クラス
   nb::class_<DOMRect>(m, "DOMRect")
       .def(nb::init<>())
-      .def(nb::init<double, double, double, double>(), nb::arg("x"),
-           nb::arg("y"), nb::arg("width"), nb::arg("height"))
+      .def(nb::init<double, double, double, double>(), "x"_a, "y"_a, "width"_a,
+           "height"_a)
       .def_rw("x", &DOMRect::x)
       .def_rw("y", &DOMRect::y)
       .def_rw("width", &DOMRect::width)
@@ -242,9 +244,9 @@ void init_webcodecs_types(nb::module_& m) {
                  self->color_space = nb::cast<VideoColorSpace>(cs_obj);
                }
              }
-             if (kwargs.contains("hardware_acceleration")) {
-               self->hardware_acceleration =
-                   nb::cast<std::string>(kwargs["hardware_acceleration"]);
+             if (kwargs.contains("hardware_acceleration_engine")) {
+               self->hardware_acceleration_engine =
+                   nb::cast<HardwareAccelerationEngine>(kwargs["hardware_acceleration_engine"]);
              }
              if (kwargs.contains("optimize_for_latency")) {
                self->optimize_for_latency =
@@ -265,8 +267,8 @@ void init_webcodecs_types(nb::module_& m) {
       .def_rw("display_aspect_height",
               &VideoDecoderConfig::display_aspect_height)
       .def_rw("color_space", &VideoDecoderConfig::color_space)
-      .def_rw("hardware_acceleration",
-              &VideoDecoderConfig::hardware_acceleration)
+      .def_rw("hardware_acceleration_engine",
+              &VideoDecoderConfig::hardware_acceleration_engine)
       .def_rw("optimize_for_latency", &VideoDecoderConfig::optimize_for_latency)
       .def_rw("rotation", &VideoDecoderConfig::rotation)
       .def_rw("flip", &VideoDecoderConfig::flip);
@@ -393,7 +395,8 @@ void init_webcodecs_types(nb::module_& m) {
                if (self.config.display_aspect_height.has_value())
                  d["display_aspect_height"] =
                      self.config.display_aspect_height.value();
-               d["hardware_acceleration"] = self.config.hardware_acceleration;
+               d["hardware_acceleration_engine"] =
+                   self.config.hardware_acceleration_engine;
                if (self.config.optimize_for_latency.has_value())
                  d["optimize_for_latency"] =
                      self.config.optimize_for_latency.value();

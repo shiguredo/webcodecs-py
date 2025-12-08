@@ -66,7 +66,7 @@ def test_different_codecs_compression():
             }
             frame = VideoFrame(data, init)
 
-            encoder.encode(frame, {"keyFrame": True})
+            encoder.encode(frame, {"key_frame": True})
             encoder.flush()
 
             if chunks:

@@ -109,6 +109,33 @@ CFStringRef map_hevc_profile_level(uint8_t profile_idc, uint8_t level_idc) {
   // 明示的なレベル指定は行わない
 }
 
+// CMVideoFormatDescription から avcC/hvcC を抽出する
+// これは MP4 の sample entry に直接使用できる形式
+static std::vector<uint8_t> extract_description(
+    CMVideoFormatDescriptionRef desc,
+    bool is_h264) {
+  std::vector<uint8_t> result;
+
+  // SampleDescriptionExtensionAtoms から avcC/hvcC を取得
+  CFDictionaryRef extensions = (CFDictionaryRef)CMFormatDescriptionGetExtension(
+      desc, kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms);
+  if (!extensions) {
+    return result;
+  }
+
+  CFStringRef key = is_h264 ? CFSTR("avcC") : CFSTR("hvcC");
+  CFDataRef data = (CFDataRef)CFDictionaryGetValue(extensions, key);
+  if (!data) {
+    return result;
+  }
+
+  CFIndex length = CFDataGetLength(data);
+  result.resize(length);
+  CFDataGetBytes(data, CFRangeMake(0, length), result.data());
+
+  return result;
+}
+
 static void vt_output_callback(void* outputCallbackRefCon,
                                void* sourceFrameRefCon,
                                OSStatus status,
@@ -153,33 +180,59 @@ static void vt_output_callback(void* outputCallbackRefCon,
   // Annex B フォーマットの場合、パラメーターセットをビットストリームに含める
   bool include_parameter_sets = use_annexb;
 
-  if (key_frame && include_parameter_sets) {
-    CMVideoFormatDescriptionRef desc =
-        CMSampleBufferGetFormatDescription(sampleBuffer);
-    if (desc) {
-      FourCharCode codec = CMFormatDescriptionGetMediaSubType(desc);
-      bool is_h264 = codec == kCMVideoCodecType_H264;
-      int nalu_len_size = 0;
-      size_t ps_count = 0;
-      OSStatus st =
-          is_h264 ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                        desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size)
-                  : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
-                        desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size);
-      if (st == noErr) {
-        for (size_t i = 0; i < ps_count; ++i) {
-          const uint8_t* ps = nullptr;
-          size_t ps_size = 0;
-          st = is_h264 ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-                             desc, i, &ps, &ps_size, nullptr, nullptr)
-                       : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
-                             desc, i, &ps, &ps_size, nullptr, nullptr);
-          if (st != noErr)
-            break;
-          out.insert(out.end(), start_code, start_code + start_size);
-          out.insert(out.end(), ps, ps + ps_size);
-        }
+  // キーフレーム時の metadata 用に description を取得
+  std::optional<EncodedVideoChunkMetadata> metadata;
+  CMVideoFormatDescriptionRef format_desc =
+      CMSampleBufferGetFormatDescription(sampleBuffer);
+
+  if (key_frame && include_parameter_sets && format_desc) {
+    FourCharCode codec = CMFormatDescriptionGetMediaSubType(format_desc);
+    bool is_h264 = codec == kCMVideoCodecType_H264;
+    int nalu_len_size = 0;
+    size_t ps_count = 0;
+    OSStatus st =
+        is_h264
+            ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+                  format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size)
+            : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
+                  format_desc, 0, nullptr, nullptr, &ps_count, &nalu_len_size);
+    if (st == noErr) {
+      for (size_t i = 0; i < ps_count; ++i) {
+        const uint8_t* ps = nullptr;
+        size_t ps_size = 0;
+        st = is_h264 ? CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+                           format_desc, i, &ps, &ps_size, nullptr, nullptr)
+                     : CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(
+                           format_desc, i, &ps, &ps_size, nullptr, nullptr);
+        if (st != noErr)
+          break;
+        out.insert(out.end(), start_code, start_code + start_size);
+        out.insert(out.end(), ps, ps + ps_size);
       }
+    }
+  }
+
+  // キーフレームかつ length-prefixed フォーマットの場合、decoderConfig を metadata に含める
+  if (key_frame && !use_annexb && format_desc) {
+    bool is_h264 = !is_hevc_codec;
+    std::vector<uint8_t> description =
+        extract_description(format_desc, is_h264);
+
+    if (!description.empty()) {
+      CMVideoDimensions dimensions =
+          CMVideoFormatDescriptionGetDimensions(format_desc);
+
+      EncodedVideoChunkMetadata meta;
+      VideoDecoderConfig decoder_config;
+
+      // コーデック文字列を設定
+      decoder_config.codec = is_h264 ? "avc1" : "hvc1";
+      decoder_config.coded_width = dimensions.width;
+      decoder_config.coded_height = dimensions.height;
+      decoder_config.description = std::move(description);
+
+      meta.decoder_config = std::move(decoder_config);
+      metadata = std::move(meta);
     }
   }
 
@@ -188,6 +241,14 @@ static void vt_output_callback(void* outputCallbackRefCon,
     return;
   size_t total = CMBlockBufferGetDataLength(block);
   size_t pos = 0;
+
+  // Annex B 変換時の再アロケーションを防ぐため、事前に容量を確保
+  // パラメーターセット + start code オーバーヘッド (1 NAL あたり 4 バイト) を考慮
+  if (use_annexb) {
+    // 1080p で約 10-20 NAL ユニット程度を想定
+    size_t estimated_overhead = 20 * 4;
+    out.reserve(out.size() + total + estimated_overhead);
+  }
 
   if (use_annexb) {
     // Annex B フォーマット: start code (0x00000001) を使用
@@ -219,7 +280,7 @@ static void vt_output_callback(void* outputCallbackRefCon,
       out,
       key_frame ? EncodedVideoChunkType::KEY : EncodedVideoChunkType::DELTA,
       timestamp, 0);
-  self->handle_output(sequence, chunk);
+  self->handle_output(sequence, chunk, metadata);
 }
 }  // namespace
 
@@ -274,11 +335,21 @@ void VideoEncoder::init_videotoolbox_encoder() {
     throw std::runtime_error("Failed to create VTCompressionSession");
   }
 
-  // Realtime, no B-frames
+  // Realtime, no B-frames, low latency settings
   VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                        kCFBooleanTrue);
   VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowFrameReordering,
                        kCFBooleanFalse);
+
+  // 期待されるフレームレートを設定（低遅延のために重要）
+  if (config_.framerate.has_value()) {
+    float expected_fps = static_cast<float>(config_.framerate.value());
+    CFNumberRef fps_num =
+        CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &expected_fps);
+    VTSessionSetProperty(session, kVTCompressionPropertyKey_ExpectedFrameRate,
+                         fps_num);
+    CFRelease(fps_num);
+  }
 
   // codec_params_ からプロファイルとレベルを設定
   // 注: プロファイル/レベルの設定はオプションで、VideoToolbox は
@@ -371,14 +442,25 @@ void VideoEncoder::encode_frame_videotoolbox(
   int height = static_cast<int>(src.height());
   int chroma_height = (height + 1) / 2;
   // Y plane
-  for (int i = 0; i < height; ++i) {
-    memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
+  // ストライドが width と等しければ一括コピー
+  if (dst_stride_y == static_cast<size_t>(width)) {
+    memcpy(dst_y, src_y, static_cast<size_t>(width * height));
+  } else {
+    for (int i = 0; i < height; ++i) {
+      memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
+    }
   }
   // UV plane (interleaved)
   int chroma_row_bytes = ((width + 1) / 2) * 2;  // even width
-  for (int i = 0; i < chroma_height; ++i) {
-    memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
-           chroma_row_bytes);
+  // ストライドが chroma_row_bytes と等しければ一括コピー
+  if (dst_stride_uv == static_cast<size_t>(chroma_row_bytes)) {
+    memcpy(dst_uv, src_uv,
+           static_cast<size_t>(chroma_row_bytes * chroma_height));
+  } else {
+    for (int i = 0; i < chroma_height; ++i) {
+      memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
+             chroma_row_bytes);
+    }
   }
   CVPixelBufferUnlockBaseAddress(pb, 0);
 

@@ -53,7 +53,7 @@ def test_encode_with_options_keyframe_true():
     enc.configure(config)
 
     f0 = create_frame(160, 120, 0)
-    enc.encode(f0, {"keyFrame": True})
+    enc.encode(f0, {"key_frame": True})
 
     enc.flush()
 
@@ -87,7 +87,7 @@ def test_encode_with_options_keyframe_false_after_keyframe():
 
     # 先頭はキーフレームを強制
     f0 = create_frame(160, 120, 0)
-    enc.encode(f0, {"keyFrame": True})
+    enc.encode(f0, {"key_frame": True})
 
     # 次はデルタフレーム意図
     f1 = create_frame(160, 120, 1000, y=90)

@@ -50,11 +50,35 @@ struct HEVCCodecParameters {
   HEVCCodecParameters() : general_profile_idc(0), general_level_idc(0) {}
 };
 
+// VP8 コーデックパラメータ
+// フォーマット: "vp8"
+struct VP8CodecParameters {
+  // VP8 は追加パラメータを持たない
+  VP8CodecParameters() = default;
+};
+
+// VP9 コーデックパラメータ
+// フォーマット: vp09.PP.LL.DD[.CC.CP.TC.MC.FF]
+struct VP9CodecParameters {
+  uint8_t profile;    // 0-3
+  uint8_t level;      // レベル（10-62）
+  uint8_t bit_depth;  // 8, 10, 12
+  std::optional<uint8_t> chroma_subsampling;
+  std::optional<uint8_t> color_primaries;
+  std::optional<uint8_t> transfer_characteristics;
+  std::optional<uint8_t> matrix_coefficients;
+  std::optional<uint8_t> video_full_range_flag;
+
+  VP9CodecParameters() : profile(0), level(10), bit_depth(8) {}
+};
+
 // コーデックパラメータを保持する variant
 using CodecParameters = std::variant<std::monostate,
                                      AV1CodecParameters,
                                      AVCCodecParameters,
-                                     HEVCCodecParameters>;
+                                     HEVCCodecParameters,
+                                     VP8CodecParameters,
+                                     VP9CodecParameters>;
 
 // AV1 コーデック文字列をパース
 // 例: "av01.0.04M.08" -> AV1CodecParameters
@@ -67,6 +91,14 @@ AVCCodecParameters parse_avc_codec_string(const std::string& codec_string);
 // HEVC/H.265 コーデック文字列をパース
 // 例: "hvc1.1.6.L93.B0" -> HEVCCodecParameters
 HEVCCodecParameters parse_hevc_codec_string(const std::string& codec_string);
+
+// VP8 コーデック文字列をパース
+// 例: "vp8" -> VP8CodecParameters
+VP8CodecParameters parse_vp8_codec_string(const std::string& codec_string);
+
+// VP9 コーデック文字列をパース
+// 例: "vp09.00.10.08" -> VP9CodecParameters
+VP9CodecParameters parse_vp9_codec_string(const std::string& codec_string);
 
 // コーデック文字列を自動判定してパース
 CodecParameters parse_codec_string(const std::string& codec_string);

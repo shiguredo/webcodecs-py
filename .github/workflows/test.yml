@@ -18,15 +18,15 @@ jobs:
       matrix:
         platform:
           # NVIDIA Video Codec (self-hosted runner)
-          # - name: nvidia-video-codec
-          #   runs_on:
-          #     group: Self
-          #     labels: [self-hosted, linux, x64, NVIDIA-Video-Codec-SDK]
-          #   env_vars: |
-          #     NVIDIA_VIDEO_CODEC=true
-          #   test_target: tests/test_nvidia_video_codec.py
-          #   # NVIDIA Video Codec 用の wheel は ubuntu-24.04_x86_64 のものを使用
-          #   wheel_platform: ubuntu-24.04_x86_64
+          - name: nvidia-video-codec
+            runs_on:
+              group: Self
+              labels: [self-hosted, linux, x64, NVIDIA-Video-Codec-SDK]
+            env_vars: |
+              NVIDIA_CUDA_TOOLKIT=true
+            test_target: tests/test_nvidia_video_codec.py
+            # NVIDIA Video Codec 用の wheel は ubuntu-24.04_x86_64 のものを使用
+            wheel_platform: ubuntu-24.04_x86_64
           # Apple Video Toolbox (self-hosted runner)
           - name: apple-video-toolbox_arm64
             runs_on:
@@ -38,8 +38,9 @@ jobs:
             # Apple Video Toolbox 用の wheel は macos_arm64 のものを使用
             wheel_platform: macos-15_arm64
         python_version:
-          - "3.13"
           - "3.14"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -117,8 +118,9 @@ jobs:
           - name: macos-15_arm64
             runs_on: macos-15
         python_version:
-          - "3.13"
           - "3.14"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -192,8 +194,9 @@ jobs:
           - name: ubuntu-22.04_arm64
             runs_on: ubuntu-22.04-arm
         python_version:
-          - "3.13"
           - "3.14"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:

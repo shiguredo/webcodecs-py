@@ -100,7 +100,7 @@ def test_video_decoder_on_dequeue():
         "timestamp": 0,
     }
     frame = VideoFrame(data, init2)
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
     encoder.close()

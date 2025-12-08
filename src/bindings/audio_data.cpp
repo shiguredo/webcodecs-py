@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <string>  // Windows ビルドで std::to_string に必要
 
+using namespace nb::literals;
+
 // WebCodecs API 準拠コンストラクタ (AudioDataInit dict を受け取る)
 AudioData::AudioData(nb::dict init) : duration_(0), closed_(false) {
   // 必須フィールドの検証
@@ -516,7 +518,7 @@ void init_audio_data(nb::module_& m) {
       .value("F32_PLANAR", AudioSampleFormat::F32_PLANAR);
 
   nb::class_<AudioData>(m, "AudioData")
-      .def(nb::init<nb::dict>(), nb::arg("init"),
+      .def(nb::init<nb::dict>(), "init"_a,
            nb::sig("def __init__(self, init: webcodecs.AudioDataInit, /) "
                    "-> None"))
       .def_prop_ro("number_of_channels", &AudioData::number_of_channels,
@@ -531,14 +533,13 @@ void init_audio_data(nb::module_& m) {
                    nb::sig("def timestamp(self, /) -> int"))
       .def_prop_ro("duration", &AudioData::duration,
                    nb::sig("def duration(self, /) -> int"))
-      .def("get_channel_data", &AudioData::get_channel_data, nb::arg("channel"),
+      .def("get_channel_data", &AudioData::get_channel_data, "channel"_a,
            nb::sig("def get_channel_data(self, channel: int, /) -> "
                    "numpy.typing.NDArray"))
-      .def("copy_to", &AudioData::copy_to, nb::arg("destination"),
-           nb::arg("options"),
+      .def("copy_to", &AudioData::copy_to, "destination"_a, "options"_a,
            nb::sig("def copy_to(self, destination: numpy.typing.NDArray, "
                    "options: webcodecs.AudioDataCopyToOptions) -> None"))
-      .def("allocation_size", &AudioData::allocation_size, nb::arg("options"),
+      .def("allocation_size", &AudioData::allocation_size, "options"_a,
            nb::sig("def allocation_size(self, options: "
                    "webcodecs.AudioDataCopyToOptions, /) -> int"))
       .def("close", &AudioData::close, nb::sig("def close(self, /) -> None"))
@@ -547,5 +548,15 @@ void init_audio_data(nb::module_& m) {
       .def(
           "clone", [](const AudioData& self) { return self.clone().release(); },
           nb::rv_policy::take_ownership,
-          nb::sig("def clone(self, /) -> AudioData"));
+          nb::sig("def clone(self, /) -> AudioData"))
+      // context manager 対応
+      .def(
+          "__enter__", [](AudioData& self) -> AudioData& { return self; },
+          nb::rv_policy::reference)
+      .def(
+          "__exit__",
+          [](AudioData& self, nb::object, nb::object, nb::object) {
+            self.close();
+          },
+          "exc_type"_a.none(), "exc_val"_a.none(), "exc_tb"_a.none());
 }

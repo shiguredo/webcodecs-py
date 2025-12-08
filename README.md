@@ -1,6 +1,7 @@
 # webcodecs-py
 
 [![PyPI](https://img.shields.io/pypi/v/webcodecs-py)](https://pypi.org/project/webcodecs-py/)
+[![SPEC 0 — Minimum Supported Dependencies](https://img.shields.io/badge/SPEC-0-green?labelColor=%23004811&color=%235CA038)](https://scientific-python.org/specs/spec-0000/)
 [![image](https://img.shields.io/pypi/pyversions/webcodecs-py.svg)](https://pypi.python.org/pypi/webcodecs-py)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Actions status](https://github.com/shiguredo/webcodecs-py/workflows/wheel/badge.svg)](https://github.com/shiguredo/webcodecs-py/actions)
@@ -22,13 +23,18 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 ## 特徴
 
 - WebCodecs API の Python バインディング
-- Opus、FLAC、AAC、AV1、H.264、H.265 コーデックをサポート
+- Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
   - AAC は macOS の AudioToolbox を利用
-  - H.264 と H.265 は macOS の VideoToolbox を利用
+  - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
+- Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
+- NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
+  - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
+- NumPy の ndarray を直接利用できる
 - クロスプラットフォーム対応
-  - macOS
-  - Ubuntu
-  - Windows
+  - macOS arm64
+  - Ubuntu x86_64 および arm64
+  - Windows x86_64
+    - Windows はソフトウェアエンコード/デコードのみ対応
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 
@@ -37,8 +43,6 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 - ImageDecoder: 画像デコード機能は実装対象外
   - Pillow や OpenCV を使用してください
 - CanvasImageSource: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
-
--
 
 ## サンプルコード
 
@@ -91,13 +95,15 @@ init: AudioDataInit = {
     "timestamp": 0,
     "data": audio_samples,
 }
-audio_data = AudioData(init)
-encoder.encode(audio_data)
+
+# with 文で AudioData を使用（自動的に close される）
+with AudioData(init) as audio_data:
+    encoder.encode(audio_data)
+
 encoder.flush()
 
 print(f"エンコード完了: {len(encoded_chunks)} チャンク")
 
-audio_data.close()
 encoder.close()
 ```
 
@@ -149,15 +155,15 @@ init: VideoFrameBufferInit = {
     "coded_height": height,
     "timestamp": 0,
 }
-frame = VideoFrame(frame_data, init)
 
-# エンコード
-encoder.encode(frame, {"keyFrame": True})
+# with 文で VideoFrame を使用（自動的に close される）
+with VideoFrame(frame_data, init) as frame:
+    encoder.encode(frame, {"key_frame": True})
+
 encoder.flush()
 
 print(f"エンコード完了: {len(encoded_chunks)} チャンク, {encoded_chunks[0].byte_length} bytes")
 
-frame.close()
 encoder.close()
 ```
 
@@ -173,18 +179,28 @@ encoder.close()
   - <https://github.com/xiph/flac>
 - AAC
   - <https://developer.apple.com/documentation/audiotoolbox>
+- VP8
+  - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
+- VP9
+  - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - AV1
   - <https://aomedia.googlesource.com/aom>
   - <https://github.com/videolan/dav1d>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.264 (AVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.265 (HEVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 
 ## Python
 
 - 3.14
 - 3.13
+- 3.12
 
 ## プラットフォーム
 
@@ -195,6 +211,7 @@ encoder.close()
 - Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
 - Windows 11 x86_64
+- Windows Server 2025 x86_64
 
 ## ビルド
 
@@ -235,4 +252,14 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+```
+
+## NVIDIA Video Codec SDK
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/license/index.html>
+
+```text
+“This software contains source code provided by NVIDIA Corporation.”
 ```

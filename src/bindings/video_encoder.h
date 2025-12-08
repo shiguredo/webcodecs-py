@@ -17,6 +17,11 @@
 #include <aom/aom_codec.h>
 #include <aom/aom_encoder.h>
 #include <aom/aomcx.h>
+#if defined(__APPLE__) || defined(__linux__)
+#include <vpx/vp8cx.h>
+#include <vpx/vpx_codec.h>
+#include <vpx/vpx_encoder.h>
+#endif
 #include "codec_parser.h"
 #include "webcodecs_types.h"
 
@@ -25,6 +30,11 @@
 #if defined(__APPLE__)
 // CFStringRef の前方宣言
 typedef const struct __CFString* CFStringRef;
+#endif
+
+#if defined(NVIDIA_CUDA_TOOLKIT)
+#include <cuda.h>
+#include <nvEncodeAPI.h>
 #endif
 
 namespace nb = nanobind;
@@ -50,12 +60,24 @@ class VideoEncoder {
     std::optional<uint16_t> quantizer;  // 0-51 の範囲
   };
 
+  // VP8 エンコードオプション
+  struct VP8EncodeOptions {
+    std::optional<uint16_t> quantizer;  // 0-63 の範囲
+  };
+
+  // VP9 エンコードオプション
+  struct VP9EncodeOptions {
+    std::optional<uint16_t> quantizer;  // 0-63 の範囲
+  };
+
   // エンコードオプション
   struct EncodeOptions {
     bool keyframe = false;
     std::optional<AV1EncodeOptions> av1;
     std::optional<AVCEncodeOptions> avc;
     std::optional<HEVCEncodeOptions> hevc;
+    std::optional<VP8EncodeOptions> vp8;
+    std::optional<VP9EncodeOptions> vp9;
   };
 
   // エンコードタスクを表す構造体
@@ -65,6 +87,8 @@ class VideoEncoder {
     std::optional<uint16_t> av1_quantizer;   // AV1 の quantizer オプション
     std::optional<uint16_t> avc_quantizer;   // AVC の quantizer オプション
     std::optional<uint16_t> hevc_quantizer;  // HEVC の quantizer オプション
+    std::optional<uint16_t> vp8_quantizer;   // VP8 の quantizer オプション
+    std::optional<uint16_t> vp9_quantizer;   // VP9 の quantizer オプション
     uint64_t sequence_number;                // タスクの順序を保持
   };
 
@@ -92,8 +116,11 @@ class VideoEncoder {
       const VideoEncoderConfig& config);
 
   // VideoToolbox コールバック用に public にする
-  void handle_output(uint64_t sequence,
-                     std::shared_ptr<EncodedVideoChunk> chunk);  // 出力処理
+  // metadata はオプショナルで、キーフレーム時に decoderConfig を含む
+  void handle_output(
+      uint64_t sequence,
+      std::shared_ptr<EncodedVideoChunk> chunk,
+      std::optional<EncodedVideoChunkMetadata> metadata = std::nullopt);
 
  private:
   aom_codec_ctx_t* aom_encoder_;
@@ -120,9 +147,14 @@ class VideoEncoder {
   std::atomic<bool> should_stop_{false};  // スレッド終了フラグ
   uint64_t current_sequence_{0};          // 現在処理中のシーケンス番号
 
+  // 出力エントリ (chunk と metadata のペア)
+  struct OutputEntry {
+    std::shared_ptr<EncodedVideoChunk> chunk;
+    std::optional<EncodedVideoChunkMetadata> metadata;
+  };
+
   // 出力順序制御のためのメンバー
-  std::map<uint64_t, std::shared_ptr<EncodedVideoChunk>>
-      output_buffer_;                 // 順序待ちバッファ
+  std::map<uint64_t, OutputEntry> output_buffer_;  // 順序待ちバッファ
   uint64_t next_output_sequence_{0};  // 次に出力すべきシーケンス番号
   std::mutex output_mutex_;           // 出力バッファの同期
 
@@ -152,6 +184,20 @@ class VideoEncoder {
   CFStringRef get_hevc_profile_level();
 #endif
 
+#if defined(__APPLE__) || defined(__linux__)
+  // libvpx エンコーダー
+  void init_vpx_encoder();
+  void cleanup_vpx_encoder();
+  void encode_frame_vpx(const VideoFrame& frame,
+                        bool keyframe,
+                        std::optional<uint16_t> quantizer = std::nullopt);
+
+  vpx_codec_ctx_t* vpx_encoder_ = nullptr;
+  vpx_codec_enc_cfg_t vpx_config_;
+  const vpx_codec_iface_t* vpx_iface_ = nullptr;
+  std::mutex vpx_mutex_;
+#endif
+
   // 並列処理のためのメソッド
   void worker_loop();  // ワーカースレッドのメインループ
   void process_encode_task(const EncodeTask& task);  // タスクの処理
@@ -162,13 +208,33 @@ class VideoEncoder {
   bool is_av1_codec() const;
   bool is_avc_codec() const;
   bool is_hevc_codec() const;
+  bool is_vp8_codec() const;
+  bool is_vp9_codec() const;
   bool uses_videotoolbox() const;
+  bool uses_nvidia_video_codec() const;
 
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)
   void* vt_session_ = nullptr;
 
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;
+
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  // NVIDIA Video Codec SDK (NVENC) 関連のメンバー
+  void* nvenc_encoder_ = nullptr;
+  void* nvenc_cuda_context_ = nullptr;
+  NV_ENCODE_API_FUNCTION_LIST* nvenc_api_ = nullptr;
+  void* nvenc_input_buffer_ = nullptr;
+  void* nvenc_output_buffer_ = nullptr;
+
+  // NVENC 関連のメソッド
+  void init_nvenc_encoder();
+  void encode_frame_nvenc(const VideoFrame& frame,
+                          bool keyframe,
+                          std::optional<uint16_t> quantizer = std::nullopt);
+  void flush_nvenc_encoder();
+  void cleanup_nvenc_encoder();
+#endif
 };
 
 void init_video_encoder(nb::module_& m);

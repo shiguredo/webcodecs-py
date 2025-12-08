@@ -1,6 +1,8 @@
 #include "encoded_video_chunk.h"
 #include <cstring>
 
+using namespace nb::literals;
+
 EncodedVideoChunk::EncodedVideoChunk(const std::vector<uint8_t>& data,
                                      EncodedVideoChunkType type,
                                      int64_t timestamp,
@@ -59,7 +61,7 @@ void init_encoded_video_chunk(nb::module_& m) {
 
             new (self) EncodedVideoChunk(data, type, timestamp, duration);
           },
-          nb::arg("init"),
+          "init"_a,
           nb::sig("def __init__(self, init: webcodecs.EncodedVideoChunkInit) "
                   "-> None"))
       .def_prop_ro("type", &EncodedVideoChunk::type,
@@ -70,7 +72,7 @@ void init_encoded_video_chunk(nb::module_& m) {
                    nb::sig("def duration(self, /) -> int"))
       .def_prop_ro("byte_length", &EncodedVideoChunk::byte_length,
                    nb::sig("def byte_length(self, /) -> int"))
-      .def("copy_to", &EncodedVideoChunk::copy_to, nb::arg("destination"),
+      .def("copy_to", &EncodedVideoChunk::copy_to, "destination"_a,
            nb::sig("def copy_to(self, destination: "
                    "numpy.typing.NDArray[numpy.uint8]) -> None"));
 }

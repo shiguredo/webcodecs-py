@@ -1,7 +1,6 @@
 """WebCodecs API 準拠の Python バインディング"""
 
-from enum import Enum
-from typing import TypedDict, NotRequired, Literal
+from typing import Any, TypedDict, NotRequired, Literal
 
 from ._webcodecs_py import (
     # Video types
@@ -34,20 +33,9 @@ from ._webcodecs_py import (
     VideoTransferCharacteristics,
     VideoMatrixCoefficients,
     # Codec capabilities
-    _HWAccelerationEngine,
+    HardwareAccelerationEngine,
     _get_video_codec_capabilities_impl,
 )
-
-
-# ハードウェアアクセラレーションエンジン
-class HardwareAccelerationEngine(str, Enum):
-    """ハードウェアアクセラレーションエンジンの種類"""
-
-    NONE = "none"
-    APPLE_VIDEO_TOOLBOX = "apple_video_toolbox"
-    NVIDIA_VIDEO_CODEC = "nvidia_video_codec"
-    INTEL_VPL = "intel_vpl"
-    AMD_AMF = "amd_amf"
 
 
 # TypedDict 定義
@@ -58,10 +46,12 @@ class EncodedAudioChunkInit(TypedDict):
 
     # 必須フィールド
     type: EncodedAudioChunkType
-    timestamp: int  # マイクロ秒
+    # マイクロ秒
+    timestamp: int
     data: bytes
     # オプションフィールド
-    duration: NotRequired[int]  # マイクロ秒
+    # マイクロ秒
+    duration: NotRequired[int]
 
 
 class EncodedVideoChunkInit(TypedDict):
@@ -69,46 +59,78 @@ class EncodedVideoChunkInit(TypedDict):
 
     # 必須フィールド
     type: EncodedVideoChunkType
-    timestamp: int  # マイクロ秒
+    # マイクロ秒
+    timestamp: int
     data: bytes
     # オプションフィールド
-    duration: NotRequired[int]  # マイクロ秒
+    # マイクロ秒
+    duration: NotRequired[int]
+
+
+class VideoFrameMetadata(TypedDict, total=False):
+    """WebCodecs VideoFrame Metadata Registry 準拠のメタデータフィールド
+
+    参照: https://w3c.github.io/webcodecs/video_frame_metadata_registry.html
+    すべてのフィールドは MediaCapture Extensions で定義されています。
+    """
+
+    # 型が明確なフィールド
+    # DOMHighResTimeStamp (マイクロ秒)
+    capture_time: float
+    # DOMHighResTimeStamp (マイクロ秒)
+    receive_time: float
+    # RTP タイムスタンプ
+    rtp_timestamp: int
+    # 型が不明確なフィールド（仕様が明確になるまで Any）
+    # 顔セグメンテーション
+    segments: Any
+    # 背景ぼかし効果ステータス
+    background_blur: Any
+    # 背景セグメンテーションマスク
+    background_segmentation_mask: Any
 
 
 class VideoFrameBufferInit(TypedDict, total=False):
     """VideoFrame コンストラクタの初期化パラメータ (WebCodecs API 準拠)"""
 
     # 必須フィールド
-    format: VideoPixelFormat | str  # VideoPixelFormat またはフォーマット文字列
+    # VideoPixelFormat またはフォーマット文字列
+    format: VideoPixelFormat | str
     coded_width: int
     coded_height: int
-    timestamp: int  # マイクロ秒
+    # マイクロ秒
+    timestamp: int
     # オプションフィールド
-    duration: int | None  # マイクロ秒
-    layout: list[PlaneLayout] | None  # PlaneLayout のリスト
-    visible_rect: dict | None  # {"x": float, "y": float, "width": float, "height": float}
+    # マイクロ秒
+    duration: int | None
+    # PlaneLayout のリスト
+    layout: list[PlaneLayout] | None
+    # {"x": float, "y": float, "width": float, "height": float}
+    visible_rect: dict | None
     display_width: int | None
     display_height: int | None
-    color_space: (
-        dict | None
-    )  # {"primaries": str, "transfer": str, "matrix": str, "full_range": bool}
-    rotation: int | None  # 0, 90, 180, 270
+    # {"primaries": str, "transfer": str, "matrix": str, "full_range": bool}
+    color_space: dict | None
+    # 0, 90, 180, 270
+    rotation: int | None
     flip: bool | None
-    metadata: dict | None
+    metadata: VideoFrameMetadata | dict | None
 
 
 # AVC エンコーダー設定 (WebCodecs AVC Codec Registration 準拠)
 class AvcEncoderConfig(TypedDict, total=False):
     """AVC (H.264) エンコーダーの設定"""
 
-    format: Literal["annexb", "avc"] | None  # デフォルト: "avc"
+    # デフォルト: "avc"
+    format: Literal["annexb", "avc"] | None
 
 
 # HEVC エンコーダー設定 (WebCodecs HEVC Codec Registration 準拠)
 class HevcEncoderConfig(TypedDict, total=False):
     """HEVC エンコーダーの設定"""
 
-    format: Literal["annexb", "hevc"] | None  # デフォルト: "hevc"
+    # デフォルト: "hevc"
+    format: Literal["annexb", "hevc"] | None
 
 
 class VideoEncoderConfig(TypedDict):
@@ -147,7 +169,7 @@ class VideoDecoderConfig(TypedDict):
     coded_height: NotRequired[int | None]
     display_aspect_width: NotRequired[int | None]
     display_aspect_height: NotRequired[int | None]
-    description: NotRequired[str | None]
+    description: NotRequired[bytes | None]
     hardware_acceleration: NotRequired[str | None]
     optimize_for_latency: NotRequired[bool | None]
     color_space: NotRequired[str | None]
@@ -158,21 +180,31 @@ class VideoDecoderConfig(TypedDict):
 class OpusEncoderConfig(TypedDict):
     """Opus エンコーダーの設定"""
 
-    format: NotRequired[Literal["opus", "ogg"] | None]  # 出力フォーマット
-    signal: NotRequired[Literal["auto", "music", "voice"] | None]  # 信号タイプ
-    application: NotRequired[Literal["voip", "audio", "lowdelay"] | None]  # アプリケーションモード
-    frame_duration: NotRequired[int | None]  # フレーム期間 (マイクロ秒)
-    complexity: NotRequired[int | None]  # 0-10 (高い値は品質が良いが処理が遅い)
-    packetlossperc: NotRequired[int | None]  # 0-100 (パケットロス率)
-    useinbandfec: NotRequired[bool | None]  # インバンド FEC
-    usedtx: NotRequired[bool | None]  # DTX (不連続伝送)
+    # 出力フォーマット
+    format: NotRequired[Literal["opus", "ogg"] | None]
+    # 信号タイプ
+    signal: NotRequired[Literal["auto", "music", "voice"] | None]
+    # アプリケーションモード
+    application: NotRequired[Literal["voip", "audio", "lowdelay"] | None]
+    # フレーム期間 (マイクロ秒)
+    frame_duration: NotRequired[int | None]
+    # 0-10 (高い値は品質が良いが処理が遅い)
+    complexity: NotRequired[int | None]
+    # 0-100 (パケットロス率)
+    packetlossperc: NotRequired[int | None]
+    # インバンド FEC
+    useinbandfec: NotRequired[bool | None]
+    # DTX (不連続伝送)
+    usedtx: NotRequired[bool | None]
 
 
 class FlacEncoderConfig(TypedDict):
     """FLAC エンコーダーの設定"""
 
-    block_size: NotRequired[int | None]  # 0 でエンコーダーが自動推定
-    compress_level: NotRequired[int | None]  # 0-8 (0: 最速、8: 最高圧縮)
+    # 0 でエンコーダーが自動推定
+    block_size: NotRequired[int | None]
+    # 0-8 (0: 最速、8: 最高圧縮)
+    compress_level: NotRequired[int | None]
 
 
 class AudioEncoderConfig(TypedDict):
@@ -199,7 +231,7 @@ class AudioDecoderConfig(TypedDict):
     sample_rate: int
     number_of_channels: int
     # オプションフィールド
-    description: NotRequired[str | None]
+    description: NotRequired[bytes | None]
 
 
 class AudioDataInit(TypedDict):
@@ -210,19 +242,25 @@ class AudioDataInit(TypedDict):
     sample_rate: int
     number_of_frames: int
     number_of_channels: int
-    timestamp: int  # マイクロ秒
-    data: "numpy.typing.NDArray"  # type: ignore[name-defined]
+    # マイクロ秒
+    timestamp: int
+    # type: ignore[name-defined]
+    data: "numpy.typing.NDArray"
 
 
 class AudioDataCopyToOptions(TypedDict):
     """AudioData.copy_to() / allocation_size() のオプション (WebCodecs API 準拠)"""
 
     # 必須フィールド
-    plane_index: int  # コピー元のプレーンインデックス
+    # コピー元のプレーンインデックス
+    plane_index: int
     # オプションフィールド
-    frame_offset: NotRequired[int]  # デフォルト 0
-    frame_count: NotRequired[int | None]  # 省略時は残り全フレーム
-    format: NotRequired[AudioSampleFormat | None]  # 省略時は元フォーマット（未実装）
+    # デフォルト 0
+    frame_offset: NotRequired[int]
+    # 省略時は残り全フレーム
+    frame_count: NotRequired[int | None]
+    # 省略時は元フォーマット（未実装）
+    format: NotRequired[AudioSampleFormat | None]
 
 
 class VideoFrameCopyToOptions(TypedDict, total=False):
@@ -231,35 +269,42 @@ class VideoFrameCopyToOptions(TypedDict, total=False):
     rect: DOMRect | None
     layout: list[PlaneLayout] | None
     format: VideoPixelFormat | None
-    colorSpace: str | None
+    color_space: str | None
 
 
 # VideoEncoder.encode() のオプション
 class VideoEncoderEncodeOptionsForAv1(TypedDict, total=False):
     """AV1 エンコードオプション (WebCodecs AV1 Codec Registration 準拠)"""
 
-    quantizer: int | None  # 0-63 の範囲
+    # 0-63 の範囲
+    quantizer: int | None
 
 
 class VideoEncoderEncodeOptionsForAvc(TypedDict, total=False):
     """AVC (H.264) エンコードオプション (WebCodecs AVC Codec Registration 準拠)"""
 
-    quantizer: int | None  # 0-51 の範囲
+    # 0-51 の範囲
+    quantizer: int | None
 
 
 class VideoEncoderEncodeOptionsForHevc(TypedDict, total=False):
     """HEVC (H.265) エンコードオプション (WebCodecs HEVC Codec Registration 準拠)"""
 
-    quantizer: int | None  # 0-51 の範囲
+    # 0-51 の範囲
+    quantizer: int | None
 
 
 class VideoEncoderEncodeOptions(TypedDict, total=False):
     """VideoEncoder.encode() のオプション"""
 
-    keyFrame: bool | None  # キーフレームを強制
-    av1: VideoEncoderEncodeOptionsForAv1 | None  # AV1 固有のオプション
-    avc: VideoEncoderEncodeOptionsForAvc | None  # AVC 固有のオプション
-    hevc: VideoEncoderEncodeOptionsForHevc | None  # HEVC 固有のオプション
+    # キーフレームを強制
+    key_frame: bool | None
+    # AV1 固有のオプション
+    av1: VideoEncoderEncodeOptionsForAv1 | None
+    # AVC 固有のオプション
+    avc: VideoEncoderEncodeOptionsForAvc | None
+    # HEVC 固有のオプション
+    hevc: VideoEncoderEncodeOptionsForHevc | None
 
 
 # Support 型定義（is_config_supported の戻り値）
@@ -291,6 +336,26 @@ class AudioDecoderSupport(TypedDict):
     config: AudioDecoderConfig
 
 
+# Metadata 型定義 (VideoEncoder output callback の第 2 引数)
+class EncodedVideoChunkMetadataDecoderConfig(TypedDict, total=False):
+    """EncodedVideoChunkMetadata の decoder_config"""
+
+    codec: str
+    coded_width: int
+    coded_height: int
+    # avcC / hvcC / av1C などのコーデック固有データ
+    description: bytes
+
+
+class EncodedVideoChunkMetadata(TypedDict, total=False):
+    """VideoEncoder の output callback で提供される metadata
+
+    キーフレーム時のみ decoder_config が含まれる。
+    """
+
+    decoder_config: EncodedVideoChunkMetadataDecoderConfig
+
+
 def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
     """
     実行環境で利用可能なビデオコーデックとその実装方法の詳細情報を返す
@@ -308,19 +373,8 @@ def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
     # C++ 実装から取得
     cpp_capabilities = _get_video_codec_capabilities_impl()
 
-    # C++ の enum を Python の HardwareAccelerationEngine に変換
-    engine_mapping = {
-        _HWAccelerationEngine.NONE: HardwareAccelerationEngine.NONE,
-        _HWAccelerationEngine.APPLE_VIDEO_TOOLBOX: HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-        _HWAccelerationEngine.NVIDIA_VIDEO_CODEC: HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        _HWAccelerationEngine.INTEL_VPL: HardwareAccelerationEngine.INTEL_VPL,
-        _HWAccelerationEngine.AMD_AMF: HardwareAccelerationEngine.AMD_AMF,
-    }
-
     capabilities: dict[HardwareAccelerationEngine, dict] = {}
-    for cpp_engine, engine_support in cpp_capabilities.items():
-        python_engine = engine_mapping[cpp_engine]
-
+    for engine, engine_support in cpp_capabilities.items():
         # CodecSupport を dict に変換
         codecs_dict = {}
         for codec_name, codec_support in engine_support.codecs.items():
@@ -329,7 +383,7 @@ def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
                 "decoder": codec_support.decoder,
             }
 
-        capabilities[python_engine] = {
+        capabilities[engine] = {
             "available": engine_support.available,
             "platform": engine_support.platform,
             "codecs": codecs_dict,
@@ -343,6 +397,7 @@ __all__ = [
     "VideoPixelFormat",
     "VideoFrame",
     "VideoFrameBufferInit",
+    "VideoFrameMetadata",
     "PlaneLayout",
     "VideoColorSpace",
     "DOMRect",
@@ -383,6 +438,9 @@ __all__ = [
     "VideoDecoderSupport",
     "AudioEncoderSupport",
     "AudioDecoderSupport",
+    # Metadata types
+    "EncodedVideoChunkMetadata",
+    "EncodedVideoChunkMetadataDecoderConfig",
     # Enums
     "CodecState",
     "LatencyMode",

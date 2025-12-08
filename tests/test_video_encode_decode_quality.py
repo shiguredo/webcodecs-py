@@ -133,7 +133,7 @@ def test_encode_decode_quality_patterns(
     frame = VideoFrame(data, init)
 
     # エンコード
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
 
     assert len(encoded_chunks) > 0, f"{codec} でエンコードされたチャンクが生成されませんでした"
@@ -236,7 +236,7 @@ def test_encode_decode_bitrate_comparison(codec: str):
         frame = VideoFrame(data, init)
 
         # エンコード
-        encoder.encode(frame, {"keyFrame": True})
+        encoder.encode(frame, {"key_frame": True})
         encoder.flush()
 
         if encoded_chunks:
@@ -321,7 +321,7 @@ def test_encode_decode_frame_size_comparison(codec: str, width: int, height: int
     frame = VideoFrame(data, init)
 
     # エンコード
-    encoder.encode(frame, {"keyFrame": True})
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
 
     assert len(encoded_chunks) > 0, f"{codec} でエンコード失敗: {width}x{height}"

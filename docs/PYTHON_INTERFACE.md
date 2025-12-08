@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-11-23
+- 最終更新: 2025-12-07
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -176,6 +176,8 @@ Options 系:
 - `VideoEncoderEncodeOptionsForAv1` - AV1 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForAvc` - AVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForHevc` - HEVC 固有のエンコードオプション
+- `VideoEncoderEncodeOptionsForVp8` - VP8 固有のエンコードオプション
+- `VideoEncoderEncodeOptionsForVp9` - VP9 固有のエンコードオプション
 
 Support 系 (is_config_supported() の戻り値):
 
@@ -183,6 +185,11 @@ Support 系 (is_config_supported() の戻り値):
 - `AudioDecoderSupport` - AudioDecoder.is_config_supported() 用
 - `VideoEncoderSupport` - VideoEncoder.is_config_supported() 用
 - `VideoDecoderSupport` - VideoDecoder.is_config_supported() 用
+
+Metadata 系 (出力コールバックで提供):
+
+- `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
+- `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
 
 ### 6. Promise の代替
 
@@ -378,6 +385,39 @@ config: VideoDecoderConfig = {
 decoder.configure(config)
 ```
 
+### VideoDecoder の例 (ハードウェアアクセラレーション)
+
+```python
+from webcodecs import VideoDecoder, VideoDecoderConfig, HardwareAccelerationEngine
+
+
+def on_output(frame):
+    print(f"デコード完了: {frame.coded_width}x{frame.coded_height}")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+decoder = VideoDecoder(on_output, on_error)
+
+# Apple Video Toolbox を使用した H.264 デコード (macOS)
+config: VideoDecoderConfig = {
+    "codec": "avc1.42001f",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+}
+decoder.configure(config)
+```
+
+```python
+# NVIDIA Video Codec SDK を使用した H.264 デコード (Ubuntu)
+config: VideoDecoderConfig = {
+    "codec": "avc1.42001f",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+}
+decoder.configure(config)
+```
+
 ### VideoEncoder の例
 
 ```python
@@ -403,6 +443,51 @@ config: VideoEncoderConfig = {
 encoder.configure(config)
 ```
 
+### VideoEncoder の例 (VP8/VP9 - macOS / Ubuntu)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk):
+    print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# VP8 の場合
+config_vp8: VideoEncoderConfig = {
+    "codec": "vp8",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+}
+
+# VP9 の場合 (Profile 0, 8-bit)
+config_vp9: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+}
+
+# VP9 Profile 2 (10-bit) の場合
+config_vp9_10bit: VideoEncoderConfig = {
+    "codec": "vp09.02.10.10",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+}
+
+encoder.configure(config_vp9)
+```
+
 ## 実装済みインターフェース
 
 ### 辞書型インターフェース (Config)
@@ -426,7 +511,7 @@ encoder.configure(config)
 | `codec` | o | o | o | **必須** |
 | `sample_rate` | o | o | o | **必須** |
 | `number_of_channels` | o | o | o | **必須** |
-| `description` | o | o | x | Codec-specific configuration |
+| `description` | o | o | o | bytes 型 (WebCodecs API では AllowSharedBufferSource) |
 
 #### AudioEncoderConfig
 
@@ -454,15 +539,66 @@ encoder.configure(config)
 | `color_space` | o | o | o | VideoColorSpace または dict |
 | `rotation` | o | * | o | 0, 90, 180, 270 のみ対応（WebCodecs は任意の double 値） |
 | `flip` | o | o | o | |
-| `metadata` | o | o | o | dict |
+| `metadata` | o | o | o | VideoFrameMetadata または dict |
 | `transfer` | x | o | - | **未実装** |
+
+#### VideoFrameMetadata
+
+WebCodecs VideoFrame Metadata Registry に準拠したメタデータフィールドの型定義です。
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `capture_time` | o | o | o | DOMHighResTimeStamp (マイクロ秒) |
+| `receive_time` | o | o | o | DOMHighResTimeStamp (マイクロ秒) |
+| `rtp_timestamp` | o | o | o | RTP タイムスタンプ（整数） |
+| `segments` | o | o | - | 顔セグメンテーション（型: Any） |
+| `background_blur` | o | o | - | 背景ぼかし効果ステータス（型: Any） |
+| `background_segmentation_mask` | o | o | - | 背景セグメンテーションマスク（型: Any） |
+
+**注意**:
+
+- すべてのフィールドはオプション (`total=False`)
+- TypedDict は型ヒント用であり、実行時の検証は行われない
+- 型が不明確なフィールド (segments, background_blur, background_segmentation_mask) は `Any` として定義
+- MediaCapture Extensions 仕様で定義されているフィールド
+- 参照: [WebCodecs VideoFrame Metadata Registry](https://w3c.github.io/webcodecs/video_frame_metadata_registry.html)
+
+**使用例**:
+
+```python
+from webcodecs import VideoFrame, VideoFrameBufferInit, VideoFrameMetadata, VideoPixelFormat
+import numpy as np
+
+# TypedDict を使用（IDE の補完・型チェックが効く）
+metadata: VideoFrameMetadata = {
+    "capture_time": 1234567890.0,
+    "receive_time": 1234567891.0,
+    "rtp_timestamp": 12345,
+}
+
+data = np.zeros(640 * 480 * 3 // 2, dtype=np.uint8)
+
+init: VideoFrameBufferInit = {
+    "format": VideoPixelFormat.I420,
+    "coded_width": 640,
+    "coded_height": 480,
+    "timestamp": 0,
+    "metadata": metadata,
+}
+
+frame = VideoFrame(data, init)
+
+# metadata の取得
+result = frame.metadata()
+print(result["capture_time"])  # 1234567890.0
+```
 
 #### VideoDecoderConfig
 
 | プロパティ | Python | WebCodecs API | テスト | 備考 |
 |-----------|---------|-------------|--------|------|
 | `codec` | o | o | o | **必須** |
-| `description` | o | o | x | Codec-specific configuration |
+| `description` | o | o | o | bytes 型 (WebCodecs API では AllowSharedBufferSource) |
 | `coded_width` | o | o | o | |
 | `coded_height` | o | o | o | |
 | `display_aspect_width` | x | o | - | **未実装** |
@@ -472,6 +608,7 @@ encoder.configure(config)
 | `optimize_for_latency` | x | o | - | **未実装** |
 | `rotation` | x | o | - | **未実装** |
 | `flip` | x | o | - | **未実装** |
+| **`hardware_acceleration_engine`** | o | x | o | **独自拡張**: HardwareAccelerationEngine ENUM |
 
 #### VideoEncoderConfig
 
@@ -579,14 +716,19 @@ encoder.configure(config)
 | `duration` | o | o | o | |
 | `timestamp` | o | o | o | |
 | `color_space` | o | o | o | VideoColorSpace を返す |
-| `metadata()` | o | o | o | dict を返す |
+| `metadata()` | o | o | o | VideoFrameMetadata 型の dict を返す |
 | `allocation_size(options)` | o | o | o | copy_to() に必要なバッファサイズを返す |
-| `copy_to(destination, options)` | o | * | o | destination に書き込み、PlaneLayout のリストを返す（format 指定で変換も可能、colorSpace オプションは未実装） |
-| `clone()` | o | o | o | |
+| `copy_to(destination, options)` | o | * | o | destination に書き込み、PlaneLayout のリストを返す（format 指定で変換も可能、color_space オプションは未実装） |
+| `clone()` | o | o | o | すべてのプロパティ（metadata 含む）をコピー |
 | `close()` | o | o | o | |
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
 | **`planes()`** | o | x | o | **独自拡張**: 全プレーン (Y, U, V) をタプルで返す（I420/I422/I444 のみ） |
 | **`plane()`** | o | x | o | **独自拡張**: 指定したプレーンを返す（全フォーマット対応） |
+
+**clone() の動作**:
+
+- すべてのプロパティ（timestamp, duration, format, color_space, metadata 等）がコピーされる
+- データは新しいメモリ領域にコピーされる（deep copy）
 
 #### EncodedVideoChunk
 
@@ -625,7 +767,7 @@ encoder.configure(config)
 | `encode_queue_size` | o | o | o | |
 | `on_dequeue` | o | o | o | EventHandler |
 | `configure(config)` | o | o | o | |
-| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (keyFrame, av1.quantizer, avc.quantizer, hevc.quantizer) |
+| `encode(frame, options)` | o | o | o | VideoEncoderEncodeOptions (key_frame, av1.quantizer, avc.quantizer, hevc.quantizer, vp8.quantizer, vp9.quantizer) |
 | `flush()` | o | o | o | |
 | `reset()` | o | o | o | |
 | `close()` | o | o | o | |
@@ -634,6 +776,21 @@ encoder.configure(config)
 | **`on_error(callback)`** | o | x | o | **独自拡張**: コールバック設定 (WebCodecs はコンストラクタで指定) |
 
 **注**: `avc.quantizer` / `hevc.quantizer` は VideoToolbox (Apple) ではフレームごとの指定がサポートされていないため無視される。
+
+**output callback の metadata**: WebCodecs API 仕様に準拠し、キーフレーム時に `metadata` (dict) が第 2 引数として渡される。後方互換性のため、1 引数のコールバックも引き続きサポートされる。
+
+```python
+def on_output(chunk, metadata=None):
+    # metadata はキーフレーム時のみ提供される
+    if metadata is not None:
+        decoder_config = metadata.get("decoder_config")
+        if decoder_config is not None:
+            # codec: str
+            # coded_width: int (オプション)
+            # coded_height: int (オプション)
+            # description: bytes (H.264 では avcC、H.265 では hvcC)
+            description = decoder_config.get("description")
+```
 
 ## 独自インターフェース
 
@@ -787,23 +944,69 @@ bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ハードウェアアクセラレーションエンジンを指定する ENUM：
 
 - `NONE` - ソフトウェアエンコード/デコード（デフォルト）
-- `APPLE_VIDEO_TOOLBOX` - macOS の VideoToolbox（H.264/H.265 のみ）
-- `NVIDIA_VIDEO_CODEC` - NVIDIA GPU（未実装）
+- `APPLE_VIDEO_TOOLBOX`
+  - macOS の VideoToolbox
+  - Encoder: H.264 / H.265
+  - Decoder: H.264 / H.265
+- `NVIDIA_VIDEO_CODEC`
+  - NVIDIA Video Codec SDK
+  - Encoder: AV1 / H.264 / H.265
+  - Decoder: VP8 / VP9 / AV1 / H.264 / H.265
 - `INTEL_VPL` - Intel VPL（未実装）
 - `AMD_AMF` - AMD AMF（未実装）
 
-**使用例**:
+**使用例 (Apple Video Toolbox)**:
 
 ```python
 from webcodecs import VideoEncoder, VideoEncoderConfig, HardwareAccelerationEngine
 
 config: VideoEncoderConfig = {
-    "codec": "h264",
+    "codec": "avc1.42001f",
     "width": 1920,
     "height": 1080,
     "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX
 }
 ```
+
+**使用例 (NVIDIA Video Codec SDK)**:
+
+```python
+from webcodecs import VideoEncoder, VideoEncoderConfig, HardwareAccelerationEngine
+
+# H.264 エンコード
+config: VideoEncoderConfig = {
+    "codec": "avc1.42001f",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+
+# HEVC エンコード
+config_hevc: VideoEncoderConfig = {
+    "codec": "hvc1.1.6.L93.B0",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+
+# AV1 エンコード (NVIDIA RTX 40 シリーズ以降)
+config_av1: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+```
+
+**NVIDIA Video Codec SDK の要件**:
+
+- NVIDIA GPU
+- NVIDIA ドライバーがインストールされていること
+- Ubuntu のみ対応
+- ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
 
 #### LatencyMode
 
@@ -965,7 +1168,9 @@ capabilities = get_video_codec_capabilities()
 #         "available": True,
 #         "platform": "all",
 #         "codecs": {
-#             "av01": {"encoder": True, "decoder": True}
+#             "av01": {"encoder": True, "decoder": True},
+#             "vp8": {"encoder": True, "decoder": True},
+#             "vp09": {"encoder": True, "decoder": True}
 #         }
 #     },
 #     HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX: {
@@ -985,7 +1190,7 @@ if vt_info and vt_info["available"]:
         print("H.264 ハードウェアエンコーダーが利用可能")
 ```
 
-**使用例 (Linux/Windows)**:
+**使用例 (Ubuntu)**:
 
 ```python
 capabilities = get_video_codec_capabilities()
@@ -1009,10 +1214,13 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - `av01` - AV1 (WebCodecs 標準)
 - `avc1` - H.264 (WebCodecs 標準、`h264` ではない)
 - `hvc1` - H.265/HEVC (WebCodecs 標準、`h265` や `hevc` ではない)
+- `vp8` - VP8 (WebCodecs 標準)
+- `vp09` - VP9 (WebCodecs 標準、`vp9` ではない)
 
 **実装詳細**:
 
 - macOS では VideoToolbox の実際の利用可能性を `VTCompressionSessionCreate()` で確認
+- macOS では libvpx による VP8/VP9 が利用可能
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
@@ -1031,9 +1239,10 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |--------|------|
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
-| `EncodedVideoChunkMetadata` | メタデータサポート未実装 |
 | `SvcOutputMetadata` | SVC サポート未実装 |
 | `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
+
+**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
 
 ### 未実装の列挙型
 
@@ -1047,11 +1256,25 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 | コーデック | エンコード | デコード | ライブラリ/API | プラットフォーム |
 |----------|-----------|----------|---------------|----------------|
+| VP8 | o | o | libvpx | macOS / Ubuntu |
+| VP9 | o | o | libvpx | macOS / Ubuntu |
 | AV1 | o | o | libaom / dav1d | All |
+| AV1 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.264 | o | o | VideoToolbox* | macOS |
+| H.264 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.265 | o | o | VideoToolbox* | macOS |
+| H.265 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 
 *ハードウェアアクセラレーション使用
+
+**VP9 プロファイル対応状況**:
+
+| Profile | ビット深度 | クロマサブサンプリング | 対応状況 |
+|---------|-----------|---------------------|---------|
+| 0 | 8-bit | 4:2:0 | o |
+| 1 | 8-bit | 4:2:2, 4:4:4 | o |
+| 2 | 10/12-bit | 4:2:0 | o |
+| 3 | 10/12-bit | 4:2:2, 4:4:4 | o |
 
 ### Audio コーデック
 
@@ -1059,9 +1282,7 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |----------|-----------|----------|---------------|----------------|
 | Opus | o | o | libopus | All |
 | FLAC | o | o | libFLAC | All |
-| AAC | o | o | AudioToolbox* | macOS |
-
-*ハードウェアアクセラレーション使用
+| AAC | o | o | AudioToolbox | macOS |
 
 ## パフォーマンス最適化
 
@@ -1134,6 +1355,7 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ
+   - libvpx (VP8/VP9) は macOS / Ubuntu
 1. **H.264/H.265 ビットストリームフォーマット**
    - **VideoDecoder は Annex B 形式のみ対応**
      - スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニット

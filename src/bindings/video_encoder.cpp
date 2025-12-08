@@ -9,6 +9,8 @@
 #include <VideoToolbox/VideoToolbox.h>
 #endif
 
+using namespace nb::literals;
+
 VideoEncoder::VideoEncoder(nb::object output, nb::object error)
     : output_callback_(output),
       error_callback_(error),
@@ -62,8 +64,8 @@ void VideoEncoder::configure(nb::dict config_dict) {
   if (config_dict.contains("alpha"))
     config.alpha = nb::cast<AlphaOption>(config_dict["alpha"]);
   if (config_dict.contains("hardware_acceleration_engine"))
-    config.hardware_acceleration_engine =
-        nb::cast<std::string>(config_dict["hardware_acceleration_engine"]);
+    config.hardware_acceleration_engine = nb::cast<HardwareAccelerationEngine>(
+        config_dict["hardware_acceleration_engine"]);
 
   // AVC 固有のオプション
   if (config_dict.contains("avc")) {
@@ -92,11 +94,6 @@ void VideoEncoder::configure(nb::dict config_dict) {
     config_.framerate = 30.0;  // デフォルト値
   }
 
-  // hardware_acceleration_engine のデフォルト値を "none" に設定
-  if (config_.hardware_acceleration_engine.empty()) {
-    config_.hardware_acceleration_engine = "none";
-  }
-
   // コーデック文字列をパースして、パラメータを抽出
   try {
     codec_params_ = parse_codec_string(config_.codec);
@@ -106,11 +103,19 @@ void VideoEncoder::configure(nb::dict config_dict) {
   }
 
   // コーデックの初期化
-  if (is_av1_codec()) {
+  if (uses_nvidia_video_codec()) {
+#if defined(NVIDIA_CUDA_TOOLKIT)
+    init_nvenc_encoder();
+#else
+    throw std::runtime_error(
+        "NVIDIA Video Codec SDK is not enabled in this build");
+#endif
+  } else if (is_av1_codec()) {
     init_aom_encoder();
   } else if (is_avc_codec() || is_hevc_codec()) {
 #if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine == "apple_video_toolbox") {
+    if (config_.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
       init_videotoolbox_encoder();
     } else {
       throw std::runtime_error(
@@ -119,6 +124,12 @@ void VideoEncoder::configure(nb::dict config_dict) {
     }
 #else
     throw std::runtime_error("AVC/HEVC not supported on this platform");
+#endif
+  } else if (is_vp8_codec() || is_vp9_codec()) {
+#if defined(__APPLE__) || defined(__linux__)
+    init_vpx_encoder();
+#else
+    throw std::runtime_error("VP8/VP9 not supported on this platform");
 #endif
   }
 
@@ -150,10 +161,29 @@ bool VideoEncoder::is_hevc_codec() const {
           config_.codec.substr(0, 5) == "hev1.");
 }
 
+bool VideoEncoder::is_vp8_codec() const {
+  return config_.codec == "vp8";
+}
+
+bool VideoEncoder::is_vp9_codec() const {
+  return config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "vp09.";
+}
+
 bool VideoEncoder::uses_videotoolbox() const {
 #if defined(__APPLE__)
   return (is_avc_codec() || is_hevc_codec()) &&
-         config_.hardware_acceleration_engine == "apple_video_toolbox";
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+#else
+  return false;
+#endif
+}
+
+bool VideoEncoder::uses_nvidia_video_codec() const {
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  return (is_avc_codec() || is_hevc_codec() || is_av1_codec()) &&
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
   return false;
 #endif
@@ -162,6 +192,10 @@ bool VideoEncoder::uses_videotoolbox() const {
 // 分割されたファイルをインクルード
 #include "video_encoder_aom.cpp"
 #include "video_encoder_apple_video_toolbox.cpp"
+#include "video_encoder_nvidia.cpp"
+#if defined(__APPLE__) || defined(__linux__)
+#include "video_encoder_vpx.cpp"
+#endif
 
 void VideoEncoder::encode(const VideoFrame& frame, bool keyframe) {
   EncodeOptions options;
@@ -225,6 +259,24 @@ void VideoEncoder::encode(const VideoFrame& frame,
       throw nb::value_error("quantizer must be in range 0-63");
     }
     task.av1_quantizer = q;
+  }
+
+  // VP8 オプションを設定
+  if (options.vp8.has_value() && options.vp8->quantizer.has_value()) {
+    uint16_t q = options.vp8->quantizer.value();
+    if (q > 63) {
+      throw nb::value_error("VP8 quantizer must be in range 0-63");
+    }
+    task.vp8_quantizer = q;
+  }
+
+  // VP9 オプションを設定
+  if (options.vp9.has_value() && options.vp9->quantizer.has_value()) {
+    uint16_t q = options.vp9->quantizer.value();
+    if (q > 63) {
+      throw nb::value_error("VP9 quantizer must be in range 0-63");
+    }
+    task.vp9_quantizer = q;
   }
 
   // タスクをキューに追加
@@ -383,6 +435,16 @@ void VideoEncoder::close() {
   }
 #endif
 
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  // NVENC リソースをクリーンアップ
+  cleanup_nvenc_encoder();
+#endif
+
+#if defined(__APPLE__) || defined(__linux__)
+  // VPX エンコーダーが存在する場合はクリーンアップ
+  cleanup_vpx_encoder();
+#endif
+
   state_ = CodecState::CLOSED;
 }
 
@@ -394,12 +456,36 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
     // コーデック文字列をパースして、パラメータを抽出
     CodecParameters codec_params = parse_codec_string(config.codec);
 
+    // NVIDIA Video Codec SDK でサポートされているかチェック
+#if defined(NVIDIA_CUDA_TOOLKIT)
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+      // NVENC は AV1, AVC, HEVC をサポート
+      if (std::holds_alternative<AV1CodecParameters>(codec_params) ||
+          std::holds_alternative<AVCCodecParameters>(codec_params) ||
+          std::holds_alternative<HEVCCodecParameters>(codec_params)) {
+        return VideoEncoderSupport(true, config);
+      }
+    }
+#endif
+
     if (std::holds_alternative<AV1CodecParameters>(codec_params)) {
       supported = true;
     } else if (std::holds_alternative<AVCCodecParameters>(codec_params) ||
                std::holds_alternative<HEVCCodecParameters>(codec_params)) {
 #if defined(__APPLE__)
       supported = true;  // macOS で VideoToolbox をサポート
+#elif defined(NVIDIA_CUDA_TOOLKIT)
+      // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
+      supported = config.hardware_acceleration_engine ==
+                  HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+      supported = false;  // 他のプラットフォームではまだサポートされていない
+#endif
+    } else if (std::holds_alternative<VP8CodecParameters>(codec_params) ||
+               std::holds_alternative<VP9CodecParameters>(codec_params)) {
+#if defined(__APPLE__) || defined(__linux__)
+      supported = true;  // macOS / Linux で libvpx をサポート
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -496,7 +582,13 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
   current_sequence_ = task.sequence_number;
 
   // 遅延初期化 (初回エンコード時)
-  if (is_av1_codec() && !aom_encoder_) {
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (uses_nvidia_video_codec() && !nvenc_encoder_) {
+    init_nvenc_encoder();
+  }
+#endif
+
+  if (is_av1_codec() && !aom_encoder_ && !uses_nvidia_video_codec()) {
     init_aom_encoder();
   }
 
@@ -504,14 +596,28 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
     init_videotoolbox_encoder();
   }
 
+#if defined(__APPLE__) || defined(__linux__)
+  if ((is_vp8_codec() || is_vp9_codec()) && !vpx_encoder_) {
+    init_vpx_encoder();
+  }
+#endif
+
   // バインディング層で既に GIL を解放しているため、ここでは解放しない
   // nb::gil_scoped_release gil_release;
+
+#if defined(NVIDIA_CUDA_TOOLKIT)
+  if (uses_nvidia_video_codec()) {
+    encode_frame_nvenc(*task.frame, task.keyframe, task.av1_quantizer);
+    return;
+  }
+#endif
 
   if (is_av1_codec()) {
     encode_frame_aom(*task.frame, task.keyframe, task.av1_quantizer);
   } else if (is_avc_codec() || is_hevc_codec()) {
 #if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine != "apple_video_toolbox") {
+    if (config_.hardware_acceleration_engine !=
+        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
       throw std::runtime_error(
           "AVC/HEVC requires "
           "hardware_acceleration_engine=\"apple_video_toolbox\" on macOS");
@@ -520,56 +626,102 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
 #else
     throw std::runtime_error("AVC/HEVC not supported on this platform");
 #endif
+  } else if (is_vp8_codec()) {
+#if defined(__APPLE__) || defined(__linux__)
+    encode_frame_vpx(*task.frame, task.keyframe, task.vp8_quantizer);
+#else
+    throw std::runtime_error("VP8 not supported on this platform");
+#endif
+  } else if (is_vp9_codec()) {
+#if defined(__APPLE__) || defined(__linux__)
+    encode_frame_vpx(*task.frame, task.keyframe, task.vp9_quantizer);
+#else
+    throw std::runtime_error("VP9 not supported on this platform");
+#endif
   }
 }
 
 // 出力フレームの順序制御
-void VideoEncoder::handle_output(uint64_t sequence,
-                                 std::shared_ptr<EncodedVideoChunk> chunk) {
-  std::vector<std::shared_ptr<EncodedVideoChunk>> chunks_to_output;
+void VideoEncoder::handle_output(
+    uint64_t sequence,
+    std::shared_ptr<EncodedVideoChunk> chunk,
+    std::optional<EncodedVideoChunkMetadata> metadata) {
+  std::vector<OutputEntry> entries_to_output;
 
   {
     std::lock_guard<std::mutex> lock(output_mutex_);
 
-    // チャンクをバッファに追加
-    output_buffer_[sequence] = chunk;
+    // チャンクと metadata をバッファに追加
+    output_buffer_[sequence] = OutputEntry{chunk, metadata};
 
     // 順序通りに出力できるチャンクを収集
     while (output_buffer_.find(next_output_sequence_) != output_buffer_.end()) {
-      chunks_to_output.push_back(output_buffer_[next_output_sequence_]);
+      entries_to_output.push_back(output_buffer_[next_output_sequence_]);
       output_buffer_.erase(next_output_sequence_);
       next_output_sequence_++;
     }
   }
 
   // コールバックを呼び出す (GIL を取得)
-  if (output_callback_ && !chunks_to_output.empty()) {
+  // WebCodecs API では callback は (chunk, metadata?) で metadata は optional
+  // Python では常に 2 引数で呼び出し、callback 側で metadata=None のデフォルト引数を使用する
+  if (output_callback_ && !entries_to_output.empty()) {
     nb::gil_scoped_acquire gil;
-    for (auto& chunk : chunks_to_output) {
+    for (auto& entry : entries_to_output) {
       // コピーを作成して渡す (Python 側で所有権を持つ)
-      EncodedVideoChunk chunk_copy = *chunk;
-      output_callback_(chunk_copy);
+      EncodedVideoChunk chunk_copy = *entry.chunk;
+
+      // metadata を dict に変換 (存在しない場合は空の dict)
+      nb::dict metadata_dict;
+      if (entry.metadata.has_value() &&
+          entry.metadata->decoder_config.has_value()) {
+        const auto& config = entry.metadata->decoder_config.value();
+        nb::dict decoder_config_dict;
+        decoder_config_dict["codec"] = config.codec;
+        if (config.coded_width.has_value()) {
+          decoder_config_dict["coded_width"] = config.coded_width.value();
+        }
+        if (config.coded_height.has_value()) {
+          decoder_config_dict["coded_height"] = config.coded_height.value();
+        }
+        if (config.description.has_value()) {
+          const auto& desc = config.description.value();
+          decoder_config_dict["description"] = nb::bytes(
+              reinterpret_cast<const char*>(desc.data()), desc.size());
+        }
+        metadata_dict["decoder_config"] = decoder_config_dict;
+      }
+
+      // callback を呼び出す
+      // Python 側では def on_output(chunk, metadata=None): と定義することを推奨
+      // 後方互換性のため、まず 2 引数で呼び出しを試み、失敗したら 1 引数で呼び出す
+      try {
+        output_callback_(chunk_copy, metadata_dict);
+      } catch (const nb::python_error&) {
+        // 2 引数呼び出しが失敗した場合は 1 引数で呼び出す (後方互換性)
+        PyErr_Clear();
+        output_callback_(chunk_copy);
+      }
     }
   }
 }
 
 void init_video_encoder(nb::module_& m) {
   nb::class_<VideoEncoder>(m, "VideoEncoder")
-      .def(nb::init<nb::object, nb::object>(), nb::arg("output"),
-           nb::arg("error"),
+      .def(nb::init<nb::object, nb::object>(), "output"_a, "error"_a,
            nb::sig("def __init__(self, output: "
                    "typing.Callable[[EncodedVideoChunk], None], "
                    "error: typing.Callable[[str], None], /) -> None"))
-      .def("configure", &VideoEncoder::configure, nb::arg("config"),
+      .def("configure", &VideoEncoder::configure, "config"_a,
            nb::sig("def configure(self, config: webcodecs.VideoEncoderConfig, "
                    "/) -> None"))
-      // WebCodecs 互換: encode(frame) または encode(frame, {"keyFrame": True})
+      // WebCodecs 互換: encode(frame) または encode(frame, {"key_frame": True})
       .def(
           "encode",
           [](VideoEncoder& self, const VideoFrame& frame) {
             self.encode(frame, false);
           },
-          nb::arg("frame"), nb::call_guard<nb::gil_scoped_release>(),
+          "frame"_a, nb::call_guard<nb::gil_scoped_release>(),
           nb::sig("def encode(self, frame: VideoFrame, /) -> None"))
       .def(
           "encode",
@@ -577,8 +729,8 @@ void init_video_encoder(nb::module_& m) {
             VideoEncoder::EncodeOptions encode_options;
 
             // dict アクセスには GIL が必要なので、ここでは解放しない
-            if (options.contains("keyFrame")) {
-              encode_options.keyframe = nb::cast<bool>(options["keyFrame"]);
+            if (options.contains("key_frame")) {
+              encode_options.keyframe = nb::cast<bool>(options["key_frame"]);
             }
 
             // AV1 オプションを解析
@@ -620,7 +772,7 @@ void init_video_encoder(nb::module_& m) {
               self.encode(frame, encode_options);
             }
           },
-          nb::arg("frame"), nb::arg("options"),
+          "frame"_a, "options"_a,
           nb::sig("def encode(self, frame: VideoFrame, options: "
                   "webcodecs.VideoEncoderEncodeOptions, /) -> None"))
       .def("flush", &VideoEncoder::flush,
@@ -678,12 +830,13 @@ void init_video_encoder(nb::module_& m) {
               config.content_hint =
                   nb::cast<std::string>(config_dict["content_hint"]);
             if (config_dict.contains("hardware_acceleration_engine"))
-              config.hardware_acceleration_engine = nb::cast<std::string>(
-                  config_dict["hardware_acceleration_engine"]);
+              config.hardware_acceleration_engine =
+                  nb::cast<HardwareAccelerationEngine>(
+                      config_dict["hardware_acceleration_engine"]);
 
             return VideoEncoder::is_config_supported(config);
           },
-          nb::arg("config"),
+          "config"_a,
           nb::sig("def is_config_supported(config: "
                   "webcodecs.VideoEncoderConfig, /) -> "
                   "webcodecs.VideoEncoderSupport"))

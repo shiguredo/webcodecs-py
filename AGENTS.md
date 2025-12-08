@@ -102,12 +102,23 @@
 - pytest 実行時長くても 60 秒以内にすること
 - pytest のタイムアウトは pytest-timeout を利用すること
   - `pytest --timeout=10` のように指定すること
+- テスト実行時は `NO_UV_SYNC=1` を指定すること
+  - `NO_UV_SYNC=1 uv run pytest` のように指定すること
 - テストを削除してテストを通したりしないこと
 - テストを無効にしてテストを通したりしないこと
 - テストがタイムアウトしたら重大な問題が発生していると考えること
   - デッドロックが発生している可能性がある
 - 明確な理由がない限りは try/expect をテストでは利用しないこと
-- lambda は使わないで def を使う事
+- class を使わないこと
+- lambda は使わないで def を使うこと
+
+### ベンチマーク
+
+- ベンチマークは `tests/benchmarks/` 以下に配置すること
+- ベンチマークファイルは `bench_` prefix を持つファイルのみが実行される
+- 通常の pytest 実行時はベンチマークは無効化されている (`--benchmark-disable`)
+- ベンチマークを実行するには `--benchmark-enable` オプションで有効化する
+  - `NO_UV_SYNC=1 APPLE_VIDEO_TOOLBOX=1 uv run pytest tests/benchmarks/ --benchmark-enable`
 
 ## ドキュメント
 
