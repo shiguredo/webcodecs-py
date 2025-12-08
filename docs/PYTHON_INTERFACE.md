@@ -944,8 +944,14 @@ bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ハードウェアアクセラレーションエンジンを指定する ENUM：
 
 - `NONE` - ソフトウェアエンコード/デコード（デフォルト）
-- `APPLE_VIDEO_TOOLBOX` - macOS の VideoToolbox（H.264/H.265 のみ）
-- `NVIDIA_VIDEO_CODEC` - NVIDIA GPU（H.264/H.265/AV1、Ubuntu のみ）
+- `APPLE_VIDEO_TOOLBOX`
+  - macOS の VideoToolbox
+  - Encoder: H.264 / H.265
+  - Decoder: H.264 / H.265
+- `NVIDIA_VIDEO_CODEC`
+  - NVIDIA Video Codec SDK
+  - Encoder: AV1 / H.264 / H.265
+  - Decoder: VP8 / VP9 / AV1 / H.264 / H.265
 - `INTEL_VPL` - Intel VPL（未実装）
 - `AMD_AMF` - AMD AMF（未実装）
 
@@ -1250,18 +1256,16 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 | コーデック | エンコード | デコード | ライブラリ/API | プラットフォーム |
 |----------|-----------|----------|---------------|----------------|
-| AV1 | o | o | libaom / dav1d | All |
-| AV1 | o | o | NVENC / NVDEC* | Ubuntu |
-| H.264 | o | o | VideoToolbox* | macOS |
-| H.264 | o | o | NVENC / NVDEC* | Ubuntu |
-| H.265 | o | o | VideoToolbox* | macOS |
-| H.265 | o | o | NVENC / NVDEC* | Ubuntu |
 | VP8 | o | o | libvpx | macOS / Ubuntu |
 | VP9 | o | o | libvpx | macOS / Ubuntu |
+| AV1 | o | o | libaom / dav1d | All |
+| AV1 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
+| H.264 | o | o | VideoToolbox* | macOS |
+| H.264 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
+| H.265 | o | o | VideoToolbox* | macOS |
+| H.265 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 
 *ハードウェアアクセラレーション使用
-
-**注**: NVIDIA Video Codec SDK (NVENC/NVDEC) を使用するには、ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` を実行する必要があります。
 
 **VP9 プロファイル対応状況**:
 
@@ -1278,9 +1282,7 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |----------|-----------|----------|---------------|----------------|
 | Opus | o | o | libopus | All |
 | FLAC | o | o | libFLAC | All |
-| AAC | o | o | AudioToolbox* | macOS |
-
-*ハードウェアアクセラレーション使用
+| AAC | o | o | AudioToolbox | macOS |
 
 ## パフォーマンス最適化
 
