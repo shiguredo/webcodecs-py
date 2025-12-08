@@ -11,6 +11,10 @@
 
 ## develop
 
+## 2025.2.0
+
+**リリース日**:: 2025-12-08
+
 - [ADD] NVIDIA Video Codec SDK (NVENC/NVDEC) をサポートする
   - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を指定可能
   - H.264 / HEVC / AV1 のハードウェアエンコード/デコードに対応
