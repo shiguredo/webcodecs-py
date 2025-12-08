@@ -28,10 +28,13 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
   - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
 - Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
 - NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
+  - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
+- NumPy の ndarray を直接利用できる
 - クロスプラットフォーム対応
-  - macOS
-  - Ubuntu
-  - Windows
+  - macOS arm64
+  - Ubuntu x86_64 および arm64
+  - Windows x86_64
+    - Windows はソフトウェアエンコード/デコードのみ対応
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 
@@ -178,11 +181,14 @@ encoder.close()
   - <https://developer.apple.com/documentation/audiotoolbox>
 - VP8
   - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - VP9
   - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - AV1
   - <https://aomedia.googlesource.com/aom>
   - <https://github.com/videolan/dav1d>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.264 (AVC)
   - <https://developer.apple.com/documentation/videotoolbox>
   - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
