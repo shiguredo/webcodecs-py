@@ -62,12 +62,16 @@ jobs:
         platform:
           - name: ubuntu-24.04_x86_64
             runs_on: ubuntu-24.04
+            arch: x86_64
           - name: ubuntu-24.04_arm64
             runs_on: ubuntu-24.04-arm
+            arch: arm64
           - name: ubuntu-22.04_x86_64
             runs_on: ubuntu-22.04
+            arch: x86_64
           - name: ubuntu-22.04_arm64
             runs_on: ubuntu-22.04-arm
+            arch: arm64
         python_version:
           - "3.14"
           - "3.13"
@@ -90,6 +94,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
+      # NVIDIA Video Codec SDK のビルドに必要な CUDA Toolkit をセットアップ
+      # x86_64 のみ (ARM64 では NVIDIA Video Codec SDK は使用不可)
+      - uses: shiguredo/github-actions/.github/actions/setup-cuda-toolkit@main
+        if: matrix.platform.arch == 'x86_64'
+        with:
+          cuda_version: "13.0.2"
+          platform: ${{ matrix.platform.runs_on }}
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -97,8 +109,19 @@ jobs:
       - name: Install meson
         run: uv tool install meson
 
-      - name: Build wheel
+      # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
+      # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
+      - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
+        if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel
+        env:
+          NVIDIA_CUDA_TOOLKIT: true
+
+      # arm64 の場合は通常ビルド
+      - name: Build wheel (arm64)
+        if: matrix.platform.arch == 'arm64'
+        run: uv build --wheel
+
       - name: Repair wheel with auditwheel
         shell: bash
         run: |

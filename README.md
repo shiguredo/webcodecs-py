@@ -24,8 +24,17 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 
 - WebCodecs API の Python バインディング
 - Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
-  - H.264、H.265、AAC は macOS でのみ利用可能
+  - AAC は macOS の AudioToolbox を利用
+  - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
 - Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
+- NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
+  - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
+- NumPy の ndarray を直接利用できる
+- クロスプラットフォーム対応
+  - macOS arm64
+  - Ubuntu x86_64 および arm64
+  - Windows x86_64
+    - Windows はソフトウェアエンコード/デコードのみ対応
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 
@@ -172,15 +181,20 @@ encoder.close()
   - <https://developer.apple.com/documentation/audiotoolbox>
 - VP8
   - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - VP9
   - <https://chromium.googlesource.com/webm/libvpx>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - AV1
   - <https://aomedia.googlesource.com/aom>
   - <https://github.com/videolan/dav1d>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.264 (AVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 - H.265 (HEVC)
   - <https://developer.apple.com/documentation/videotoolbox>
+  - <https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
 
 ## Python
 
@@ -238,4 +252,14 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+```
+
+## NVIDIA Video Codec SDK
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/index.html>
+
+<https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/license/index.html>
+
+```text
+“This software contains source code provided by NVIDIA Corporation.”
 ```

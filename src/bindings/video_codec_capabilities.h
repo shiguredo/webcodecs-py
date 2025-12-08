@@ -5,7 +5,7 @@
 #include <vector>
 
 // ハードウェアアクセラレーションエンジン
-enum class HWAccelerationEngine {
+enum class HardwareAccelerationEngine {
   NONE,
   APPLE_VIDEO_TOOLBOX,
   NVIDIA_VIDEO_CODEC,
@@ -27,5 +27,5 @@ struct EngineSupport {
 };
 
 // ビデオコーデックの機能情報を取得する
-std::map<HWAccelerationEngine, EngineSupport>
+std::map<HardwareAccelerationEngine, EngineSupport>
 get_video_codec_capabilities_impl();

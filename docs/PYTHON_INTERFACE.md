@@ -385,6 +385,39 @@ config: VideoDecoderConfig = {
 decoder.configure(config)
 ```
 
+### VideoDecoder の例 (ハードウェアアクセラレーション)
+
+```python
+from webcodecs import VideoDecoder, VideoDecoderConfig, HardwareAccelerationEngine
+
+
+def on_output(frame):
+    print(f"デコード完了: {frame.coded_width}x{frame.coded_height}")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+decoder = VideoDecoder(on_output, on_error)
+
+# Apple Video Toolbox を使用した H.264 デコード (macOS)
+config: VideoDecoderConfig = {
+    "codec": "avc1.42001f",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+}
+decoder.configure(config)
+```
+
+```python
+# NVIDIA Video Codec SDK を使用した H.264 デコード (Ubuntu)
+config: VideoDecoderConfig = {
+    "codec": "avc1.42001f",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+}
+decoder.configure(config)
+```
+
 ### VideoEncoder の例
 
 ```python
@@ -575,7 +608,7 @@ print(result["capture_time"])  # 1234567890.0
 | `optimize_for_latency` | x | o | - | **未実装** |
 | `rotation` | x | o | - | **未実装** |
 | `flip` | x | o | - | **未実装** |
-| **`hardware_acceleration_engine`** | x | x | - | **独自拡張**: HardwareAccelerationEngine ENUM（実装予定） |
+| **`hardware_acceleration_engine`** | o | x | o | **独自拡張**: HardwareAccelerationEngine ENUM |
 
 #### VideoEncoderConfig
 
@@ -911,23 +944,69 @@ bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ハードウェアアクセラレーションエンジンを指定する ENUM：
 
 - `NONE` - ソフトウェアエンコード/デコード（デフォルト）
-- `APPLE_VIDEO_TOOLBOX` - macOS の VideoToolbox（H.264/H.265 のみ）
-- `NVIDIA_VIDEO_CODEC` - NVIDIA GPU（未実装）
+- `APPLE_VIDEO_TOOLBOX`
+  - macOS の VideoToolbox
+  - Encoder: H.264 / H.265
+  - Decoder: H.264 / H.265
+- `NVIDIA_VIDEO_CODEC`
+  - NVIDIA Video Codec SDK
+  - Encoder: AV1 / H.264 / H.265
+  - Decoder: VP8 / VP9 / AV1 / H.264 / H.265
 - `INTEL_VPL` - Intel VPL（未実装）
 - `AMD_AMF` - AMD AMF（未実装）
 
-**使用例**:
+**使用例 (Apple Video Toolbox)**:
 
 ```python
 from webcodecs import VideoEncoder, VideoEncoderConfig, HardwareAccelerationEngine
 
 config: VideoEncoderConfig = {
-    "codec": "h264",
+    "codec": "avc1.42001f",
     "width": 1920,
     "height": 1080,
     "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX
 }
 ```
+
+**使用例 (NVIDIA Video Codec SDK)**:
+
+```python
+from webcodecs import VideoEncoder, VideoEncoderConfig, HardwareAccelerationEngine
+
+# H.264 エンコード
+config: VideoEncoderConfig = {
+    "codec": "avc1.42001f",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+
+# HEVC エンコード
+config_hevc: VideoEncoderConfig = {
+    "codec": "hvc1.1.6.L93.B0",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+
+# AV1 エンコード (NVIDIA RTX 40 シリーズ以降)
+config_av1: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1920,
+    "height": 1080,
+    "bitrate": 5_000_000,
+    "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC
+}
+```
+
+**NVIDIA Video Codec SDK の要件**:
+
+- NVIDIA GPU
+- NVIDIA ドライバーがインストールされていること
+- Ubuntu のみ対応
+- ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
 
 #### LatencyMode
 
@@ -1111,7 +1190,7 @@ if vt_info and vt_info["available"]:
         print("H.264 ハードウェアエンコーダーが利用可能")
 ```
 
-**使用例 (Linux/Windows)**:
+**使用例 (Ubuntu)**:
 
 ```python
 capabilities = get_video_codec_capabilities()
@@ -1177,11 +1256,14 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 
 | コーデック | エンコード | デコード | ライブラリ/API | プラットフォーム |
 |----------|-----------|----------|---------------|----------------|
+| VP8 | o | o | libvpx | macOS / Ubuntu |
+| VP9 | o | o | libvpx | macOS / Ubuntu |
 | AV1 | o | o | libaom / dav1d | All |
+| AV1 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.264 | o | o | VideoToolbox* | macOS |
+| H.264 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.265 | o | o | VideoToolbox* | macOS |
-| VP8 | o | o | libvpx | macOS |
-| VP9 | o | o | libvpx | macOS |
+| H.265 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 
 *ハードウェアアクセラレーション使用
 
@@ -1200,9 +1282,7 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |----------|-----------|----------|---------------|----------------|
 | Opus | o | o | libopus | All |
 | FLAC | o | o | libFLAC | All |
-| AAC | o | o | AudioToolbox* | macOS |
-
-*ハードウェアアクセラレーション使用
+| AAC | o | o | AudioToolbox | macOS |
 
 ## パフォーマンス最適化
 

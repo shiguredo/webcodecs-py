@@ -1,6 +1,5 @@
 """WebCodecs API 準拠の Python バインディング"""
 
-from enum import Enum
 from typing import Any, TypedDict, NotRequired, Literal
 
 from ._webcodecs_py import (
@@ -34,20 +33,9 @@ from ._webcodecs_py import (
     VideoTransferCharacteristics,
     VideoMatrixCoefficients,
     # Codec capabilities
-    _HWAccelerationEngine,
+    HardwareAccelerationEngine,
     _get_video_codec_capabilities_impl,
 )
-
-
-# ハードウェアアクセラレーションエンジン
-class HardwareAccelerationEngine(str, Enum):
-    """ハードウェアアクセラレーションエンジンの種類"""
-
-    NONE = "none"
-    APPLE_VIDEO_TOOLBOX = "apple_video_toolbox"
-    NVIDIA_VIDEO_CODEC = "nvidia_video_codec"
-    INTEL_VPL = "intel_vpl"
-    AMD_AMF = "amd_amf"
 
 
 # TypedDict 定義
@@ -385,19 +373,8 @@ def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
     # C++ 実装から取得
     cpp_capabilities = _get_video_codec_capabilities_impl()
 
-    # C++ の enum を Python の HardwareAccelerationEngine に変換
-    engine_mapping = {
-        _HWAccelerationEngine.NONE: HardwareAccelerationEngine.NONE,
-        _HWAccelerationEngine.APPLE_VIDEO_TOOLBOX: HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-        _HWAccelerationEngine.NVIDIA_VIDEO_CODEC: HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        _HWAccelerationEngine.INTEL_VPL: HardwareAccelerationEngine.INTEL_VPL,
-        _HWAccelerationEngine.AMD_AMF: HardwareAccelerationEngine.AMD_AMF,
-    }
-
     capabilities: dict[HardwareAccelerationEngine, dict] = {}
-    for cpp_engine, engine_support in cpp_capabilities.items():
-        python_engine = engine_mapping[cpp_engine]
-
+    for engine, engine_support in cpp_capabilities.items():
         # CodecSupport を dict に変換
         codecs_dict = {}
         for codec_name, codec_support in engine_support.codecs.items():
@@ -406,7 +383,7 @@ def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
                 "decoder": codec_support.decoder,
             }
 
-        capabilities[python_engine] = {
+        capabilities[engine] = {
             "available": engine_support.available,
             "platform": engine_support.platform,
             "codecs": codecs_dict,
