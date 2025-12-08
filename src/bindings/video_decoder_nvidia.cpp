@@ -3,7 +3,7 @@
 
 #include "video_decoder.h"
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 
 #include <cuda.h>
 #include <cuviddec.h>
@@ -363,4 +363,4 @@ void VideoDecoder::cleanup_nvdec_decoder() {
   nvdec_video_parser_ = nullptr;
 }
 
-#endif  // defined(NVIDIA_CUDA_TOOLKIT)
+#endif  // defined(USE_NVIDIA_CUDA_TOOLKIT)

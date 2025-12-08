@@ -32,7 +32,7 @@
 typedef const struct __CFString* CFStringRef;
 #endif
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 #include <cuda.h>
 #include <nvEncodeAPI.h>
 #endif
@@ -219,7 +219,7 @@ class VideoEncoder {
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK (NVENC) 関連のメンバー
   void* nvenc_encoder_ = nullptr;
   void* nvenc_cuda_context_ = nullptr;
@@ -235,6 +235,31 @@ class VideoEncoder {
   void flush_nvenc_encoder();
   void cleanup_nvenc_encoder();
 #endif
+
+#if defined(__linux__)
+  // Intel VPL 関連のメンバー
+  void* vpl_loader_ = nullptr;
+  void* vpl_session_ = nullptr;
+  std::vector<uint8_t> vpl_bitstream_buffer_;
+  // SPS/PPS から生成した avcC/hvcC 形式の description
+  std::vector<uint8_t> vpl_description_;
+
+  // Intel VPL 関連のメソッド
+  void init_intel_vpl_encoder();
+  void encode_frame_intel_vpl(const VideoFrame& frame,
+                              bool keyframe,
+                              std::optional<uint16_t> quantizer = std::nullopt);
+  void flush_intel_vpl_encoder();
+  void cleanup_intel_vpl_encoder();
+  // SPS/PPS から avcC/hvcC を生成
+  void build_vpl_description(const uint8_t* sps,
+                             uint16_t sps_size,
+                             const uint8_t* pps,
+                             uint16_t pps_size,
+                             bool is_hevc);
+#endif
+
+  bool uses_intel_vpl() const;
 };
 
 void init_video_encoder(nb::module_& m);

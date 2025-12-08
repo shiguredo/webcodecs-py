@@ -19,7 +19,7 @@
 #include "video_frame.h"
 #include "webcodecs_types.h"
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 #include <cuda.h>
 #include <cuviddec.h>
 #include <nvcuvid.h>
@@ -152,7 +152,7 @@ class VideoDecoder {
   // NVIDIA Video Codec SDK を使用するかどうかを判定
   bool uses_nvidia_video_codec() const;
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK (NVDEC) 関連のメンバー
   void* nvdec_decoder_ = nullptr;
   void* nvdec_cuda_context_ = nullptr;
@@ -174,4 +174,20 @@ class VideoDecoder {
   static int handle_decode_picture(void* user_data, void* pic_params);
   static int handle_display_picture(void* user_data, void* disp_info);
 #endif
+
+#if defined(__linux__)
+  // Intel VPL 関連のメンバー
+  void* vpl_loader_ = nullptr;
+  void* vpl_session_ = nullptr;
+  std::vector<uint8_t> vpl_bitstream_buffer_;
+
+  // Intel VPL 関連のメソッド
+  void init_intel_vpl_decoder();
+  bool decode_intel_vpl(const EncodedVideoChunk& chunk);
+  void flush_intel_vpl();
+  void cleanup_intel_vpl_decoder();
+#endif
+
+  // Intel VPL を使用するかどうかを判定
+  bool uses_intel_vpl() const;
 };

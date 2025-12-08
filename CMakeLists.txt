@@ -21,11 +21,11 @@ else()
 endif()
 
 # NVIDIA Video Codec SDK の設定
-# ビルド方法: NVIDIA_CUDA_TOOLKIT=1 uv build --wheel
-option(NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
+# ビルド方法: USE_NVIDIA_CUDA_TOOLKIT=1 uv build --wheel
+option(USE_NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
 
 # NVIDIA Video Codec SDK のパス設定
-if(NVIDIA_CUDA_TOOLKIT)
+if(USE_NVIDIA_CUDA_TOOLKIT)
     # third_party/NvCodec を使用
     set(NVCODEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/NvCodec")
     message(STATUS "NVIDIA Video Codec SDK path: ${NVCODEC_DIR}")
@@ -39,6 +39,13 @@ if(NVIDIA_CUDA_TOOLKIT)
     if(APPLE)
         message(FATAL_ERROR "NVIDIA Video Codec SDK is not supported on macOS")
     endif()
+endif()
+
+# Intel VPL (Video Processing Library) の設定
+# Linux では常に有効（ヘッダーは _deps からダウンロード、libvpl は dlopen で動的ロード）
+if(NOT APPLE AND NOT WIN32)
+    set(INTEL_VPL_ENABLED ON)
+    message(STATUS "Intel VPL enabled (Linux)")
 endif()
 
 # レイアウト: ExternalProject の依存関係は _deps 配下で管理
@@ -86,6 +93,13 @@ set(DAV1D_GIT_TAG "${DAV1D_VERSION}")
 string(JSON YUV_VERSION GET ${DEPS_JSON} libyuv version)
 string(JSON YUV_GIT_REPOSITORY GET ${DEPS_JSON} libyuv repository)
 set(YUV_GIT_TAG ${YUV_VERSION})  # コミットハッシュを使用
+
+# VPL の設定を解析（Linux のみ）
+if(NOT APPLE AND NOT WIN32)
+    string(JSON VPL_VERSION GET ${DEPS_JSON} libvpl version)
+    string(JSON VPL_GIT_REPOSITORY GET ${DEPS_JSON} libvpl repository)
+    set(VPL_GIT_TAG "v${VPL_VERSION}")
+endif()
 
 # 静的ライブラリのビルドオプションを設定
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "静的ライブラリをビルド" FORCE)
@@ -331,6 +345,36 @@ else()
     )
 endif()
 
+# ========== libvpl (Linux のみ、ヘッダーのみ) ==========
+if(INTEL_VPL_ENABLED)
+    message(STATUS "Setting up libvpl...")
+    set(VPL_SOURCE_DIR "${DEPS_DIR}/vpl/${VPL_VERSION}/source")
+
+    # ヘッダーディレクトリの存在チェック
+    if(EXISTS "${VPL_SOURCE_DIR}/api/vpl/mfx.h")
+        message(STATUS "libvpl already downloaded: ${VPL_SOURCE_DIR}")
+        add_custom_target(libvpl_download)
+    else()
+        message(STATUS "Downloading libvpl...")
+        ExternalProject_Add(
+            libvpl_download
+            GIT_REPOSITORY ${VPL_GIT_REPOSITORY}
+            GIT_TAG ${VPL_GIT_TAG}
+            GIT_SHALLOW TRUE
+            SOURCE_DIR ${VPL_SOURCE_DIR}
+            UPDATE_COMMAND ""
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+        )
+    endif()
+
+    # ヘッダーディレクトリを設定
+    set(VPL_DIR "${VPL_SOURCE_DIR}/api/vpl")
+    message(STATUS "Intel VPL header path: ${VPL_DIR}")
+endif()
+
 # ========== libvpx (macOS / Linux) ==========
 if(APPLE OR UNIX)
     # VPX の設定を解析
@@ -430,6 +474,9 @@ add_dependencies(_webcodecs_py opus_build flac_build libaom_build libyuv_build d
 if(APPLE OR UNIX)
     add_dependencies(_webcodecs_py libvpx_build)
 endif()
+if(INTEL_VPL_ENABLED)
+    add_dependencies(_webcodecs_py libvpl_download)
+endif()
 
 # インクルードディレクトリ
 target_include_directories(_webcodecs_py PRIVATE
@@ -447,7 +494,7 @@ if(APPLE OR UNIX)
 endif()
 
 # NVIDIA Video Codec SDK を使用する場合のインクルードディレクトリ
-if(NVIDIA_CUDA_TOOLKIT)
+if(USE_NVIDIA_CUDA_TOOLKIT)
     target_include_directories(_webcodecs_py PRIVATE
         ${NVCODEC_DIR}/Interface
         ${NVCODEC_DIR}/Utils
@@ -462,7 +509,7 @@ if(NVIDIA_CUDA_TOOLKIT)
         ${NVCODEC_DIR}/NvCodec/NvDecoder/NvDecoder.cpp
     )
     # コンパイル定義を追加
-    target_compile_definitions(_webcodecs_py PRIVATE NVIDIA_CUDA_TOOLKIT=1)
+    target_compile_definitions(_webcodecs_py PRIVATE USE_NVIDIA_CUDA_TOOLKIT=1)
 endif()
 
 # ライブラリをリンク
@@ -509,7 +556,17 @@ endif()
 # NVIDIA Video Codec SDK ライブラリ (Ubuntu のみ対応)
 # CUDA ライブラリは dlopen で動的にロードするため、直接リンクしない
 # これにより、GPU がない環境でもモジュールをインポートできる
-if(NVIDIA_CUDA_TOOLKIT)
+if(USE_NVIDIA_CUDA_TOOLKIT)
+    # dlopen/dlsym に必要
+    target_link_libraries(_webcodecs_py PRIVATE dl)
+endif()
+
+# Intel VPL (Linux のみ)
+# libvpl は dlopen で動的にロードするため、直接リンクしない
+# これにより、Intel GPU がない環境でもモジュールをインポートできる
+# C++ コードでは #if defined(__linux__) で判定する
+if(INTEL_VPL_ENABLED)
+    target_include_directories(_webcodecs_py PRIVATE ${VPL_DIR})
     # dlopen/dlsym に必要
     target_link_libraries(_webcodecs_py PRIVATE dl)
 endif()

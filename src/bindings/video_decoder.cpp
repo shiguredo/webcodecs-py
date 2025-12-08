@@ -172,7 +172,7 @@ void VideoDecoder::flush() {
   }
 
   // NVIDIA Video Codec SDK の場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     // 全てのペンディングタスクが完了するまで待機
     {
@@ -182,6 +182,21 @@ void VideoDecoder::flush() {
       });
     }
     flush_nvdec();
+    return;
+  }
+#endif
+
+  // Intel VPL の場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    // 全てのペンディングタスクが完了するまで待機
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      queue_cv_.wait(lock, [this]() {
+        return decode_queue_.empty() && pending_tasks_ == 0;
+      });
+    }
+    flush_intel_vpl();
     return;
   }
 #endif
@@ -274,13 +289,24 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
     VideoCodec codec = string_to_codec(config.codec);
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
     if (config.hardware_acceleration_engine ==
         HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVDEC でサポートされているコーデック: AV1, AVC, HEVC, VP8, VP9
       if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
           codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
           codec == VideoCodec::VP9) {
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
+    // Intel VPL でサポートされているかチェック
+#if defined(__linux__)
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::INTEL_VPL) {
+      // Intel VPL でサポートされているコーデック: AVC, HEVC
+      if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
         return VideoDecoderSupport(true, config);
       }
     }
@@ -294,17 +320,19 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
       case VideoCodec::H265:
 #if defined(__APPLE__)
         supported = true;  // macOS で VideoToolbox をサポート
-#elif defined(NVIDIA_CUDA_TOOLKIT)
-        // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
+#elif defined(USE_NVIDIA_CUDA_TOOLKIT) || defined(__linux__)
+        // NVIDIA Video Codec SDK または Intel VPL が有効な場合
         supported = config.hardware_acceleration_engine ==
-                    HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+                        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC ||
+                    config.hardware_acceleration_engine ==
+                        HardwareAccelerationEngine::INTEL_VPL;
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
         break;
       case VideoCodec::VP8:
       case VideoCodec::VP9:
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
         // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
         if (config.hardware_acceleration_engine ==
             HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
@@ -335,9 +363,17 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
 void VideoDecoder::init_decoder() {
   // NVIDIA Video Codec SDK を使用する場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     init_nvdec_decoder();
+    return;
+  }
+#endif
+
+  // Intel VPL を使用する場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    init_intel_vpl_decoder();
     return;
   }
 #endif
@@ -376,9 +412,17 @@ void VideoDecoder::cleanup_decoder() {
   }
 
   // NVIDIA Video Codec SDK のクリーンアップ
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (nvdec_decoder_) {
     cleanup_nvdec_decoder();
+    return;
+  }
+#endif
+
+  // Intel VPL のクリーンアップ
+#if defined(__linux__)
+  if (vpl_session_) {
+    cleanup_intel_vpl_decoder();
     return;
   }
 #endif
@@ -417,9 +461,16 @@ void VideoDecoder::cleanup_decoder() {
 
 bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
   // NVIDIA Video Codec SDK を使用する場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     return decode_nvdec(chunk);
+  }
+#endif
+
+  // Intel VPL を使用する場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    return decode_intel_vpl(chunk);
   }
 #endif
 
@@ -466,9 +517,12 @@ void VideoDecoder::flush_dav1d() {
 #if defined(__APPLE__) || defined(__linux__)
 #include "video_decoder_vpx.cpp"
 #endif
+#if defined(__linux__)
+#include "video_decoder_intel_vpl.cpp"
+#endif
 
 bool VideoDecoder::uses_nvidia_video_codec() const {
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK が有効な場合
   // エンコーダー/デコーダー: H.264, H.265, AV1
   // デコーダーのみ: VP8, VP9
@@ -478,6 +532,17 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
           codec == VideoCodec::VP9) &&
          config_.hardware_acceleration_engine ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+  return false;
+#endif
+}
+
+bool VideoDecoder::uses_intel_vpl() const {
+#if defined(__linux__)
+  VideoCodec codec = string_to_codec(config_.codec);
+  return (codec == VideoCodec::H264 || codec == VideoCodec::H265) &&
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::INTEL_VPL;
 #else
   return false;
 #endif

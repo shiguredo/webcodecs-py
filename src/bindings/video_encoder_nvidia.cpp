@@ -3,7 +3,7 @@
 
 #include "video_encoder.h"
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 
 #include <cuda.h>
 #include <nvEncodeAPI.h>
@@ -406,4 +406,4 @@ void VideoEncoder::cleanup_nvenc_encoder() {
   nvenc_api_ = nullptr;
 }
 
-#endif  // defined(NVIDIA_CUDA_TOOLKIT)
+#endif  // defined(USE_NVIDIA_CUDA_TOOLKIT)

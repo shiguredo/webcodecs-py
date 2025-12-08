@@ -111,11 +111,12 @@ jobs:
 
       # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
       # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
+      # Intel VPL は Linux では常に有効（ヘッダーは third_party/vpl/ にあり、libvpl は dlopen で動的ロード）
       - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
         if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel
         env:
-          NVIDIA_CUDA_TOOLKIT: true
+          USE_NVIDIA_CUDA_TOOLKIT: true
 
       # arm64 の場合は通常ビルド
       - name: Build wheel (arm64)
