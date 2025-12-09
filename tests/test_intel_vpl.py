@@ -60,8 +60,15 @@ def create_frame(w: int, h: int, ts: int, y: int = 80) -> VideoFrame:
     return frame
 
 
-def test_intel_vpl_h264_encode():
-    """Intel VPL H.264 エンコードのテスト"""
+@pytest.mark.parametrize(
+    "codec,hardware_acceleration_engine",
+    [
+        ("avc1.42001e", HardwareAccelerationEngine.INTEL_VPL),
+        ("hvc1.1.6.L93.B0", HardwareAccelerationEngine.INTEL_VPL),
+    ],
+)
+def test_intel_vpl_encode(codec, hardware_acceleration_engine):
+    """Intel VPL エンコードのテスト"""
     outputs = []
 
     def on_output(chunk):
@@ -73,12 +80,12 @@ def test_intel_vpl_h264_encode():
     enc = VideoEncoder(on_output, on_error)
 
     config: VideoEncoderConfig = {
-        "codec": "avc1.42001e",
+        "codec": codec,
         "width": 320,
         "height": 240,
         "bitrate": 500_000,
         "latency_mode": LatencyMode.REALTIME,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
+        "hardware_acceleration_engine": hardware_acceleration_engine,
     }
     enc.configure(config)
 
@@ -99,47 +106,15 @@ def test_intel_vpl_h264_encode():
     enc.close()
 
 
-def test_intel_vpl_hevc_encode():
-    """Intel VPL HEVC (H.265) エンコードのテスト"""
-    outputs = []
-
-    def on_output(chunk):
-        outputs.append(chunk)
-
-    def on_error(error):
-        pytest.fail(f"エンコーダエラー: {error}")
-
-    enc = VideoEncoder(on_output, on_error)
-
-    config: VideoEncoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "width": 320,
-        "height": 240,
-        "bitrate": 500_000,
-        "latency_mode": LatencyMode.REALTIME,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
-    }
-    enc.configure(config)
-
-    frames = []
-    for i in range(5):
-        frame = create_frame(320, 240, i * 33333, y=80 + i * 10)
-        frames.append(frame)
-        enc.encode(frame, {"key_frame": i == 0})
-
-    enc.flush()
-
-    assert len(outputs) >= 1
-    # 最初のフレームはキーフレーム
-    assert outputs[0].type == EncodedVideoChunkType.KEY
-
-    for frame in frames:
-        frame.close()
-    enc.close()
-
-
-def test_intel_vpl_h264_encode_decode_roundtrip():
-    """Intel VPL H.264 エンコード/デコード往復のテスト"""
+@pytest.mark.parametrize(
+    "codec,hardware_acceleration_engine",
+    [
+        ("avc1.42001e", HardwareAccelerationEngine.INTEL_VPL),
+        ("hvc1.1.6.L93.B0", HardwareAccelerationEngine.INTEL_VPL),
+    ],
+)
+def test_intel_vpl_encode_decode_roundtrip(codec, hardware_acceleration_engine):
+    """Intel VPL エンコード/デコード往復のテスト"""
     encoded_chunks = []
     decoded_frames = []
 
@@ -158,12 +133,12 @@ def test_intel_vpl_h264_encode_decode_roundtrip():
     # エンコーダを設定
     enc = VideoEncoder(on_encode_output, on_encode_error)
     enc_config: VideoEncoderConfig = {
-        "codec": "avc1.42001e",
+        "codec": codec,
         "width": 320,
         "height": 240,
         "bitrate": 500_000,
         "latency_mode": LatencyMode.REALTIME,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
+        "hardware_acceleration_engine": hardware_acceleration_engine,
     }
     enc.configure(enc_config)
 
@@ -181,10 +156,10 @@ def test_intel_vpl_h264_encode_decode_roundtrip():
     # デコーダを設定
     dec = VideoDecoder(on_decode_output, on_decode_error)
     dec_config: VideoDecoderConfig = {
-        "codec": "avc1.42001e",
+        "codec": codec,
         "coded_width": 320,
         "coded_height": 240,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
+        "hardware_acceleration_engine": hardware_acceleration_engine,
     }
     dec.configure(dec_config)
 
@@ -209,73 +184,45 @@ def test_intel_vpl_h264_encode_decode_roundtrip():
     dec.close()
 
 
-def test_intel_vpl_encoder_is_config_supported():
+@pytest.mark.parametrize(
+    "codec,hardware_acceleration_engine",
+    [
+        ("avc1.42001e", HardwareAccelerationEngine.INTEL_VPL),
+        ("hvc1.1.6.L93.B0", HardwareAccelerationEngine.INTEL_VPL),
+        ("av01.0.04M.08", HardwareAccelerationEngine.INTEL_VPL),
+    ],
+)
+def test_intel_vpl_encoder_is_config_supported(codec, hardware_acceleration_engine):
     """Intel VPL エンコーダの is_config_supported のテスト"""
-    # H.264 設定
-    h264_config: VideoEncoderConfig = {
-        "codec": "avc1.42001e",
+    config: VideoEncoderConfig = {
+        "codec": codec,
         "width": 1920,
         "height": 1080,
         "bitrate": 5_000_000,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
+        "hardware_acceleration_engine": hardware_acceleration_engine,
     }
-    h264_result = VideoEncoder.is_config_supported(h264_config)
-    assert h264_result["supported"] is True
-
-    # HEVC 設定
-    hevc_config: VideoEncoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "width": 1920,
-        "height": 1080,
-        "bitrate": 5_000_000,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
-    }
-    hevc_result = VideoEncoder.is_config_supported(hevc_config)
-    assert hevc_result["supported"] is True
-
-    # AV1 設定
-    av1_config: VideoEncoderConfig = {
-        "codec": "av01.0.04M.08",
-        "width": 1920,
-        "height": 1080,
-        "bitrate": 5_000_000,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
-    }
-    av1_result = VideoEncoder.is_config_supported(av1_config)
-    assert av1_result["supported"] is True
+    result = VideoEncoder.is_config_supported(config)
+    assert result["supported"] is True
 
 
-def test_intel_vpl_decoder_is_config_supported():
+@pytest.mark.parametrize(
+    "codec,hardware_acceleration_engine",
+    [
+        ("avc1.42001e", HardwareAccelerationEngine.INTEL_VPL),
+        ("hvc1.1.6.L93.B0", HardwareAccelerationEngine.INTEL_VPL),
+        ("av01.0.04M.08", HardwareAccelerationEngine.INTEL_VPL),
+    ],
+)
+def test_intel_vpl_decoder_is_config_supported(codec, hardware_acceleration_engine):
     """Intel VPL デコーダの is_config_supported のテスト"""
-    # H.264 設定
-    h264_config: VideoDecoderConfig = {
-        "codec": "avc1.42001e",
+    config: VideoDecoderConfig = {
+        "codec": codec,
         "coded_width": 1920,
         "coded_height": 1080,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
+        "hardware_acceleration_engine": hardware_acceleration_engine,
     }
-    h264_result = VideoDecoder.is_config_supported(h264_config)
-    assert h264_result["supported"] is True
-
-    # HEVC 設定
-    hevc_config: VideoDecoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "coded_width": 1920,
-        "coded_height": 1080,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
-    }
-    hevc_result = VideoDecoder.is_config_supported(hevc_config)
-    assert hevc_result["supported"] is True
-
-    # AV1 設定
-    av1_config: VideoDecoderConfig = {
-        "codec": "av01.0.04M.08",
-        "coded_width": 1920,
-        "coded_height": 1080,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.INTEL_VPL,
-    }
-    av1_result = VideoDecoder.is_config_supported(av1_config)
-    assert av1_result["supported"] is True
+    result = VideoDecoder.is_config_supported(config)
+    assert result["supported"] is True
 
 
 def test_intel_vpl_av1_encode_decode_roundtrip():
