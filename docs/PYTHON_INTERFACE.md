@@ -1224,13 +1224,100 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
+## Image インターフェース
+
+### ImageDecoder
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `constructor(init)` | o | o | o | ImageDecoderInit を使用 |
+| `type` | o | o | o | MIME タイプ |
+| `complete` | o | o | o | データ読み込み完了 |
+| `completed` | - | o | - | Promise（Python では `is_complete` プロパティ） |
+| `tracks` | o | o | o | ImageTrackList |
+| `decode(options)` | o | o | o | 同期的に実行、ImageDecodeResult を返す |
+| `reset()` | o | o | o | |
+| `close()` | o | o | o | |
+| `is_type_supported()` | o | o | o | 静的メソッド |
+| **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
+| **`is_complete`** | o | x | o | **独自拡張**: `complete` の別名 |
+
+**サポートフォーマット (macOS のみ)**:
+
+| フォーマット | MIME タイプ | 対応状況 |
+|------------|------------|---------|
+| JPEG | image/jpeg | o |
+| PNG | image/png | o |
+| GIF | image/gif | o（アニメーション対応） |
+| WebP | image/webp | o |
+| BMP | image/bmp | o |
+| TIFF | image/tiff | o |
+| HEIC/HEIF | image/heic, image/heif | o |
+
+**注**: ImageDecoder は macOS の Image I/O フレームワークを使用しています。他のプラットフォームでは利用できません。
+
+### ImageTrackList
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `[index]` | o | o | o | `__getitem__` |
+| `ready` | - | o | - | Promise（Python では `is_ready` プロパティ） |
+| `length` | o | o | o | |
+| `selected_index` | o | o | o | |
+| `selected_track` | o | o | o | |
+| **`is_ready`** | o | x | o | **独自拡張**: `ready` の同期版 |
+
+### ImageTrack
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `animated` | o | o | o | |
+| `frame_count` | o | o | o | |
+| `repetition_count` | o | o | o | |
+| `selected` | o | o | o | 読み書き可能 |
+
+### ImageDecoder の使用例
+
+```python
+from webcodecs import ImageDecoder, ImageDecoderInit
+
+# JPEG ファイルを読み込み
+with open("image.jpg", "rb") as f:
+    jpeg_data = f.read()
+
+# ImageDecoder を作成
+decoder = ImageDecoder({
+    "type": "image/jpeg",
+    "data": jpeg_data,
+})
+
+# 画像情報を確認
+print(f"Type: {decoder.type}")
+print(f"Complete: {decoder.complete}")
+print(f"Tracks: {decoder.tracks.length}")
+
+track = decoder.tracks[0]
+print(f"Animated: {track.animated}")
+print(f"Frame count: {track.frame_count}")
+
+# デコード
+result = decoder.decode()
+frame = result["image"]
+
+print(f"Size: {frame.coded_width}x{frame.coded_height}")
+print(f"Format: {frame.format}")  # RGBA
+
+# クリーンアップ
+frame.close()
+decoder.close()
+```
+
 ## 未実装の機能
 
 ### 実装しない機能
 
 以下の機能は webcodecs-py では実装しません:
 
-- **ImageDecoder**: 画像デコード機能は実装対象外（PIL/Pillow や OpenCV を使用してください）
 - **CanvasImageSource**: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
 ### 未実装の辞書型

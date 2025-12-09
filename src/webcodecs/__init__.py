@@ -22,6 +22,10 @@ from ._webcodecs_py import (
     AudioEncoder,
     VideoDecoder,
     AudioDecoder,
+    # Image types
+    ImageDecoder,
+    ImageTrack,
+    ImageTrackList,
     # Codec state and enums
     CodecState,
     LatencyMode,
@@ -336,6 +340,36 @@ class AudioDecoderSupport(TypedDict):
     config: AudioDecoderConfig
 
 
+# ImageDecoder 関連の型定義
+
+
+class ImageDecoderInit(TypedDict, total=False):
+    """ImageDecoder コンストラクタの初期化パラメータ (WebCodecs API 準拠)"""
+
+    # 必須フィールド
+    type: str
+    data: bytes
+    # オプションフィールド
+    color_space_conversion: Literal["default", "none"] | None
+    desired_width: int | None
+    desired_height: int | None
+    prefer_animation: bool | None
+
+
+class ImageDecodeOptions(TypedDict, total=False):
+    """ImageDecoder.decode() のオプション (WebCodecs API 準拠)"""
+
+    frame_index: int
+    complete_frames_only: bool
+
+
+class ImageDecodeResult(TypedDict):
+    """ImageDecoder.decode() の戻り値 (WebCodecs API 準拠)"""
+
+    image: VideoFrame
+    complete: bool
+
+
 # Metadata 型定義 (VideoEncoder output callback の第 2 引数)
 class EncodedVideoChunkMetadataDecoderConfig(TypedDict, total=False):
     """EncodedVideoChunkMetadata の decoder_config"""
@@ -417,6 +451,13 @@ __all__ = [
     "AudioEncoder",
     "VideoDecoder",
     "AudioDecoder",
+    # Image types
+    "ImageDecoder",
+    "ImageTrack",
+    "ImageTrackList",
+    "ImageDecoderInit",
+    "ImageDecodeOptions",
+    "ImageDecodeResult",
     # Config types
     "VideoEncoderConfig",
     "VideoDecoderConfig",

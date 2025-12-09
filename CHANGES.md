@@ -11,6 +11,12 @@
 
 ## develop
 
+- [ADD] ImageDecoder を追加する (macOS)
+  - WebCodecs ImageDecoder API を実装
+  - macOS の Image I/O フレームワークを使用
+  - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
+  - @voluntas
+
 ## 2025.2.0
 
 **リリース日**:: 2025-12-08

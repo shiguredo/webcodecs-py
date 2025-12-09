@@ -423,6 +423,7 @@ nanobind_add_module(
     src/bindings/encoded_video_chunk.cpp
     src/bindings/encoded_audio_chunk.cpp
     src/bindings/video_codec_capabilities.cpp
+    src/bindings/image_decoder.cpp
 )
 
 # ビルド順序を保証するため依存関係を追加
@@ -503,6 +504,8 @@ if(APPLE)
         "-framework VideoToolbox"
         "-framework CoreMedia"
         "-framework AudioToolbox"
+        "-framework CoreGraphics"
+        "-framework ImageIO"
     )
 endif()
 
