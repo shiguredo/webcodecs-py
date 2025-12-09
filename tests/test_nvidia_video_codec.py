@@ -41,10 +41,12 @@ def create_test_frame(width: int, height: int, timestamp: int) -> VideoFrame:
 def test_nvenc_h264_encode():
     """H.264 エンコードのテスト"""
     chunks = []
+    metadatas = []
     errors = []
 
     def on_output(chunk, metadata=None):
         chunks.append(chunk)
+        metadatas.append(metadata)
 
     def on_error(error):
         errors.append(error)
@@ -71,14 +73,27 @@ def test_nvenc_h264_encode():
     assert len(errors) == 0
     assert len(chunks) > 0
 
+    # キーフレームの metadata に description が含まれていることを確認
+    keyframe_metadata = metadatas[0]
+    assert keyframe_metadata is not None
+    assert "decoderConfig" in keyframe_metadata
+    decoder_config = keyframe_metadata["decoderConfig"]
+    assert "description" in decoder_config
+    description = decoder_config["description"]
+    # avcC 形式: 最初のバイトは configurationVersion = 1
+    assert len(description) > 0
+    assert description[0] == 1
+
 
 def test_nvenc_hevc_encode():
     """HEVC エンコードのテスト"""
     chunks = []
+    metadatas = []
     errors = []
 
     def on_output(chunk, metadata=None):
         chunks.append(chunk)
+        metadatas.append(metadata)
 
     def on_error(error):
         errors.append(error)
@@ -104,6 +119,17 @@ def test_nvenc_hevc_encode():
 
     assert len(errors) == 0
     assert len(chunks) > 0
+
+    # キーフレームの metadata に description が含まれていることを確認
+    keyframe_metadata = metadatas[0]
+    assert keyframe_metadata is not None
+    assert "decoderConfig" in keyframe_metadata
+    decoder_config = keyframe_metadata["decoderConfig"]
+    assert "description" in decoder_config
+    description = decoder_config["description"]
+    # hvcC 形式: 最初のバイトは configurationVersion = 1
+    assert len(description) > 0
+    assert description[0] == 1
 
 
 def test_nvenc_av1_encode():
