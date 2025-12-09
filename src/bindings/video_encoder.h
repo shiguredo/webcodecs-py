@@ -226,6 +226,7 @@ class VideoEncoder {
   NV_ENCODE_API_FUNCTION_LIST* nvenc_api_ = nullptr;
   void* nvenc_input_buffer_ = nullptr;
   void* nvenc_output_buffer_ = nullptr;
+  std::vector<uint8_t> nvenc_description_;
 
   // NVENC 関連のメソッド
   void init_nvenc_encoder();
@@ -234,6 +235,17 @@ class VideoEncoder {
                           std::optional<uint16_t> quantizer = std::nullopt);
   void flush_nvenc_encoder();
   void cleanup_nvenc_encoder();
+  void build_nvenc_description(const uint8_t* sps,
+                               size_t sps_size,
+                               const uint8_t* pps,
+                               size_t pps_size,
+                               bool is_hevc);
+  void build_nvenc_hevc_description(const uint8_t* vps,
+                                    size_t vps_size,
+                                    const uint8_t* sps,
+                                    size_t sps_size,
+                                    const uint8_t* pps,
+                                    size_t pps_size);
 #endif
 
 #if defined(__linux__)

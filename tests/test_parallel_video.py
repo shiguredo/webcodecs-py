@@ -448,7 +448,7 @@ def test_encode_decode_frame_ordering():
     decoder.close()
 
 
-def test_parallel_encode_decode_with_keyframes():
+def test_parallel_encode_decode_with_key_frames():
     """キーフレームとデルタフレームを混在させた並列エンコード・デコード"""
     width, height = 320, 240
 
@@ -481,8 +481,8 @@ def test_parallel_encode_decode_with_keyframes():
         frame = create_test_frame(width, height, i * 1000)
         frames_to_encode.append(frame)
         # 最初と5番目をキーフレームに
-        is_keyframe = i == 0 or i == 5
-        encoder.encode(frame, {"key_frame": is_keyframe})
+        is_key_frame = i == 0 or i == 5
+        encoder.encode(frame, {"key_frame": is_key_frame})
         frame.close()
 
     encoder.flush()

@@ -535,7 +535,7 @@ def test_nv12_frame_encode_decode():
     decoder.close()
 
 
-def test_keyframe_and_delta_frames():
+def test_key_frame_and_delta_frames():
     """キーフレームとデルタフレームのデコードテスト."""
     # エンコーダーで複数のフレームを生成
     encoded_chunks = []
@@ -769,14 +769,14 @@ def test_video_toolbox_basic_encode():
     encoder.close()
 
 
-def test_video_toolbox_keyframe_control():
+def test_video_toolbox_key_frame_control():
     """キーフレーム制御のテスト"""
-    keyframe_count = 0
+    key_frame_count = 0
 
     def on_output(chunk):
-        nonlocal keyframe_count
+        nonlocal key_frame_count
         if chunk.type.name == "KEY":
-            keyframe_count += 1
+            key_frame_count += 1
 
     def on_error(error):
         print(f"Encoder error: {error}")
@@ -815,7 +815,7 @@ def test_video_toolbox_keyframe_control():
 
     # VideoToolbox では自動的にキーフレームが挿入される場合があるため、
     # 少なくとも1つはキーフレームがあることを確認
-    assert keyframe_count >= 1, f"期待されるキーフレーム数: 1以上, 実際: {keyframe_count}"
+    assert key_frame_count >= 1, f"期待されるキーフレーム数: 1以上, 実際: {key_frame_count}"
     encoder.close()
 
 
