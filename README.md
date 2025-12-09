@@ -26,6 +26,9 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 - Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
   - AAC は macOS の AudioToolbox を利用
   - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
+- ImageDecoder による画像デコードをサポート (macOS)
+  - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
+  - macOS の Image I/O フレームワークを利用
 - Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
 - NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
   - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
@@ -40,8 +43,6 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 
 ## 実装しない機能
 
-- ImageDecoder: 画像デコード機能は実装対象外
-  - Pillow や OpenCV を使用してください
 - CanvasImageSource: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
 ## サンプルコード

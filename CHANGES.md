@@ -19,6 +19,10 @@
   - H.264 / HEVC のハードウェアエンコード/デコードに対応
   - キーフレーム時に decoder_config.description (avcC/hvcC) を提供する
   - Ubuntu のみ対応
+- [ADD] ImageDecoder を追加する (macOS)
+  - WebCodecs ImageDecoder API を実装
+  - macOS の Image I/O フレームワークを使用
+  - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
   - @voluntas
 
 ## 2025.2.0

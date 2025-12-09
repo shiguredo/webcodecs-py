@@ -149,10 +149,11 @@ encoder.configure(config)  # dict として渡す
 
 Init 系:
 
-- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 - `AudioDataInit` - AudioData コンストラクタ用
-- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
 - `EncodedAudioChunkInit` - EncodedAudioChunk コンストラクタ用
+- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
+- `ImageDecoderInit` - ImageDecoder コンストラクタ用
+- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 
 Config 系:
 
@@ -171,13 +172,14 @@ Config 系:
 Options 系:
 
 - `AudioDataCopyToOptions` - AudioData.copy_to() のオプション
-- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
+- `ImageDecodeOptions` - ImageDecoder.decode() のオプション
 - `VideoEncoderEncodeOptions` - VideoEncoder.encode() のオプション
 - `VideoEncoderEncodeOptionsForAv1` - AV1 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForAvc` - AVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForHevc` - HEVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp8` - VP8 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp9` - VP9 固有のエンコードオプション
+- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
 
 Support 系 (is_config_supported() の戻り値):
 
@@ -190,6 +192,10 @@ Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
 - `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
+
+Result 系 (メソッドの戻り値):
+
+- `ImageDecodeResult` - ImageDecoder.decode() の戻り値
 
 ### 6. Promise の代替
 
@@ -1224,13 +1230,128 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
+## Image インターフェース
+
+### 辞書型インターフェース (Image)
+
+#### ImageDecoderInit
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `type` | o | o | o | MIME タイプ、**必須** |
+| `data` | o | o | o | bytes 型、**必須** |
+| `color_space_conversion` | o | o | - | "default" または "none" |
+| `desired_width` | o | o | - | リサイズ幅 |
+| `desired_height` | o | o | - | リサイズ高さ |
+| `prefer_animation` | o | o | - | アニメーション優先 |
+| `transfer` | x | o | - | **未実装** |
+
+#### ImageDecodeOptions
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `frame_index` | o | o | o | デフォルト 0 |
+| `complete_frames_only` | o | o | - | デフォルト true |
+
+#### ImageDecodeResult
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `image` | o | o | o | VideoFrame |
+| `complete` | o | o | o | デコード完了フラグ |
+
+### ImageDecoder
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `constructor(init)` | o | o | o | ImageDecoderInit を使用 |
+| `type` | o | o | o | MIME タイプ |
+| `complete` | o | o | o | データ読み込み完了 |
+| `completed` | - | o | - | Promise（Python では `is_complete` プロパティ） |
+| `tracks` | o | o | o | ImageTrackList |
+| `decode(options)` | o | o | o | 同期的に実行、ImageDecodeResult を返す |
+| `reset()` | o | o | o | |
+| `close()` | o | o | o | |
+| `is_type_supported()` | o | o | o | 静的メソッド |
+| **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
+| **`is_complete`** | o | x | o | **独自拡張**: `complete` の別名 |
+
+**サポートフォーマット (macOS のみ)**:
+
+| フォーマット | MIME タイプ | 対応状況 |
+|------------|------------|---------|
+| JPEG | image/jpeg | o |
+| PNG | image/png | o |
+| GIF | image/gif | o（アニメーション対応） |
+| WebP | image/webp | o |
+| BMP | image/bmp | o |
+| TIFF | image/tiff | o |
+| HEIC/HEIF | image/heic, image/heif | o |
+
+**注**: ImageDecoder は macOS の Image I/O フレームワークを使用しています。他のプラットフォームでは利用できません。
+
+### ImageTrackList
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `[index]` | o | o | o | `__getitem__` |
+| `ready` | - | o | - | Promise（Python では `is_ready` プロパティ） |
+| `length` | o | o | o | |
+| `selected_index` | o | o | o | |
+| `selected_track` | o | o | o | |
+| **`is_ready`** | o | x | o | **独自拡張**: `ready` の同期版 |
+
+### ImageTrack
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `animated` | o | o | o | |
+| `frame_count` | o | o | o | |
+| `repetition_count` | o | o | o | |
+| `selected` | o | o | o | 読み書き可能 |
+
+### ImageDecoder の使用例
+
+```python
+from webcodecs import ImageDecoder, ImageDecoderInit
+
+# JPEG ファイルを読み込み
+with open("image.jpg", "rb") as f:
+    jpeg_data = f.read()
+
+# ImageDecoder を作成
+decoder = ImageDecoder({
+    "type": "image/jpeg",
+    "data": jpeg_data,
+})
+
+# 画像情報を確認
+print(f"Type: {decoder.type}")
+print(f"Complete: {decoder.complete}")
+print(f"Tracks: {decoder.tracks.length}")
+
+track = decoder.tracks[0]
+print(f"Animated: {track.animated}")
+print(f"Frame count: {track.frame_count}")
+
+# デコード
+result = decoder.decode()
+frame = result["image"]
+
+print(f"Size: {frame.coded_width}x{frame.coded_height}")
+print(f"Format: {frame.format}")  # RGBA
+
+# クリーンアップ
+frame.close()
+decoder.close()
+```
+
 ## 未実装の機能
 
 ### 実装しない機能
 
 以下の機能は webcodecs-py では実装しません:
 
-- **ImageDecoder**: 画像デコード機能は実装対象外（PIL/Pillow や OpenCV を使用してください）
 - **CanvasImageSource**: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
 ### 未実装の辞書型
@@ -1240,7 +1361,6 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
 | `SvcOutputMetadata` | SVC サポート未実装 |
-| `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
 
 **注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
 
