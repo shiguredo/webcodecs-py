@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-07
+- 最終更新: 2025-12-09
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -420,6 +420,28 @@ decoder.configure(config)
 config: VideoDecoderConfig = {
     "codec": "avc1.42001f",
     "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+}
+decoder.configure(config)
+```
+
+```python
+# Apple Video Toolbox を使用した VP9 デコード (macOS)
+# デフォルトでは libvpx によるソフトウェアデコードが使用される
+# VideoToolbox による高速なハードウェアデコードを使用する場合は明示的に指定が必要
+config: VideoDecoderConfig = {
+    "codec": "vp09.00.10.08",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+}
+decoder.configure(config)
+```
+
+```python
+# Apple Video Toolbox を使用した AV1 デコード (macOS)
+# デフォルトでは dav1d によるソフトウェアデコードが使用される
+# VideoToolbox による高速なハードウェアデコードを使用する場合は明示的に指定が必要
+config: VideoDecoderConfig = {
+    "codec": "av01.0.08M.08",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
 }
 decoder.configure(config)
 ```
@@ -953,7 +975,7 @@ bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 - `APPLE_VIDEO_TOOLBOX`
   - macOS の VideoToolbox
   - Encoder: H.264 / H.265
-  - Decoder: H.264 / H.265
+  - Decoder: H.264 / H.265 / VP9 / AV1
 - `NVIDIA_VIDEO_CODEC`
   - NVIDIA Video Codec SDK
   - Encoder: AV1 / H.264 / H.265
@@ -1184,7 +1206,9 @@ capabilities = get_video_codec_capabilities()
 #         "platform": "darwin",
 #         "codecs": {
 #             "avc1": {"encoder": True, "decoder": True},
-#             "hvc1": {"encoder": True, "decoder": True}
+#             "hvc1": {"encoder": True, "decoder": True},
+#             "vp09": {"encoder": False, "decoder": True},
+#             "av01": {"encoder": False, "decoder": True}
 #         }
 #     }
 # }
@@ -1378,14 +1402,16 @@ decoder.close()
 |----------|-----------|----------|---------------|----------------|
 | VP8 | o | o | libvpx | macOS / Ubuntu |
 | VP9 | o | o | libvpx | macOS / Ubuntu |
+| VP9 | - | o | VideoToolbox* | macOS |
 | AV1 | o | o | libaom / dav1d | All |
+| AV1 | - | o | VideoToolbox* | macOS |
 | AV1 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.264 | o | o | VideoToolbox* | macOS |
 | H.264 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.265 | o | o | VideoToolbox* | macOS |
 | H.265 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 
-*ハードウェアアクセラレーション使用
+*ハードウェアアクセラレーション使用（VP9/AV1 の VideoToolbox デコードは `HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX` を明示的に指定した場合のみ有効）
 
 **VP9 プロファイル対応状況**:
 

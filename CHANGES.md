@@ -11,6 +11,10 @@
 
 ## develop
 
+- [ADD] Apple Video Toolbox で VP9/AV1 デコーダーをサポートする
+  - VideoDecoderConfig で hardware_acceleration_engine に HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を指定した場合のみ有効
+  - デフォルトは libvpx (VP9) / dav1d (AV1) によるソフトウェアデコード
+  - @voluntas
 - [ADD] ImageDecoder を追加する (macOS)
   - WebCodecs ImageDecoder API を実装
   - macOS の Image I/O フレームワークを使用

@@ -152,6 +152,9 @@ class VideoDecoder {
   // NVIDIA Video Codec SDK を使用するかどうかを判定
   bool uses_nvidia_video_codec() const;
 
+  // Apple Video Toolbox を使用するかどうかを判定
+  bool uses_apple_video_toolbox() const;
+
 #if defined(NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK (NVDEC) 関連のメンバー
   void* nvdec_decoder_ = nullptr;

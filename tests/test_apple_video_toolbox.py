@@ -1749,3 +1749,221 @@ def test_h265_decode_multiple_delta_frames():
         frame.close()
     encoder.close()
     decoder.close()
+
+
+# =============================================================================
+# VP9 VideoToolbox デコーダーテスト
+# =============================================================================
+
+
+def test_vp9_decoder_videotoolbox_is_config_supported():
+    """VP9 VideoToolbox デコーダーの is_config_supported テスト."""
+    config: VideoDecoderConfig = {
+        "codec": "vp09.00.10.08",
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+    support = VideoDecoder.is_config_supported(config)
+    assert support["supported"] is True
+    assert support["config"]["codec"] == "vp09.00.10.08"
+
+
+def test_vp9_decode_videotoolbox():
+    """libvpx でエンコード → VideoToolbox でデコードするテスト."""
+    width, height = 320, 240
+
+    # libvpx でエンコード
+    encoded_chunks = []
+
+    def on_encode_output(chunk):
+        encoded_chunks.append(chunk)
+
+    def on_encode_error(error):
+        pytest.fail(f"エンコーダーエラー: {error}")
+
+    encoder = VideoEncoder(on_encode_output, on_encode_error)
+
+    encoder_config: VideoEncoderConfig = {
+        "codec": "vp09.00.10.08",
+        "width": width,
+        "height": height,
+        "bitrate": 500_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+    }
+    encoder.configure(encoder_config)
+
+    # テストフレームを作成してエンコード
+    test_frames = []
+    data_size = width * height * 3 // 2
+    for i in range(5):
+        data = np.full(data_size, (i * 50) % 256, dtype=np.uint8)
+        init: VideoFrameBufferInit = {
+            "format": VideoPixelFormat.I420,
+            "coded_width": width,
+            "coded_height": height,
+            "timestamp": i * 33333,
+        }
+        frame = VideoFrame(data, init)
+        test_frames.append(frame)
+        encoder.encode(frame, {"key_frame": i == 0})
+
+    encoder.flush()
+
+    assert len(encoded_chunks) >= 1, "エンコードされたチャンクが生成されませんでした"
+
+    # VideoToolbox でデコード
+    decoded_frames = []
+    decode_errors = []
+
+    def on_decode_output(frame):
+        decoded_frames.append(frame)
+
+    def on_decode_error(error):
+        decode_errors.append(error)
+
+    decoder = VideoDecoder(on_decode_output, on_decode_error)
+
+    decoder_config: VideoDecoderConfig = {
+        "codec": "vp09.00.10.08",
+        "coded_width": width,
+        "coded_height": height,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+    decoder.configure(decoder_config)
+
+    for chunk in encoded_chunks:
+        decoder.decode(chunk)
+
+    decoder.flush()
+
+    # デコードエラーがないことを確認
+    assert len(decode_errors) == 0, f"デコードエラーが発生: {decode_errors}"
+
+    # フレームがデコードされたことを確認
+    assert len(decoded_frames) >= 1, "デコードされたフレームが生成されませんでした"
+
+    # デコードされたフレームのサイズを確認
+    for frame in decoded_frames:
+        assert frame.coded_width == width
+        assert frame.coded_height == height
+
+    print(
+        f"VP9 エンコードチャンク数: {len(encoded_chunks)}, デコードフレーム数: {len(decoded_frames)}"
+    )
+
+    # クリーンアップ
+    for frame in test_frames:
+        frame.close()
+    for frame in decoded_frames:
+        frame.close()
+    encoder.close()
+    decoder.close()
+
+
+# =============================================================================
+# AV1 VideoToolbox デコーダーテスト
+# =============================================================================
+
+
+def test_av1_decoder_videotoolbox_is_config_supported():
+    """AV1 VideoToolbox デコーダーの is_config_supported テスト."""
+    config: VideoDecoderConfig = {
+        "codec": "av01.0.04M.08",
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+    support = VideoDecoder.is_config_supported(config)
+    assert support["supported"] is True
+    assert support["config"]["codec"] == "av01.0.04M.08"
+
+
+def test_av1_decode_videotoolbox():
+    """libaom でエンコード → VideoToolbox でデコードするテスト."""
+    width, height = 320, 240
+
+    # libaom でエンコード
+    encoded_chunks = []
+
+    def on_encode_output(chunk):
+        encoded_chunks.append(chunk)
+
+    def on_encode_error(error):
+        pytest.fail(f"エンコーダーエラー: {error}")
+
+    encoder = VideoEncoder(on_encode_output, on_encode_error)
+
+    encoder_config: VideoEncoderConfig = {
+        "codec": "av01.0.04M.08",
+        "width": width,
+        "height": height,
+        "bitrate": 500_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+    }
+    encoder.configure(encoder_config)
+
+    # テストフレームを作成してエンコード
+    test_frames = []
+    data_size = width * height * 3 // 2
+    for i in range(5):
+        data = np.full(data_size, (i * 50) % 256, dtype=np.uint8)
+        init: VideoFrameBufferInit = {
+            "format": VideoPixelFormat.I420,
+            "coded_width": width,
+            "coded_height": height,
+            "timestamp": i * 33333,
+        }
+        frame = VideoFrame(data, init)
+        test_frames.append(frame)
+        encoder.encode(frame, {"key_frame": i == 0})
+
+    encoder.flush()
+
+    assert len(encoded_chunks) >= 1, "エンコードされたチャンクが生成されませんでした"
+
+    # VideoToolbox でデコード
+    decoded_frames = []
+    decode_errors = []
+
+    def on_decode_output(frame):
+        decoded_frames.append(frame)
+
+    def on_decode_error(error):
+        decode_errors.append(error)
+
+    decoder = VideoDecoder(on_decode_output, on_decode_error)
+
+    decoder_config: VideoDecoderConfig = {
+        "codec": "av01.0.04M.08",
+        "coded_width": width,
+        "coded_height": height,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+    decoder.configure(decoder_config)
+
+    for chunk in encoded_chunks:
+        decoder.decode(chunk)
+
+    decoder.flush()
+
+    # デコードエラーがないことを確認
+    assert len(decode_errors) == 0, f"デコードエラーが発生: {decode_errors}"
+
+    # フレームがデコードされたことを確認
+    assert len(decoded_frames) >= 1, "デコードされたフレームが生成されませんでした"
+
+    # デコードされたフレームのサイズを確認
+    for frame in decoded_frames:
+        assert frame.coded_width == width
+        assert frame.coded_height == height
+
+    print(
+        f"AV1 エンコードチャンク数: {len(encoded_chunks)}, デコードフレーム数: {len(decoded_frames)}"
+    )
+
+    # クリーンアップ
+    for frame in test_frames:
+        frame.close()
+    for frame in decoded_frames:
+        frame.close()
+    encoder.close()
+    decoder.close()

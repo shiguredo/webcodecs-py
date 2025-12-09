@@ -104,8 +104,7 @@ void VideoDecoder::configure(nb::dict config_dict) {
   // ワーカースレッドの開始
   // VideoToolbox は独自の非同期モデルを持つため、ワーカースレッドを開始しない
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (!(codec == VideoCodec::H264 || codec == VideoCodec::H265)) {
+  if (!uses_apple_video_toolbox()) {
     if (!worker_thread_.joinable()) {
       start_worker();  // ワーカースレッドを開始
     }
@@ -126,8 +125,7 @@ void VideoDecoder::decode(const EncodedVideoChunk& chunk) {
 
   // VideoToolbox は独自の非同期モデルを持つため、ワーカースレッドをバイパス
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
+  if (uses_apple_video_toolbox()) {
     // シーケンス番号を設定して直接デコード
     current_sequence_ = next_sequence_number_++;
     bool success = decode_internal(chunk);
@@ -188,8 +186,7 @@ void VideoDecoder::flush() {
 
   // VideoToolbox は直接処理されるため、ワーカーキューの待機をスキップ
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (!(codec == VideoCodec::H264 || codec == VideoCodec::H265)) {
+  if (!uses_apple_video_toolbox()) {
 #endif
     // 全てのペンディングタスクが完了するまで待機
     {
@@ -203,17 +200,14 @@ void VideoDecoder::flush() {
 #endif
 
   // VideoToolbox の場合
-  if (string_to_codec(config_.codec) == VideoCodec::H264 ||
-      string_to_codec(config_.codec) == VideoCodec::H265) {
 #if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
     if (vt_session_) {
       // VideoToolbox デコーダーでのフラッシュ処理
-      // VTDecompressionSessionWaitForAsynchronousFrames は
-      // video_decoder_apple_video_toolbox.cpp で定義された関数経由で呼ぶ
       flush_videotoolbox();
     }
-#endif
   }
+#endif
 }
 
 void VideoDecoder::reset() {
@@ -286,8 +280,21 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
     }
 #endif
 
+#if defined(__APPLE__)
+    // Apple Video Toolbox でサポートされているかチェック
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+      // VideoToolbox でサポートされているコーデック: H.264, H.265, VP9, AV1
+      if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
     switch (codec) {
       case VideoCodec::AV1:
+        // AV1 は dav1d でソフトウェアデコード
         supported = true;
         break;
       case VideoCodec::H264:
@@ -342,6 +349,14 @@ void VideoDecoder::init_decoder() {
   }
 #endif
 
+  // Apple Video Toolbox を使用する場合
+#if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
+    init_videotoolbox_decoder();
+    return;
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
@@ -349,11 +364,8 @@ void VideoDecoder::init_decoder() {
       break;
     case VideoCodec::H264:
     case VideoCodec::H265:
-#if defined(__APPLE__)
-      init_videotoolbox_decoder();
-#else
+      // H.264/H.265 は uses_apple_video_toolbox() で処理されるため、ここには到達しない
       throw std::runtime_error("H.264/H.265 not supported on this platform");
-#endif
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
@@ -383,6 +395,15 @@ void VideoDecoder::cleanup_decoder() {
   }
 #endif
 
+  // Apple Video Toolbox のクリーンアップ
+#if defined(__APPLE__)
+  if (vt_session_) {
+    cleanup_videotoolbox_decoder();
+    decoder_context_ = nullptr;
+    return;
+  }
+#endif
+
   if (!decoder_context_) {
 #if defined(__APPLE__) || defined(__linux__)
     // VPX デコーダーは decoder_context_ を使わないのでここでクリーンアップ
@@ -398,9 +419,7 @@ void VideoDecoder::cleanup_decoder() {
       break;
     case VideoCodec::H264:
     case VideoCodec::H265:
-#if defined(__APPLE__)
-      cleanup_videotoolbox_decoder();
-#endif
+      // VideoToolbox は上で処理されるため、ここには到達しない
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
@@ -423,21 +442,25 @@ bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
   }
 #endif
 
+  // Apple Video Toolbox を使用する場合
+#if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
+    return decode_videotoolbox(chunk);
+  }
+#endif
+
   VideoCodec codec = string_to_codec(config_.codec);
   switch (codec) {
     case VideoCodec::AV1:
       return decode_dav1d(chunk);
     case VideoCodec::H264:
     case VideoCodec::H265:
-#if defined(__APPLE__)
-      return decode_videotoolbox(chunk);
-#else
+      // H.264/H.265 は uses_apple_video_toolbox() で処理されるため、ここには到達しない
       if (error_callback_) {
         nb::gil_scoped_acquire gil;
         error_callback_("H.264/H.265 not supported on this platform");
       }
       return false;
-#endif
     case VideoCodec::VP8:
     case VideoCodec::VP9:
 #if defined(__APPLE__) || defined(__linux__)
@@ -478,6 +501,25 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
           codec == VideoCodec::VP9) &&
          config_.hardware_acceleration_engine ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+  return false;
+#endif
+}
+
+bool VideoDecoder::uses_apple_video_toolbox() const {
+#if defined(__APPLE__)
+  // Apple Video Toolbox が有効な場合
+  // H.264, H.265: デフォルトで VideoToolbox を使用
+  // VP9, AV1: HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX 指定時のみ
+  VideoCodec codec = string_to_codec(config_.codec);
+  if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
+    return true;
+  }
+  if (codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
+    return config_.hardware_acceleration_engine ==
+           HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+  }
+  return false;
 #else
   return false;
 #endif
