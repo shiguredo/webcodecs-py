@@ -39,22 +39,38 @@ def create_test_frame(width: int, height: int, timestamp: int) -> VideoFrame:
     return VideoFrame(data, init)
 
 
-def test_nvenc_h264_encode():
-    """H.264 エンコードのテスト"""
-    chunks = []
+@pytest.mark.parametrize(
+    "codec",
+    [
+        "avc1.42001f",
+        "hvc1.1.6.L93.B0",
+    ],
+)
+def test_description(codec):
+    """description 生成とデコードテスト"""
+    encoded_chunks = []
     metadatas = []
-    errors = []
+    decoded_frames = []
+    encode_errors = []
+    decode_errors = []
 
-    def on_output(chunk, metadata=None):
-        chunks.append(chunk)
+    def on_encode_output(chunk, metadata=None):
+        encoded_chunks.append(chunk)
         metadatas.append(metadata)
 
-    def on_error(error):
-        errors.append(error)
+    def on_encode_error(error):
+        encode_errors.append(error)
 
-    encoder = VideoEncoder(on_output, on_error)
+    def on_decode_output(frame):
+        decoded_frames.append(frame)
+
+    def on_decode_error(error):
+        decode_errors.append(error)
+
+    # エンコード
+    encoder = VideoEncoder(on_encode_output, on_encode_error)
     config = {
-        "codec": "avc1.42001f",
+        "codec": codec,
         "width": 320,
         "height": 240,
         "bitrate": 500_000,
@@ -63,124 +79,65 @@ def test_nvenc_h264_encode():
     encoder.configure(config)
     assert encoder.state == CodecState.CONFIGURED
 
-    # フレームをエンコード
-    for i in range(10):
+    for i in range(5):
         frame = create_test_frame(320, 240, i * 33333)
         encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
     encoder.close()
 
-    assert len(errors) == 0
-    assert len(chunks) > 0
+    assert len(encode_errors) == 0
+    assert len(encoded_chunks) > 0
 
-    # キーフレームを探す
+    # キーフレームの metadata から description を取得
     keyframe_metadata = None
-    for i, chunk in enumerate(chunks):
+    for i, chunk in enumerate(encoded_chunks):
         if chunk.type == EncodedVideoChunkType.KEY:
             keyframe_metadata = metadatas[i]
             break
 
     # キーフレームの metadata に description が含まれていることを確認
     assert keyframe_metadata is not None
-    assert "decoderConfig" in keyframe_metadata
-    decoder_config = keyframe_metadata["decoderConfig"]
+    assert "decoder_config" in keyframe_metadata
+    decoder_config = keyframe_metadata["decoder_config"]
     assert "description" in decoder_config
     description = decoder_config["description"]
-    # avcC 形式: 最初のバイトは configurationVersion = 1
+    # avcC/hvcC 形式: 最初のバイトは configurationVersion = 1
     assert len(description) > 0
     assert description[0] == 1
 
+    # デコード (description を使用)
+    decoder = VideoDecoder(on_decode_output, on_decode_error)
+    decoder.configure(
+        {
+            "codec": codec,
+            "description": description,
+            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+        }
+    )
 
-def test_nvenc_hevc_encode():
-    """HEVC エンコードのテスト"""
-    chunks = []
-    metadatas = []
-    errors = []
+    for chunk in encoded_chunks:
+        decoder.decode(chunk)
 
-    def on_output(chunk, metadata=None):
-        chunks.append(chunk)
-        metadatas.append(metadata)
+    decoder.flush()
+    decoder.close()
 
-    def on_error(error):
-        errors.append(error)
-
-    encoder = VideoEncoder(on_output, on_error)
-    config = {
-        "codec": "hvc1.1.6.L93.B0",
-        "width": 320,
-        "height": 240,
-        "bitrate": 500_000,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-    }
-    encoder.configure(config)
-    assert encoder.state == CodecState.CONFIGURED
-
-    # フレームをエンコード
-    for i in range(10):
-        frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"key_frame": i == 0})
-
-    encoder.flush()
-    encoder.close()
-
-    assert len(errors) == 0
-    assert len(chunks) > 0
-
-    # キーフレームを探す
-    keyframe_metadata = None
-    for i, chunk in enumerate(chunks):
-        if chunk.type == EncodedVideoChunkType.KEY:
-            keyframe_metadata = metadatas[i]
-            break
-
-    # キーフレームの metadata に description が含まれていることを確認
-    assert keyframe_metadata is not None
-    assert "decoderConfig" in keyframe_metadata
-    decoder_config = keyframe_metadata["decoderConfig"]
-    assert "description" in decoder_config
-    description = decoder_config["description"]
-    # hvcC 形式: 最初のバイトは configurationVersion = 1
-    assert len(description) > 0
-    assert description[0] == 1
+    assert len(decode_errors) == 0
+    assert len(decoded_frames) > 0
+    # デコードされたフレーム数がエンコードしたフレーム数と一致することを確認
+    assert len(decoded_frames) == 5
 
 
-def test_nvenc_av1_encode():
-    """AV1 エンコードのテスト"""
-    chunks = []
-    errors = []
-
-    def on_output(chunk, metadata=None):
-        chunks.append(chunk)
-
-    def on_error(error):
-        errors.append(error)
-
-    encoder = VideoEncoder(on_output, on_error)
-    config = {
-        "codec": "av01.0.04M.08",
-        "width": 320,
-        "height": 240,
-        "bitrate": 500_000,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-    }
-    encoder.configure(config)
-    assert encoder.state == CodecState.CONFIGURED
-
-    # フレームをエンコード
-    for i in range(10):
-        frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"key_frame": i == 0})
-
-    encoder.flush()
-    encoder.close()
-
-    assert len(errors) == 0
-    assert len(chunks) > 0
-
-
-def test_nvdec_h264_decode():
-    """H.264 デコードのテスト"""
+@pytest.mark.parametrize(
+    "codec",
+    [
+        "avc1.42001f",
+        "hvc1.1.6.L93.B0",
+        "av01.0.04M.08",
+    ],
+)
+def test_encode_decode(codec):
+    """エンコード + デコードのテスト"""
     encoded_chunks = []
     decoded_frames = []
     encode_errors = []
@@ -202,7 +159,7 @@ def test_nvdec_h264_decode():
     encoder = VideoEncoder(on_encode_output, on_encode_error)
     encoder.configure(
         {
-            "codec": "avc1.42001f",
+            "codec": codec,
             "width": 320,
             "height": 240,
             "bitrate": 500_000,
@@ -220,11 +177,14 @@ def test_nvdec_h264_decode():
     assert len(encode_errors) == 0
     assert len(encoded_chunks) > 0
 
+    # 最初のチャンクがキーフレームであることを確認
+    assert encoded_chunks[0].type == EncodedVideoChunkType.KEY
+
     # デコード
     decoder = VideoDecoder(on_decode_output, on_decode_error)
     decoder.configure(
         {
-            "codec": "avc1.42001f",
+            "codec": codec,
             "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
         }
     )
@@ -239,11 +199,19 @@ def test_nvdec_h264_decode():
     assert len(decoded_frames) > 0
 
 
-def test_nvidia_encoder_h264_is_config_supported():
-    """H.264 エンコーダーのサポートチェック"""
+@pytest.mark.parametrize(
+    "codec",
+    [
+        "avc1.42001f",
+        "hvc1.1.6.L93.B0",
+        "av01.0.04M.08",
+    ],
+)
+def test_encoder_is_config_supported(codec):
+    """エンコーダーのサポートチェック"""
     support = VideoEncoder.is_config_supported(
         {
-            "codec": "avc1.42001f",
+            "codec": codec,
             "width": 1920,
             "height": 1080,
             "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
@@ -252,59 +220,19 @@ def test_nvidia_encoder_h264_is_config_supported():
     assert support["supported"] is True
 
 
-def test_nvidia_encoder_hevc_is_config_supported():
-    """HEVC エンコーダーのサポートチェック"""
-    support = VideoEncoder.is_config_supported(
-        {
-            "codec": "hvc1.1.6.L93.B0",
-            "width": 1920,
-            "height": 1080,
-            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        }
-    )
-    assert support["supported"] is True
-
-
-def test_nvidia_encoder_av1_is_config_supported():
-    """AV1 エンコーダーのサポートチェック"""
-    support = VideoEncoder.is_config_supported(
-        {
-            "codec": "av01.0.04M.08",
-            "width": 1920,
-            "height": 1080,
-            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        }
-    )
-    assert support["supported"] is True
-
-
-def test_nvidia_decoder_h264_is_config_supported():
-    """H.264 デコーダーのサポートチェック"""
+@pytest.mark.parametrize(
+    "codec",
+    [
+        "avc1.42001f",
+        "hvc1.1.6.L93.B0",
+        "av01.0.04M.08",
+    ],
+)
+def test_decoder_is_config_supported(codec):
+    """デコーダーのサポートチェック"""
     support = VideoDecoder.is_config_supported(
         {
-            "codec": "avc1.42001f",
-            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        }
-    )
-    assert support["supported"] is True
-
-
-def test_nvidia_decoder_hevc_is_config_supported():
-    """HEVC デコーダーのサポートチェック"""
-    support = VideoDecoder.is_config_supported(
-        {
-            "codec": "hvc1.1.6.L93.B0",
-            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        }
-    )
-    assert support["supported"] is True
-
-
-def test_nvidia_decoder_av1_is_config_supported():
-    """AV1 デコーダーのサポートチェック"""
-    support = VideoDecoder.is_config_supported(
-        {
-            "codec": "av01.0.04M.08",
+            "codec": codec,
             "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
         }
     )
