@@ -104,11 +104,17 @@ void VideoEncoder::configure(nb::dict config_dict) {
 
   // コーデックの初期化
   if (uses_nvidia_video_codec()) {
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
     init_nvenc_encoder();
 #else
     throw std::runtime_error(
         "NVIDIA Video Codec SDK is not enabled in this build");
+#endif
+  } else if (uses_intel_vpl()) {
+#if defined(__linux__)
+    init_intel_vpl_encoder();
+#else
+    throw std::runtime_error("Intel VPL is not enabled in this build");
 #endif
   } else if (is_av1_codec()) {
     init_aom_encoder();
@@ -180,10 +186,20 @@ bool VideoEncoder::uses_videotoolbox() const {
 }
 
 bool VideoEncoder::uses_nvidia_video_codec() const {
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   return (is_avc_codec() || is_hevc_codec() || is_av1_codec()) &&
          config_.hardware_acceleration_engine ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+  return false;
+#endif
+}
+
+bool VideoEncoder::uses_intel_vpl() const {
+#if defined(__linux__)
+  return (is_avc_codec() || is_hevc_codec()) &&
+         config_.hardware_acceleration_engine ==
+             HardwareAccelerationEngine::INTEL_VPL;
 #else
   return false;
 #endif
@@ -195,6 +211,9 @@ bool VideoEncoder::uses_nvidia_video_codec() const {
 #include "video_encoder_nvidia.cpp"
 #if defined(__APPLE__) || defined(__linux__)
 #include "video_encoder_vpx.cpp"
+#endif
+#if defined(__linux__)
+#include "video_encoder_intel_vpl.cpp"
 #endif
 
 void VideoEncoder::encode(const VideoFrame& frame, bool keyframe) {
@@ -435,9 +454,14 @@ void VideoEncoder::close() {
   }
 #endif
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVENC リソースをクリーンアップ
   cleanup_nvenc_encoder();
+#endif
+
+#if defined(__linux__)
+  // Intel VPL リソースをクリーンアップ
+  cleanup_intel_vpl_encoder();
 #endif
 
 #if defined(__APPLE__) || defined(__linux__)
@@ -457,7 +481,7 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
     CodecParameters codec_params = parse_codec_string(config.codec);
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
     if (config.hardware_acceleration_engine ==
         HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVENC は AV1, AVC, HEVC をサポート
@@ -469,13 +493,28 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
     }
 #endif
 
+    // Intel VPL でサポートされているかチェック
+#if defined(__linux__)
+    if (config.hardware_acceleration_engine ==
+        HardwareAccelerationEngine::INTEL_VPL) {
+      // Intel VPL は AVC, HEVC, AV1 をサポート
+      if (std::holds_alternative<AVCCodecParameters>(codec_params) ||
+          std::holds_alternative<HEVCCodecParameters>(codec_params) ||
+          std::holds_alternative<AV1CodecParameters>(codec_params)) {
+        // ハードウェアがサポートしているか実際に確認する必要がある
+        // 今は true を返すが、実際のハードウェアサポートは初期化時にチェックされる
+        return VideoEncoderSupport(true, config);
+      }
+    }
+#endif
+
     if (std::holds_alternative<AV1CodecParameters>(codec_params)) {
       supported = true;
     } else if (std::holds_alternative<AVCCodecParameters>(codec_params) ||
                std::holds_alternative<HEVCCodecParameters>(codec_params)) {
 #if defined(__APPLE__)
       supported = true;  // macOS で VideoToolbox をサポート
-#elif defined(NVIDIA_CUDA_TOOLKIT)
+#elif defined(USE_NVIDIA_CUDA_TOOLKIT)
       // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
       supported = config.hardware_acceleration_engine ==
                   HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
@@ -582,9 +621,15 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
   current_sequence_ = task.sequence_number;
 
   // 遅延初期化 (初回エンコード時)
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec() && !nvenc_encoder_) {
     init_nvenc_encoder();
+  }
+#endif
+
+#if defined(__linux__)
+  if (uses_intel_vpl() && !vpl_session_) {
+    init_intel_vpl_encoder();
   }
 #endif
 
@@ -605,9 +650,16 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
   // バインディング層で既に GIL を解放しているため、ここでは解放しない
   // nb::gil_scoped_release gil_release;
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     encode_frame_nvenc(*task.frame, task.keyframe, task.av1_quantizer);
+    return;
+  }
+#endif
+
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    encode_frame_intel_vpl(*task.frame, task.keyframe, task.avc_quantizer);
     return;
   }
 #endif

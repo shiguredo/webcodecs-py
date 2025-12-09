@@ -8,6 +8,10 @@
 #include <VideoToolbox/VideoToolbox.h>
 #endif
 
+#if defined(__linux__)
+#include "../dyn/vpl.h"
+#endif
+
 namespace nb = nanobind;
 
 std::map<HardwareAccelerationEngine, EngineSupport>
@@ -94,6 +98,19 @@ get_video_codec_capabilities_impl() {
   // VideoToolbox がサポートするコーデックがある場合のみ追加
   if (!vt_support.codecs.empty()) {
     capabilities[HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX] = vt_support;
+  }
+#endif
+
+#if defined(__linux__)
+  // Intel VPL の利用可能性を確認
+  if (dyn::DynModule::IsLoadable(dyn::VPL_SO)) {
+    EngineSupport intel_support;
+    intel_support.available = true;
+    intel_support.platform = "linux";
+    // Intel VPL は AVC (H.264) と HEVC (H.265) をサポート
+    intel_support.codecs["avc1"] = {true, true};
+    intel_support.codecs["hvc1"] = {true, true};
+    capabilities[HardwareAccelerationEngine::INTEL_VPL] = intel_support;
   }
 #endif
 
