@@ -10,6 +10,7 @@ import numpy as np
 from webcodecs import (
     CodecState,
     EncodedVideoChunk,
+    EncodedVideoChunkType,
     HardwareAccelerationEngine,
     VideoDecoder,
     VideoEncoder,
@@ -73,8 +74,14 @@ def test_nvenc_h264_encode():
     assert len(errors) == 0
     assert len(chunks) > 0
 
+    # キーフレームを探す
+    keyframe_metadata = None
+    for i, chunk in enumerate(chunks):
+        if chunk.type == EncodedVideoChunkType.KEY:
+            keyframe_metadata = metadatas[i]
+            break
+
     # キーフレームの metadata に description が含まれていることを確認
-    keyframe_metadata = metadatas[0]
     assert keyframe_metadata is not None
     assert "decoderConfig" in keyframe_metadata
     decoder_config = keyframe_metadata["decoderConfig"]
@@ -120,8 +127,14 @@ def test_nvenc_hevc_encode():
     assert len(errors) == 0
     assert len(chunks) > 0
 
+    # キーフレームを探す
+    keyframe_metadata = None
+    for i, chunk in enumerate(chunks):
+        if chunk.type == EncodedVideoChunkType.KEY:
+            keyframe_metadata = metadatas[i]
+            break
+
     # キーフレームの metadata に description が含まれていることを確認
-    keyframe_metadata = metadatas[0]
     assert keyframe_metadata is not None
     assert "decoderConfig" in keyframe_metadata
     decoder_config = keyframe_metadata["decoderConfig"]
