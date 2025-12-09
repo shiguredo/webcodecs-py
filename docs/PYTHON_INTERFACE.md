@@ -149,10 +149,11 @@ encoder.configure(config)  # dict として渡す
 
 Init 系:
 
-- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 - `AudioDataInit` - AudioData コンストラクタ用
-- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
 - `EncodedAudioChunkInit` - EncodedAudioChunk コンストラクタ用
+- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
+- `ImageDecoderInit` - ImageDecoder コンストラクタ用
+- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 
 Config 系:
 
@@ -171,13 +172,14 @@ Config 系:
 Options 系:
 
 - `AudioDataCopyToOptions` - AudioData.copy_to() のオプション
-- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
+- `ImageDecodeOptions` - ImageDecoder.decode() のオプション
 - `VideoEncoderEncodeOptions` - VideoEncoder.encode() のオプション
 - `VideoEncoderEncodeOptionsForAv1` - AV1 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForAvc` - AVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForHevc` - HEVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp8` - VP8 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp9` - VP9 固有のエンコードオプション
+- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
 
 Support 系 (is_config_supported() の戻り値):
 
@@ -190,6 +192,10 @@ Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
 - `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
+
+Result 系 (メソッドの戻り値):
+
+- `ImageDecodeResult` - ImageDecoder.decode() の戻り値
 
 ### 6. Promise の代替
 
@@ -1225,6 +1231,34 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
 ## Image インターフェース
+
+### 辞書型インターフェース (Image)
+
+#### ImageDecoderInit
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `type` | o | o | o | MIME タイプ、**必須** |
+| `data` | o | o | o | bytes 型、**必須** |
+| `color_space_conversion` | o | o | - | "default" または "none" |
+| `desired_width` | o | o | - | リサイズ幅 |
+| `desired_height` | o | o | - | リサイズ高さ |
+| `prefer_animation` | o | o | - | アニメーション優先 |
+| `transfer` | x | o | - | **未実装** |
+
+#### ImageDecodeOptions
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `frame_index` | o | o | o | デフォルト 0 |
+| `complete_frames_only` | o | o | - | デフォルト true |
+
+#### ImageDecodeResult
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `image` | o | o | o | VideoFrame |
+| `complete` | o | o | o | デコード完了フラグ |
 
 ### ImageDecoder
 
