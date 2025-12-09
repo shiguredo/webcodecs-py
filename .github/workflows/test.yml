@@ -91,19 +91,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_macos:
@@ -162,19 +161,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_ubuntu:
@@ -233,19 +231,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_windows:
@@ -259,8 +256,9 @@ jobs:
           - name: windows-2025_x86_64
             runs_on: windows-2025
         python_version:
-          - "3.13"
           - "3.14"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -300,18 +298,17 @@ jobs:
       - name: Install wheel
         shell: bash
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         shell: bash
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1
