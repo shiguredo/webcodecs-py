@@ -65,7 +65,7 @@ def test_nvenc_h264_encode():
     # フレームをエンコード
     for i in range(10):
         frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
     encoder.close()
@@ -112,7 +112,7 @@ def test_nvenc_hevc_encode():
     # フレームをエンコード
     for i in range(10):
         frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
     encoder.close()
@@ -157,7 +157,7 @@ def test_nvenc_av1_encode():
     # フレームをエンコード
     for i in range(10):
         frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
     encoder.close()
@@ -199,7 +199,7 @@ def test_nvdec_h264_decode():
 
     for i in range(5):
         frame = create_test_frame(320, 240, i * 33333)
-        encoder.encode(frame, {"keyFrame": i == 0})
+        encoder.encode(frame, {"key_frame": i == 0})
 
     encoder.flush()
     encoder.close()
