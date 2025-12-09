@@ -39,7 +39,7 @@ test = [
     "pytest-benchmark",
     "numpy",
     "blend2d-py",
-    "pillow>=12.0.0",
+    "pillow",
 ]
 lint = ["ruff", "ty"]
 example = ["opencv-python", "blend2d-py", "mp4-py"]

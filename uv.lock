@@ -448,7 +448,7 @@ dev = [
     { name = "mp4-py" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "pillow", specifier = ">=12.0.0" },
+    { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
     { name = "pytest-repeat" },
@@ -472,7 +472,7 @@ pypi = [
 test = [
     { name = "blend2d-py" },
     { name = "numpy" },
-    { name = "pillow", specifier = ">=12.0.0" },
+    { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
     { name = "pytest-repeat" },
