@@ -1361,7 +1361,6 @@ decoder.close()
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
 | `SvcOutputMetadata` | SVC サポート未実装 |
-| `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
 
 **注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
 
