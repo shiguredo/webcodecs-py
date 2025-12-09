@@ -91,19 +91,12 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv sync
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
-          # UV_NO_SYNC=1 を指定する理由:
-          # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
-          # この同期により、uv pip install でインストールした wheel が削除され、
-          # 元のソースコードがインストールされてしまう
-          # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
           uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
-        env:
-          UV_NO_SYNC: 1
 
   test_macos:
     # 自動実行: wheel.yml が成功した場合のみ実行
@@ -161,7 +154,7 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv sync
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
@@ -242,8 +235,9 @@ jobs:
           - name: windows-2025_x86_64
             runs_on: windows-2025
         python_version:
-          - "3.13"
           - "3.14"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -283,7 +277,7 @@ jobs:
       - name: Install wheel
         shell: bash
         run: |
-          uv sync
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
