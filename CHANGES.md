@@ -11,6 +11,14 @@
 
 ## develop
 
+- [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
+  - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
+  - @voluntas
+- [ADD] Intel VPL (H.264/HEVC) をサポートする
+  - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.INTEL_VPL を指定できる
+  - H.264 / HEVC のハードウェアエンコード/デコードに対応
+  - キーフレーム時に decoder_config.description (avcC/hvcC) を提供する
+  - Ubuntu のみ対応
 - [ADD] ImageDecoder を追加する (macOS)
   - WebCodecs ImageDecoder API を実装
   - macOS の Image I/O フレームワークを使用

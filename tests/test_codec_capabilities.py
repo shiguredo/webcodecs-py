@@ -122,8 +122,7 @@ def test_get_video_codec_capabilities_non_macos_no_videotoolbox():
 
 @pytest.mark.skipif(platform.system() == "Darwin", reason="macOS 以外でのみ実行")
 def test_get_video_codec_capabilities_non_macos_no_other_engines():
-    """macOS 以外で NVIDIA、INTEL、AMD AMF が含まれないことを確認"""
+    """macOS 以外で NVIDIA、AMD AMF が含まれないことを確認"""
     capabilities = get_video_codec_capabilities()
     assert HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC not in capabilities
-    assert HardwareAccelerationEngine.INTEL_VPL not in capabilities
     assert HardwareAccelerationEngine.AMD_AMF not in capabilities

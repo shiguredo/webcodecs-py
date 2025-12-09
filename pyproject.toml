@@ -1,5 +1,6 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "nanobind>=2.9", "meson>=1.9"]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.10.1", "meson>=1.9"]
+
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -57,10 +58,10 @@ verbose = false
 version = ">=4.1"
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
-# 環境変数 NVIDIA_CUDA_TOOLKIT=1 が設定されている場合に NVIDIA Video Codec SDK を有効にする
+# 環境変数 USE_NVIDIA_CUDA_TOOLKIT=1 が設定されている場合
 [[tool.scikit-build.overrides]]
-if.env.NVIDIA_CUDA_TOOLKIT = true
-cmake.args = ["-DCMAKE_BUILD_TYPE=Release", "-DNVIDIA_CUDA_TOOLKIT=ON"]
+if.env.USE_NVIDIA_CUDA_TOOLKIT = true
+cmake.define.USE_NVIDIA_CUDA_TOOLKIT = "ON"
 
 [tool.scikit-build.ninja]
 version = ">=1.13"

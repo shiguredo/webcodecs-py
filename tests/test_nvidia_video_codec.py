@@ -19,7 +19,7 @@ from webcodecs import (
 
 # NVIDIA Video Codec SDK 環境でのみテストを実行
 pytestmark = pytest.mark.skipif(
-    os.environ.get("NVIDIA_CUDA_TOOLKIT") is None, reason="NVIDIA Video Codec SDK でのみ実行する"
+    os.environ.get("NVIDIA_VIDEO_CODEC") is None, reason="NVIDIA Video Codec SDK でのみ実行する"
 )
 
 

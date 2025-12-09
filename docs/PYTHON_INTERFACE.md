@@ -1012,7 +1012,7 @@ config_av1: VideoEncoderConfig = {
 - NVIDIA GPU
 - NVIDIA ドライバーがインストールされていること
 - Ubuntu のみ対応
-- ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
+- ビルド時に `USE_NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
 
 #### LatencyMode
 
