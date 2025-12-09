@@ -18,6 +18,10 @@
 - [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
   - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
   - @voluntas
+- [ADD] NVIDIA Video Codec SDK (H.264/HEVC) で description (avcC/hvcC) をサポートする
+  - キーフレーム時に decoder_config.description を提供する
+  - デコーダーの configure で description を指定可能
+  - @voluntas
 - [ADD] Intel VPL (H.264/HEVC) をサポートする
   - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.INTEL_VPL を指定できる
   - H.264 / HEVC のハードウェアエンコード/デコードに対応
