@@ -66,10 +66,12 @@ def test_jpeg_decode_basic():
     """基本的な JPEG デコードテスト"""
     jpeg_data = create_jpeg_bytes(16, 16, (255, 0, 0))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     assert decoder.type == "image/jpeg"
     assert decoder.complete is True
@@ -108,10 +110,12 @@ def test_png_decode_basic():
     """基本的な PNG デコードテスト"""
     png_data = create_png_bytes(32, 24, (0, 255, 0))
 
-    decoder = ImageDecoder({
-        "type": "image/png",
-        "data": png_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/png",
+            "data": png_data,
+        }
+    )
 
     assert decoder.type == "image/png"
     assert decoder.complete is True
@@ -132,15 +136,19 @@ def test_jpeg_decode_with_options():
     """オプション付きの JPEG デコードテスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (0, 0, 255))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
-    result = decoder.decode({
-        "frame_index": 0,
-        "complete_frames_only": True,
-    })
+    result = decoder.decode(
+        {
+            "frame_index": 0,
+            "complete_frames_only": True,
+        }
+    )
     assert result["complete"] is True
 
     frame = result["image"]
@@ -155,10 +163,12 @@ def test_track_selected_index():
     """トラックの selected_index テスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (128, 128, 128))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     tracks = decoder.tracks
     assert tracks.selected_index == 0
@@ -172,10 +182,12 @@ def test_decoder_close():
     """close() 後の動作テスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (255, 255, 255))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     decoder.close()
     assert decoder.is_closed is True
@@ -189,10 +201,12 @@ def test_decoder_reset():
     """reset() のテスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (100, 100, 100))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     # デコード
     result1 = decoder.decode()
@@ -212,20 +226,24 @@ def test_decoder_reset():
 def test_invalid_data():
     """不正なデータでのエラーテスト"""
     with pytest.raises(RuntimeError):
-        ImageDecoder({
-            "type": "image/jpeg",
-            "data": b"not a valid jpeg",
-        })
+        ImageDecoder(
+            {
+                "type": "image/jpeg",
+                "data": b"not a valid jpeg",
+            }
+        )
 
 
 def test_frame_index_out_of_range():
     """フレームインデックス範囲外のエラーテスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (200, 200, 200))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     # JPEG は 1 フレームなので index=1 はエラー
     with pytest.raises(RuntimeError):
@@ -239,27 +257,33 @@ def test_missing_required_type():
     jpeg_data = create_jpeg_bytes(8, 8, (50, 50, 50))
 
     with pytest.raises(Exception):
-        ImageDecoder({
-            "data": jpeg_data,
-        })
+        ImageDecoder(
+            {
+                "data": jpeg_data,
+            }
+        )
 
 
 def test_missing_required_data():
     """data が欠けている場合のエラーテスト"""
     with pytest.raises(Exception):
-        ImageDecoder({
-            "type": "image/jpeg",
-        })
+        ImageDecoder(
+            {
+                "type": "image/jpeg",
+            }
+        )
 
 
 def test_context_manager():
     """with 文での使用テスト"""
     jpeg_data = create_jpeg_bytes(8, 8, (75, 75, 75))
 
-    decoder = ImageDecoder({
-        "type": "image/jpeg",
-        "data": jpeg_data,
-    })
+    decoder = ImageDecoder(
+        {
+            "type": "image/jpeg",
+            "data": jpeg_data,
+        }
+    )
 
     result = decoder.decode()
     frame = result["image"]

@@ -232,19 +232,18 @@ void ImageDecoder::init_image_io_decoder() {
     CFDictionaryRef properties =
         CGImageSourceCopyProperties(image_source_, nullptr);
     if (properties) {
-      CFDictionaryRef gif_properties =
-          static_cast<CFDictionaryRef>(CFDictionaryGetValue(
-              properties, kCGImagePropertyGIFDictionary));
+      CFDictionaryRef gif_properties = static_cast<CFDictionaryRef>(
+          CFDictionaryGetValue(properties, kCGImagePropertyGIFDictionary));
       if (gif_properties) {
-        CFNumberRef loop_count = static_cast<CFNumberRef>(CFDictionaryGetValue(
-            gif_properties, kCGImagePropertyGIFLoopCount));
+        CFNumberRef loop_count = static_cast<CFNumberRef>(
+            CFDictionaryGetValue(gif_properties, kCGImagePropertyGIFLoopCount));
         if (loop_count) {
           int count = 0;
           CFNumberGetValue(loop_count, kCFNumberIntType, &count);
           // 0 は無限ループを意味する
-          repetition_count =
-              (count == 0) ? std::numeric_limits<float>::infinity()
-                           : static_cast<float>(count);
+          repetition_count = (count == 0)
+                                 ? std::numeric_limits<float>::infinity()
+                                 : static_cast<float>(count);
         }
       }
       CFRelease(properties);
@@ -367,5 +366,6 @@ void init_image_decoder(nb::module_& m) {
       .def_prop_ro("is_closed", &ImageDecoder::is_closed,
                    nb::sig("def is_closed(self, /) -> bool"))
       .def_static("is_type_supported", &ImageDecoder::is_type_supported,
-                  "type"_a, nb::sig("def is_type_supported(type: str) -> bool"));
+                  "type"_a,
+                  nb::sig("def is_type_supported(type: str) -> bool"));
 }
