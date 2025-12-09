@@ -90,16 +90,16 @@ def test_description(codec):
     assert len(encoded_chunks) > 0
 
     # キーフレームの metadata から description を取得
-    keyframe_metadata = None
+    key_frame_metadata = None
     for i, chunk in enumerate(encoded_chunks):
         if chunk.type == EncodedVideoChunkType.KEY:
-            keyframe_metadata = metadatas[i]
+            key_frame_metadata = metadatas[i]
             break
 
     # キーフレームの metadata に description が含まれていることを確認
-    assert keyframe_metadata is not None
-    assert "decoder_config" in keyframe_metadata
-    decoder_config = keyframe_metadata["decoder_config"]
+    assert key_frame_metadata is not None
+    assert "decoder_config" in key_frame_metadata
+    decoder_config = key_frame_metadata["decoder_config"]
     assert "description" in decoder_config
     description = decoder_config["description"]
     # avcC/hvcC 形式: 最初のバイトは configurationVersion = 1

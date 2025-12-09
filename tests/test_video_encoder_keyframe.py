@@ -32,7 +32,7 @@ def create_frame(w: int, h: int, ts: int, y: int = 80) -> VideoFrame:
     return frame
 
 
-def test_encode_with_options_keyframe_true():
+def test_encode_with_options_key_frame_true():
     outputs = []
 
     def on_output(chunk):
@@ -65,7 +65,7 @@ def test_encode_with_options_keyframe_true():
     enc.close()
 
 
-def test_encode_with_options_keyframe_false_after_keyframe():
+def test_encode_with_options_key_frame_false_after_key_frame():
     outputs = []
 
     def on_output(chunk):
