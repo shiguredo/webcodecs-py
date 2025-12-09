@@ -261,6 +261,7 @@ def test_nvidia_decoder_hevc_is_config_supported():
     assert support["supported"] is True
 
 
+@pytest.mark.skip(reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化")
 def test_nvidia_decoder_av1_is_config_supported():
     """AV1 デコーダーのサポートチェック"""
     support = VideoDecoder.is_config_supported(
