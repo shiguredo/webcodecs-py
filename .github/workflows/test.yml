@@ -97,6 +97,13 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
+        env:
+          # UV_NO_SYNC=1 を指定する理由:
+          # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
+          # この同期により、uv pip install でインストールした wheel が削除され、
+          # 元のソースコードがインストールされてしまう
+          # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
+          UV_NO_SYNC: 1
 
   test_macos:
     # 自動実行: wheel.yml が成功した場合のみ実行
@@ -160,6 +167,13 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest tests/ --tb=short -v
+        env:
+          # UV_NO_SYNC=1 を指定する理由:
+          # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
+          # この同期により、uv pip install でインストールした wheel が削除され、
+          # 元のソースコードがインストールされてしまう
+          # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
+          UV_NO_SYNC: 1
 
   test_ubuntu:
     # 自動実行: wheel.yml が成功した場合のみ実行
@@ -223,6 +237,13 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest tests/ --tb=short -v
+        env:
+          # UV_NO_SYNC=1 を指定する理由:
+          # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
+          # この同期により、uv pip install でインストールした wheel が削除され、
+          # 元のソースコードがインストールされてしまう
+          # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
+          UV_NO_SYNC: 1
 
   test_windows:
     # 自動実行: wheel.yml が成功した場合のみ実行
@@ -284,3 +305,10 @@ jobs:
         shell: bash
         run: |
           uv run pytest tests/ --tb=short -v
+        env:
+          # UV_NO_SYNC=1 を指定する理由:
+          # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
+          # この同期により、uv pip install でインストールした wheel が削除され、
+          # 元のソースコードがインストールされてしまう
+          # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
+          UV_NO_SYNC: 1
