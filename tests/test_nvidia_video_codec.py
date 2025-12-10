@@ -224,6 +224,7 @@ def test_encoder_is_config_supported(codec):
     [
         "avc1.42001f",
         "hvc1.1.6.L93.B0",
+        "av01.0.04M.08",
     ],
 )
 def test_decoder_is_config_supported(codec):
@@ -231,18 +232,6 @@ def test_decoder_is_config_supported(codec):
     support = VideoDecoder.is_config_supported(
         {
             "codec": codec,
-            "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
-        }
-    )
-    assert support["supported"] is True
-
-
-@pytest.mark.skip(reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化")
-def test_nvidia_decoder_av1_is_config_supported():
-    """AV1 デコーダーのサポートチェック"""
-    support = VideoDecoder.is_config_supported(
-        {
-            "codec": "av01.0.04M.08",
             "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
         }
     )

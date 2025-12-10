@@ -303,8 +303,9 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
 #if defined(USE_NVIDIA_CUDA_TOOLKIT)
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVDEC でサポートされているコーデック: AV1, AVC, HEVC, VP8, VP9
       if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
           codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
@@ -316,8 +317,9 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
 #if defined(__APPLE__)
     // Apple Video Toolbox でサポートされているかチェック
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
       // VideoToolbox でサポートされているコーデック: H.264, H.265, VP9, AV1
       if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
           codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
@@ -328,8 +330,9 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
     // Intel VPL でサポートされているかチェック
 #if defined(__linux__)
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::INTEL_VPL) {
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::INTEL_VPL) {
       // Intel VPL でサポートされているコーデック: AVC, HEVC, AV1
       if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
           codec == VideoCodec::AV1) {
@@ -351,10 +354,11 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
         supported = true;  // macOS で VideoToolbox をサポート
 #elif defined(USE_NVIDIA_CUDA_TOOLKIT) || defined(__linux__)
         // NVIDIA Video Codec SDK または Intel VPL が有効な場合
-        supported = config.hardware_acceleration_engine ==
-                        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC ||
-                    config.hardware_acceleration_engine ==
-                        HardwareAccelerationEngine::INTEL_VPL;
+        supported = config.hardware_acceleration_engine.has_value() &&
+                    (config.hardware_acceleration_engine.value() ==
+                         HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC ||
+                     config.hardware_acceleration_engine.value() ==
+                         HardwareAccelerationEngine::INTEL_VPL);
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -363,8 +367,9 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
       case VideoCodec::VP9:
 #if defined(USE_NVIDIA_CUDA_TOOLKIT)
         // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-        if (config.hardware_acceleration_engine ==
-            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+        if (config.hardware_acceleration_engine.has_value() &&
+            config.hardware_acceleration_engine.value() ==
+                HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
           supported = true;
         } else {
 #if defined(__APPLE__) || defined(__linux__)
@@ -575,7 +580,8 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
   return (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
           codec == VideoCodec::AV1 || codec == VideoCodec::VP8 ||
           codec == VideoCodec::VP9) &&
-         config_.hardware_acceleration_engine ==
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
   return false;
@@ -585,15 +591,21 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
 bool VideoDecoder::uses_apple_video_toolbox() const {
 #if defined(__APPLE__)
   // Apple Video Toolbox が有効な場合
-  // H.264, H.265: デフォルトで VideoToolbox を使用
+  // H.264, H.265: デフォルトで VideoToolbox を使用（WebCodecs API 準拠）
   // VP9, AV1: HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX 指定時のみ
   VideoCodec codec = string_to_codec(config_.codec);
   if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
-    return true;
+    // hardware_acceleration_engine が未指定、または明示的に APPLE_VIDEO_TOOLBOX が指定された場合
+    if (!config_.hardware_acceleration_engine.has_value()) {
+      return true;  // 未指定の場合は自動的に VideoToolbox を使用
+    }
+    return config_.hardware_acceleration_engine.value() ==
+           HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
   }
   if (codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
-    return config_.hardware_acceleration_engine ==
-           HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+    return config_.hardware_acceleration_engine.has_value() &&
+           config_.hardware_acceleration_engine.value() ==
+               HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
   }
   return false;
 #else
@@ -605,7 +617,8 @@ bool VideoDecoder::uses_intel_vpl() const {
 #if defined(__linux__)
   VideoCodec codec = string_to_codec(config_.codec);
   return (codec == VideoCodec::H264 || codec == VideoCodec::H265) &&
-         config_.hardware_acceleration_engine ==
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
              HardwareAccelerationEngine::INTEL_VPL;
 #else
   return false;

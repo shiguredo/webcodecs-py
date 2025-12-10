@@ -151,8 +151,8 @@ struct VideoEncoderConfig {
   std::optional<std::string> content_hint;
 
   // 独自拡張 (ハードウェアアクセラレーション用)
-  HardwareAccelerationEngine hardware_acceleration_engine =
-      HardwareAccelerationEngine::NONE;
+  // std::nullopt の場合、プラットフォームが自動的に最適なエンジンを選択
+  std::optional<HardwareAccelerationEngine> hardware_acceleration_engine;
 
   // AVC 固有のオプション (WebCodecs AVC Codec Registration 準拠)
   std::string avc_format = "avc";  // "annexb", "avc" (デフォルト: "avc")
@@ -176,8 +176,8 @@ struct VideoDecoderConfig {
   std::optional<uint32_t> display_aspect_height;
   std::optional<VideoColorSpace> color_space;
   std::optional<bool> optimize_for_latency;
-  HardwareAccelerationEngine hardware_acceleration_engine =
-      HardwareAccelerationEngine::NONE;
+  // std::nullopt の場合、プラットフォームが自動的に最適なエンジンを選択
+  std::optional<HardwareAccelerationEngine> hardware_acceleration_engine;
   double rotation = 0;
   bool flip = false;
 

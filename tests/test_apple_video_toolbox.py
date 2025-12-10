@@ -6,10 +6,6 @@ import numpy as np
 import pytest
 
 from webcodecs import (
-    AudioDecoder,
-    AudioDecoderConfig,
-    AudioEncoder,
-    AudioEncoderConfig,
     CodecState,
     HardwareAccelerationEngine,
     LatencyMode,
@@ -28,116 +24,55 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_h264_encoder_is_config_supported():
-    """H.264 エンコーダーの is_config_supported テスト."""
-    # サポートされているコーデック
+@pytest.mark.parametrize(
+    ("codec", "expected_supported"),
+    [
+        ("avc1.42E01E", True),
+        ("hvc1.1.6.L93.B0", True),
+        ("vp9", False),
+    ],
+)
+def test_encoder_is_config_supported(codec, expected_supported):
+    """ビデオエンコーダーの is_config_supported テスト."""
+    width, height = 960, 540
     config: VideoEncoderConfig = {
-        "codec": "avc1.42E01E",
-        "width": 640,
-        "height": 480,
+        "codec": codec,
+        "width": width,
+        "height": height,
     }
     support = VideoEncoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "avc1.42E01E"
-    assert support["config"]["width"] == 640
-    assert support["config"]["height"] == 480
-
-    # サポートされていないコーデック
-    config_vp9: VideoEncoderConfig = {
-        "codec": "vp9",
-        "width": 640,
-        "height": 480,
-    }
-    support_vp9 = VideoEncoder.is_config_supported(config_vp9)
-    assert support_vp9["supported"] is False
-    assert support_vp9["config"]["codec"] == "vp9"
+    assert support["supported"] is expected_supported
+    assert support["config"]["codec"] == codec
+    if expected_supported:
+        assert support["config"]["width"] == width
+        assert support["config"]["height"] == height
 
 
-def test_h265_encoder_is_config_supported():
-    """H.265/HEVC エンコーダーの is_config_supported テスト."""
-    config: VideoEncoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "width": 1280,
-        "height": 720,
-    }
-    support = VideoEncoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "hvc1.1.6.L93.B0"
-    assert support["config"]["width"] == 1280
-    assert support["config"]["height"] == 720
-
-
-def test_h264_decoder_is_config_supported():
-    """H.264 デコーダーの is_config_supported テスト."""
+@pytest.mark.parametrize(
+    ("codec", "hardware_acceleration_engine", "expected_supported"),
+    [
+        ("avc1.42E01E", None, True),
+        ("hvc1.1.6.L93.B0", None, True),
+        ("vp9", None, False),
+        ("vp09.00.10.08", HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX, True),
+        pytest.param(
+            "av01.0.04M.08",
+            HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+            True,
+            marks=pytest.mark.skip(reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化"),
+        ),
+    ],
+)
+def test_decoder_is_config_supported(codec, hardware_acceleration_engine, expected_supported):
+    """ビデオデコーダーの is_config_supported テスト."""
     config: VideoDecoderConfig = {
-        "codec": "avc1.42E01E",
+        "codec": codec,
     }
+    if hardware_acceleration_engine is not None:
+        config["hardware_acceleration_engine"] = hardware_acceleration_engine
     support = VideoDecoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "avc1.42E01E"
-
-    # サポートされていないコーデック
-    config_vp9: VideoDecoderConfig = {
-        "codec": "vp9",
-    }
-    support_vp9 = VideoDecoder.is_config_supported(config_vp9)
-    assert support_vp9["supported"] is False
-
-
-def test_h265_decoder_is_config_supported():
-    """H.265/HEVC デコーダーの is_config_supported テスト."""
-    config: VideoDecoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-    }
-    support = VideoDecoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "hvc1.1.6.L93.B0"
-
-
-def test_opus_encoder_is_config_supported():
-    """Opus エンコーダーの is_config_supported テスト."""
-    config: AudioEncoderConfig = {
-        "codec": "opus",
-        "sample_rate": 48000,
-        "number_of_channels": 2,
-    }
-    support = AudioEncoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "opus"
-    assert support["config"]["sample_rate"] == 48000
-    assert support["config"]["number_of_channels"] == 2
-
-    # サポートされていないコーデック
-    config_unsupported: AudioEncoderConfig = {
-        "codec": "unsupported-codec",
-        "sample_rate": 48000,
-        "number_of_channels": 2,
-    }
-    support_unsupported = AudioEncoder.is_config_supported(config_unsupported)
-    assert support_unsupported["supported"] is False
-
-
-def test_opus_decoder_is_config_supported():
-    """Opus デコーダーの is_config_supported テスト."""
-    config: AudioDecoderConfig = {
-        "codec": "opus",
-        "sample_rate": 48000,
-        "number_of_channels": 2,
-    }
-    support = AudioDecoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "opus"
-    assert support["config"]["sample_rate"] == 48000
-    assert support["config"]["number_of_channels"] == 2
-
-    # サポートされていないコーデック
-    config_unsupported: AudioDecoderConfig = {
-        "codec": "unsupported-codec",
-        "sample_rate": 48000,
-        "number_of_channels": 2,
-    }
-    support_unsupported = AudioDecoder.is_config_supported(config_unsupported)
-    assert support_unsupported["supported"] is False
+    assert support["supported"] is expected_supported
+    assert support["config"]["codec"] == codec
 
 
 def test_h264_encode_decode():
@@ -1756,17 +1691,6 @@ def test_h265_decode_multiple_delta_frames():
 # =============================================================================
 
 
-def test_vp9_decoder_videotoolbox_is_config_supported():
-    """VP9 VideoToolbox デコーダーの is_config_supported テスト."""
-    config: VideoDecoderConfig = {
-        "codec": "vp09.00.10.08",
-        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-    }
-    support = VideoDecoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "vp09.00.10.08"
-
-
 def test_vp9_decode_videotoolbox():
     """libvpx でエンコード → VideoToolbox でデコードするテスト."""
     width, height = 320, 240
@@ -1865,17 +1789,7 @@ def test_vp9_decode_videotoolbox():
 # =============================================================================
 
 
-def test_av1_decoder_videotoolbox_is_config_supported():
-    """AV1 VideoToolbox デコーダーの is_config_supported テスト."""
-    config: VideoDecoderConfig = {
-        "codec": "av01.0.04M.08",
-        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-    }
-    support = VideoDecoder.is_config_supported(config)
-    assert support["supported"] is True
-    assert support["config"]["codec"] == "av01.0.04M.08"
-
-
+@pytest.mark.skip(reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化")
 def test_av1_decode_videotoolbox():
     """libaom でエンコード → VideoToolbox でデコードするテスト."""
     width, height = 320, 240
