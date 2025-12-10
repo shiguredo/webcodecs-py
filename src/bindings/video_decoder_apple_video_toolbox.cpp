@@ -2,6 +2,7 @@
 
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
+#include <CoreMedia/CoreMedia.h>
 #include <CoreVideo/CoreVideo.h>
 #include <VideoToolbox/VideoToolbox.h>
 #include <nanobind/nanobind.h>
@@ -13,6 +14,16 @@
 #include "video_frame.h"
 
 namespace nb = nanobind;
+
+// VP9 コーデックタイプ
+#ifndef kCMVideoCodecType_VP9
+#define kCMVideoCodecType_VP9 'vp09'
+#endif
+
+// AV1 コーデックタイプ
+#ifndef kCMVideoCodecType_AV1
+#define kCMVideoCodecType_AV1 'av01'
+#endif
 
 namespace {
 struct VTDecodeRef {
@@ -317,6 +328,407 @@ create_format_description(const uint8_t* data, size_t size, bool is_h264) {
 
   return format_desc;
 }
+// VP9 フレームヘッダーからプロファイルとビット深度を取得
+static bool parse_vp9_frame_header(const uint8_t* data,
+                                   size_t size,
+                                   uint8_t* profile,
+                                   uint8_t* bit_depth,
+                                   uint32_t* width,
+                                   uint32_t* height) {
+  if (size < 3) {
+    return false;
+  }
+
+  // VP9 フレームマーカー (最初の2ビット = 0b10)
+  uint8_t frame_marker = (data[0] >> 6) & 0x03;
+  if (frame_marker != 0x02) {
+    return false;
+  }
+
+  // プロファイル (ビット2-3)
+  *profile = (data[0] >> 4) & 0x03;
+  if (*profile == 3) {
+    // Profile 3 の場合、追加ビットがある
+    *profile += (data[0] >> 3) & 0x01;
+  }
+
+  // ビット深度
+  if (*profile >= 2) {
+    *bit_depth = ((data[0] >> 2) & 0x01) ? 12 : 10;
+  } else {
+    *bit_depth = 8;
+  }
+
+  // 解像度は設定から取得するため、ここでは簡易的に 0 を返す
+  // 実際のパースは複雑なため、config から取得する
+  *width = 0;
+  *height = 0;
+
+  return true;
+}
+
+// VP9 用のフォーマット記述子を作成
+static CMVideoFormatDescriptionRef create_vp9_format_description(
+    const uint8_t* data,
+    size_t size,
+    uint32_t width,
+    uint32_t height) {
+  // VP9 フレームヘッダーを解析
+  uint8_t profile = 0;
+  uint8_t bit_depth = 8;
+  uint32_t parsed_width = 0;
+  uint32_t parsed_height = 0;
+
+  parse_vp9_frame_header(data, size, &profile, &bit_depth, &parsed_width,
+                         &parsed_height);
+
+  // vpcC ボックスを構築
+  // ISO/IEC 14496-15 Section 7.6.6
+  std::vector<uint8_t> vpcc_data;
+  vpcc_data.push_back(1);  // version
+  vpcc_data.push_back(0);  // flags (3 bytes)
+  vpcc_data.push_back(0);
+  vpcc_data.push_back(0);
+  vpcc_data.push_back(profile);  // profile
+
+  // コーデック文字列からレベルを取得 (vp09.PP.LL.DD の LL 部分)
+  // デフォルトは 10 (Level 1.0)
+  vpcc_data.push_back(10);  // level
+
+  // bitDepth (4 bits) | chromaSubsampling (3 bits) | videoFullRangeFlag (1 bit)
+  // chromaSubsampling: 0 = 4:2:0 vertical, 1 = 4:2:0 collocated
+  // 通常の VP9 は 4:2:0 collocated (値 = 1) を使用
+  uint8_t chroma_subsampling = 1;  // 4:2:0 collocated
+  uint8_t video_full_range = 0;    // limited range
+  vpcc_data.push_back((bit_depth << 4) | (chroma_subsampling << 1) |
+                      video_full_range);
+
+  // カラーメタデータ
+  // 1 = BT.709
+  vpcc_data.push_back(1);  // colourPrimaries
+  vpcc_data.push_back(1);  // transferCharacteristics
+  vpcc_data.push_back(1);  // matrixCoefficients
+
+  // codecInitializationDataSize は VP9 では常に 0
+  vpcc_data.push_back(0);  // codecInitializationDataSize (2 bytes, big endian)
+  vpcc_data.push_back(0);
+
+  // 拡張辞書を作成
+  CFMutableDictionaryRef extensions = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+      &kCFTypeDictionaryValueCallBacks);
+
+  // vpcC アトムを追加
+  CFDataRef vpcc_cf =
+      CFDataCreate(kCFAllocatorDefault, vpcc_data.data(), vpcc_data.size());
+  CFMutableDictionaryRef atoms = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+      &kCFTypeDictionaryValueCallBacks);
+  CFDictionarySetValue(atoms, CFSTR("vpcC"), vpcc_cf);
+  CFDictionarySetValue(
+      extensions, kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms,
+      atoms);
+
+  // CMVideoFormatDescription を作成
+  CMVideoFormatDescriptionRef format_desc = nullptr;
+  OSStatus status =
+      CMVideoFormatDescriptionCreate(kCFAllocatorDefault, kCMVideoCodecType_VP9,
+                                     width, height, extensions, &format_desc);
+
+  CFRelease(vpcc_cf);
+  CFRelease(atoms);
+  CFRelease(extensions);
+
+  return (status == noErr) ? format_desc : nullptr;
+}
+
+// VP9 用のサンプルバッファを作成
+static CMSampleBufferRef create_vp9_sample_buffer(
+    const uint8_t* data,
+    size_t size,
+    CMVideoFormatDescriptionRef format_desc,
+    int64_t timestamp) {
+  // CMBlockBuffer を作成（データをコピー）
+  CMBlockBufferRef block_buffer = nullptr;
+  void* buffer_data = malloc(size);
+  memcpy(buffer_data, data, size);
+
+  OSStatus status = CMBlockBufferCreateWithMemoryBlock(
+      kCFAllocatorDefault, buffer_data, size, kCFAllocatorDefault, nullptr, 0,
+      size, 0, &block_buffer);
+
+  if (status != noErr || !block_buffer) {
+    return nullptr;
+  }
+
+  // CMSampleBuffer を作成
+  CMSampleBufferRef sample_buffer = nullptr;
+  CMTime pts = CMTimeMake(timestamp, 1000000);
+  CMTime duration = kCMTimeInvalid;
+  CMSampleTimingInfo timing = {duration, pts, pts};
+  size_t sample_size = size;
+
+  status =
+      CMSampleBufferCreateReady(kCFAllocatorDefault, block_buffer, format_desc,
+                                1, 1, &timing, 1, &sample_size, &sample_buffer);
+
+  CFRelease(block_buffer);
+
+  if (status != noErr || !sample_buffer) {
+    return nullptr;
+  }
+
+  return sample_buffer;
+}
+
+// AV1 OBU からシーケンスヘッダーを解析
+static bool parse_av1_sequence_header_obu(const uint8_t* data,
+                                          size_t size,
+                                          uint8_t* profile,
+                                          uint8_t* level,
+                                          uint8_t* bit_depth,
+                                          bool* mono_chrome,
+                                          uint8_t* chroma_subsampling_x,
+                                          uint8_t* chroma_subsampling_y) {
+  if (size < 2) {
+    return false;
+  }
+
+  // OBU ヘッダーを解析
+  size_t pos = 0;
+  while (pos < size) {
+    if (pos >= size) {
+      return false;
+    }
+
+    uint8_t obu_header = data[pos];
+    uint8_t obu_type = (obu_header >> 3) & 0x0F;
+    bool obu_extension_flag = (obu_header >> 2) & 0x01;
+    bool obu_has_size_field = (obu_header >> 1) & 0x01;
+    pos++;
+
+    // 拡張ヘッダーをスキップ
+    if (obu_extension_flag) {
+      pos++;
+    }
+
+    // OBU サイズを読み取り
+    size_t obu_size = 0;
+    if (obu_has_size_field) {
+      // leb128 デコード
+      uint8_t byte;
+      int shift = 0;
+      do {
+        if (pos >= size) {
+          return false;
+        }
+        byte = data[pos++];
+        obu_size |= (size_t)(byte & 0x7F) << shift;
+        shift += 7;
+      } while (byte & 0x80);
+    } else {
+      obu_size = size - pos;
+    }
+
+    // OBU_SEQUENCE_HEADER (タイプ 1) を探す
+    if (obu_type == 1) {
+      // シーケンスヘッダー OBU を解析
+      if (pos + obu_size > size || obu_size < 3) {
+        return false;
+      }
+
+      const uint8_t* seq_data = data + pos;
+
+      // seq_profile (3 bits)
+      *profile = (seq_data[0] >> 5) & 0x07;
+
+      // still_picture (1 bit)
+      // reduced_still_picture_header (1 bit)
+      bool reduced_still_picture_header = (seq_data[0] >> 3) & 0x01;
+
+      if (reduced_still_picture_header) {
+        // seq_level_idx[0] (5 bits)
+        *level = seq_data[0] & 0x1F;
+      } else {
+        // 複雑なケースは簡易的にデフォルト値を使用
+        *level = 8;  // Level 4.0
+      }
+
+      // ビット深度とモノクローム情報（簡易的に）
+      if (*profile == 2) {
+        *bit_depth = 10;
+      } else {
+        *bit_depth = 8;
+      }
+      *mono_chrome = false;
+      *chroma_subsampling_x = 1;
+      *chroma_subsampling_y = 1;
+
+      return true;
+    }
+
+    pos += obu_size;
+  }
+
+  return false;
+}
+
+// AV1 用のフォーマット記述子を作成
+static CMVideoFormatDescriptionRef create_av1_format_description(
+    const uint8_t* data,
+    size_t size,
+    uint32_t width,
+    uint32_t height) {
+  // AV1 シーケンスヘッダー OBU を解析
+  uint8_t profile = 0;
+  uint8_t level = 8;
+  uint8_t bit_depth = 8;
+  bool mono_chrome = false;
+  uint8_t chroma_subsampling_x = 1;
+  uint8_t chroma_subsampling_y = 1;
+
+  parse_av1_sequence_header_obu(data, size, &profile, &level, &bit_depth,
+                                &mono_chrome, &chroma_subsampling_x,
+                                &chroma_subsampling_y);
+
+  // av1C ボックスを構築
+  // ISO/IEC 14496-15 Section 11.2.3.1
+  std::vector<uint8_t> av1c_data;
+  av1c_data.push_back(0x81);  // marker (1) | version (1)
+
+  // seq_profile (3 bits) | seq_level_idx_0 (5 bits)
+  av1c_data.push_back((profile << 5) | (level & 0x1F));
+
+  // seq_tier_0 (1 bit) | high_bitdepth (1 bit) | twelve_bit (1 bit) |
+  // monochrome (1 bit) | chroma_subsampling_x (1 bit) |
+  // chroma_subsampling_y (1 bit) | chroma_sample_position (2 bits)
+  uint8_t byte3 = 0;
+  byte3 |= (bit_depth > 8 ? 1 : 0) << 6;    // high_bitdepth
+  byte3 |= (bit_depth == 12 ? 1 : 0) << 5;  // twelve_bit
+  byte3 |= (mono_chrome ? 1 : 0) << 4;      // monochrome
+  byte3 |= (chroma_subsampling_x & 0x01) << 3;
+  byte3 |= (chroma_subsampling_y & 0x01) << 2;
+  byte3 |= 0;  // chroma_sample_position
+  av1c_data.push_back(byte3);
+
+  // initial_presentation_delay_present (1 bit) | reserved (3 bits) |
+  // initial_presentation_delay_minus_one (4 bits) or reserved
+  av1c_data.push_back(0);
+
+  // configOBUs (シーケンスヘッダー OBU を含める)
+  // OBU_SEQUENCE_HEADER を探してコピー
+  size_t pos = 0;
+  while (pos < size) {
+    if (pos >= size)
+      break;
+
+    uint8_t obu_header = data[pos];
+    uint8_t obu_type = (obu_header >> 3) & 0x0F;
+    bool obu_extension_flag = (obu_header >> 2) & 0x01;
+    bool obu_has_size_field = (obu_header >> 1) & 0x01;
+
+    size_t obu_start = pos;
+    pos++;
+
+    if (obu_extension_flag) {
+      pos++;
+    }
+
+    size_t obu_size = 0;
+    if (obu_has_size_field) {
+      uint8_t byte;
+      int shift = 0;
+      do {
+        if (pos >= size)
+          break;
+        byte = data[pos++];
+        obu_size |= (size_t)(byte & 0x7F) << shift;
+        shift += 7;
+      } while (byte & 0x80);
+    } else {
+      obu_size = size - pos;
+    }
+
+    if (obu_type == 1) {
+      // シーケンスヘッダー OBU をコピー
+      size_t total_obu_size = pos - obu_start + obu_size;
+      for (size_t i = 0; i < total_obu_size && (obu_start + i) < size; ++i) {
+        av1c_data.push_back(data[obu_start + i]);
+      }
+      break;
+    }
+
+    pos += obu_size;
+  }
+
+  // 拡張辞書を作成
+  CFMutableDictionaryRef extensions = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+      &kCFTypeDictionaryValueCallBacks);
+
+  // av1C アトムを追加
+  CFDataRef av1c_cf =
+      CFDataCreate(kCFAllocatorDefault, av1c_data.data(), av1c_data.size());
+  CFMutableDictionaryRef atoms = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+      &kCFTypeDictionaryValueCallBacks);
+  CFDictionarySetValue(atoms, CFSTR("av1C"), av1c_cf);
+  CFDictionarySetValue(
+      extensions, kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms,
+      atoms);
+
+  // CMVideoFormatDescription を作成
+  CMVideoFormatDescriptionRef format_desc = nullptr;
+  OSStatus status =
+      CMVideoFormatDescriptionCreate(kCFAllocatorDefault, kCMVideoCodecType_AV1,
+                                     width, height, extensions, &format_desc);
+
+  CFRelease(av1c_cf);
+  CFRelease(atoms);
+  CFRelease(extensions);
+
+  return (status == noErr) ? format_desc : nullptr;
+}
+
+// AV1 用のサンプルバッファを作成
+static CMSampleBufferRef create_av1_sample_buffer(
+    const uint8_t* data,
+    size_t size,
+    CMVideoFormatDescriptionRef format_desc,
+    int64_t timestamp) {
+  // CMBlockBuffer を作成（データをコピー）
+  CMBlockBufferRef block_buffer = nullptr;
+  void* buffer_data = malloc(size);
+  memcpy(buffer_data, data, size);
+
+  OSStatus status = CMBlockBufferCreateWithMemoryBlock(
+      kCFAllocatorDefault, buffer_data, size, kCFAllocatorDefault, nullptr, 0,
+      size, 0, &block_buffer);
+
+  if (status != noErr || !block_buffer) {
+    return nullptr;
+  }
+
+  // CMSampleBuffer を作成
+  CMSampleBufferRef sample_buffer = nullptr;
+  CMTime pts = CMTimeMake(timestamp, 1000000);
+  CMTime duration = kCMTimeInvalid;
+  CMSampleTimingInfo timing = {duration, pts, pts};
+  size_t sample_size = size;
+
+  status =
+      CMSampleBufferCreateReady(kCFAllocatorDefault, block_buffer, format_desc,
+                                1, 1, &timing, 1, &sample_size, &sample_buffer);
+
+  CFRelease(block_buffer);
+
+  if (status != noErr || !sample_buffer) {
+    return nullptr;
+  }
+
+  return sample_buffer;
+}
+
 }  // namespace
 
 void VideoDecoder::init_videotoolbox_decoder() {
@@ -329,9 +741,21 @@ void VideoDecoder::init_videotoolbox_decoder() {
   bool is_h265 =
       (config_.codec.length() >= 5 && (config_.codec.substr(0, 5) == "hvc1." ||
                                        config_.codec.substr(0, 5) == "hev1."));
+  bool is_vp9 =
+      (config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "vp09.");
+  bool is_av1 =
+      (config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "av01.");
 
-  if (!is_h264 && !is_h265) {
-    throw std::runtime_error("VideoToolbox supports only H.264/H.265");
+  if (!is_h264 && !is_h265 && !is_vp9 && !is_av1) {
+    throw std::runtime_error("VideoToolbox supports only H.264/H.265/VP9/AV1");
+  }
+
+  // VP9/AV1 は macOS 11 以降で追加の登録が必要
+  if (is_vp9) {
+    VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_VP9);
+  }
+  if (is_av1) {
+    VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_AV1);
   }
 
   // デコーダー仕様辞書を作成
@@ -385,21 +809,40 @@ bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
   bool is_h265 =
       (config_.codec.length() >= 5 && (config_.codec.substr(0, 5) == "hvc1." ||
                                        config_.codec.substr(0, 5) == "hev1."));
+  bool is_vp9 =
+      (config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "vp09.");
+  bool is_av1 =
+      (config_.codec.length() >= 5 && config_.codec.substr(0, 5) == "av01.");
 
-  if (!is_h264 && !is_h265) {
+  if (!is_h264 && !is_h265 && !is_vp9 && !is_av1) {
     if (error_callback_) {
       nb::gil_scoped_acquire gil;
-      error_callback_("VideoToolbox supports only H.264/H.265");
+      error_callback_("VideoToolbox supports only H.264/H.265/VP9/AV1");
     }
     return false;
   }
 
   const auto data = chunk.data_vector();
 
+  // 解像度を取得
+  uint32_t width = config_.coded_width.value_or(640);
+  uint32_t height = config_.coded_height.value_or(480);
+
   // キーフレームの場合、フォーマット記述子を更新してキャッシュ
   if (chunk.type() == EncodedVideoChunkType::KEY) {
-    CMVideoFormatDescriptionRef format_desc =
-        create_format_description(data.data(), data.size(), is_h264);
+    CMVideoFormatDescriptionRef format_desc = nullptr;
+
+    if (is_h264 || is_h265) {
+      format_desc =
+          create_format_description(data.data(), data.size(), is_h264);
+    } else if (is_vp9) {
+      format_desc = create_vp9_format_description(data.data(), data.size(),
+                                                  width, height);
+    } else if (is_av1) {
+      format_desc = create_av1_format_description(data.data(), data.size(),
+                                                  width, height);
+    }
+
     if (!format_desc) {
       if (error_callback_) {
         nb::gil_scoped_acquire gil;
@@ -502,8 +945,19 @@ bool VideoDecoder::decode_videotoolbox(const EncodedVideoChunk& chunk) {
       (CMVideoFormatDescriptionRef)vt_format_desc_;
 
   // サンプルバッファを作成
-  CMSampleBufferRef sample_buffer = create_sample_buffer(
-      data.data(), data.size(), format_for_sample, chunk.timestamp(), is_h264);
+  CMSampleBufferRef sample_buffer = nullptr;
+
+  if (is_h264 || is_h265) {
+    sample_buffer =
+        create_sample_buffer(data.data(), data.size(), format_for_sample,
+                             chunk.timestamp(), is_h264);
+  } else if (is_vp9) {
+    sample_buffer = create_vp9_sample_buffer(
+        data.data(), data.size(), format_for_sample, chunk.timestamp());
+  } else if (is_av1) {
+    sample_buffer = create_av1_sample_buffer(
+        data.data(), data.size(), format_for_sample, chunk.timestamp());
+  }
 
   if (!sample_buffer) {
     if (error_callback_) {

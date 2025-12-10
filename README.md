@@ -24,20 +24,20 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 
 - WebCodecs API の Python バインディング
 - Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
-  - AAC は macOS の AudioToolbox を利用
-  - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
-- ImageDecoder による画像デコードをサポート (macOS)
+- macOS arm64 にて ImageDecoder による画像デコードをサポート
   - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
-  - macOS の Image I/O フレームワークを利用
-- Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
-- NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
+- macOS arm64 にて Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応
+  - AAC エンコード/デコードに対応
+  - H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP9 / AV1 デコードに対応
+    - AV1 デコードは M3 チップ以降で利用できる
+- Ubuntu x86_64 にて NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応
   - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
-- NumPy の ndarray を直接利用できる
 - クロスプラットフォーム対応
   - macOS arm64
   - Ubuntu x86_64 および arm64
   - Windows x86_64
-    - Windows はソフトウェアエンコード/デコードのみ対応
+    - Windows はソフトウェアコーデックのみ対応
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 

@@ -120,13 +120,13 @@ void VideoEncoder::configure(nb::dict config_dict) {
     init_aom_encoder();
   } else if (is_avc_codec() || is_hevc_codec()) {
 #if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+    // VideoToolbox は uses_videotoolbox() で自動判定される
+    if (uses_videotoolbox()) {
       init_videotoolbox_encoder();
     } else {
       throw std::runtime_error(
-          "AVC/HEVC requires "
-          "hardware_acceleration_engine=\"apple_video_toolbox\" on macOS");
+          "AVC/HEVC requires VideoToolbox on macOS (set "
+          "hardware_acceleration_engine to avoid NONE)");
     }
 #else
     throw std::runtime_error("AVC/HEVC not supported on this platform");
@@ -177,9 +177,17 @@ bool VideoEncoder::is_vp9_codec() const {
 
 bool VideoEncoder::uses_videotoolbox() const {
 #if defined(__APPLE__)
-  return (is_avc_codec() || is_hevc_codec()) &&
-         config_.hardware_acceleration_engine ==
-             HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+  // Apple Video Toolbox が有効な場合
+  // H.264, H.265: デフォルトで VideoToolbox を使用（WebCodecs API 準拠）
+  if (is_avc_codec() || is_hevc_codec()) {
+    // hardware_acceleration_engine が未指定、または明示的に APPLE_VIDEO_TOOLBOX が指定された場合
+    if (!config_.hardware_acceleration_engine.has_value()) {
+      return true;  // 未指定の場合は自動的に VideoToolbox を使用
+    }
+    return config_.hardware_acceleration_engine.value() ==
+           HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+  }
+  return false;
 #else
   return false;
 #endif
@@ -188,7 +196,8 @@ bool VideoEncoder::uses_videotoolbox() const {
 bool VideoEncoder::uses_nvidia_video_codec() const {
 #if defined(USE_NVIDIA_CUDA_TOOLKIT)
   return (is_avc_codec() || is_hevc_codec() || is_av1_codec()) &&
-         config_.hardware_acceleration_engine ==
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
   return false;
@@ -198,7 +207,8 @@ bool VideoEncoder::uses_nvidia_video_codec() const {
 bool VideoEncoder::uses_intel_vpl() const {
 #if defined(__linux__)
   return (is_avc_codec() || is_hevc_codec()) &&
-         config_.hardware_acceleration_engine ==
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
              HardwareAccelerationEngine::INTEL_VPL;
 #else
   return false;
@@ -482,8 +492,9 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
 #if defined(USE_NVIDIA_CUDA_TOOLKIT)
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVENC は AV1, AVC, HEVC をサポート
       if (std::holds_alternative<AV1CodecParameters>(codec_params) ||
           std::holds_alternative<AVCCodecParameters>(codec_params) ||
@@ -495,8 +506,9 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
 
     // Intel VPL でサポートされているかチェック
 #if defined(__linux__)
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::INTEL_VPL) {
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::INTEL_VPL) {
       // Intel VPL は AVC, HEVC, AV1 をサポート
       if (std::holds_alternative<AVCCodecParameters>(codec_params) ||
           std::holds_alternative<HEVCCodecParameters>(codec_params) ||
@@ -516,8 +528,9 @@ VideoEncoderSupport VideoEncoder::is_config_supported(
       supported = true;  // macOS で VideoToolbox をサポート
 #elif defined(USE_NVIDIA_CUDA_TOOLKIT)
       // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-      supported = config.hardware_acceleration_engine ==
-                  HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+      supported = config.hardware_acceleration_engine.has_value() &&
+                  config.hardware_acceleration_engine.value() ==
+                      HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
 #else
       supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
@@ -667,17 +680,8 @@ void VideoEncoder::process_encode_task(const EncodeTask& task) {
   if (is_av1_codec()) {
     encode_frame_aom(*task.frame, task.keyframe, task.av1_quantizer);
   } else if (is_avc_codec() || is_hevc_codec()) {
-#if defined(__APPLE__)
-    if (config_.hardware_acceleration_engine !=
-        HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
-      throw std::runtime_error(
-          "AVC/HEVC requires "
-          "hardware_acceleration_engine=\"apple_video_toolbox\" on macOS");
-    }
-    encode_frame_videotoolbox(*task.frame, task.keyframe);
-#else
-    throw std::runtime_error("AVC/HEVC not supported on this platform");
-#endif
+    // VideoToolbox は encode() で直接処理されるため、ここには到達しない
+    throw std::runtime_error("AVC/HEVC should be handled by VideoToolbox");
   } else if (is_vp8_codec()) {
 #if defined(__APPLE__) || defined(__linux__)
     encode_frame_vpx(*task.frame, task.keyframe, task.vp8_quantizer);

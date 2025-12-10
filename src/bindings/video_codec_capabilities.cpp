@@ -85,6 +85,16 @@ get_video_codec_capabilities_impl() {
                                  hevc_decoder_available};
   }
 
+  // VP9 デコーダーのサポートを追加
+  // VP9 は VideoToolbox でデコードのみサポート
+  VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_VP9);
+  vt_support.codecs["vp09"] = {false, true};
+
+  // AV1 デコーダーのサポートを追加
+  // AV1 は VideoToolbox でデコードのみサポート
+  VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_AV1);
+  vt_support.codecs["av01"] = {false, true};
+
   // VideoToolbox がサポートするコーデックがある場合のみ追加
   if (!vt_support.codecs.empty()) {
     capabilities[HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX] = vt_support;

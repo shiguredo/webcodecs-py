@@ -9,7 +9,6 @@ import numpy as np
 
 from webcodecs import (
     CodecState,
-    EncodedVideoChunk,
     EncodedVideoChunkType,
     HardwareAccelerationEngine,
     VideoDecoder,
