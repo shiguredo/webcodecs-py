@@ -11,6 +11,10 @@
 
 ## develop
 
+- [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
+  - WebCodecs API 準拠の自動選択動作を実装
+  - HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を明示的に指定しなくても H.264/HEVC では Video Toolbox が使用される
+  - @voluntas
 - [ADD] Apple Video Toolbox で VP9/AV1 デコーダーをサポートする
   - VideoDecoderConfig で hardware_acceleration_engine に HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を指定した場合のみ有効
   - デフォルトは libvpx (VP9) / dav1d (AV1) によるソフトウェアデコード
