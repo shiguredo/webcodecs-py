@@ -19,9 +19,6 @@
   - VideoDecoderConfig で hardware_acceleration_engine に HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を指定した場合のみ有効
   - デフォルトは libvpx (VP9) / dav1d (AV1) によるソフトウェアデコード
   - @voluntas
-- [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
-  - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
-  - @voluntas
 - [ADD] NVIDIA Video Codec SDK (H.264/HEVC) で description (avcC/hvcC) をサポートする
   - キーフレーム時に decoder_config.description を提供する
   - デコーダーの configure で description を指定可能
@@ -30,11 +27,17 @@
   - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.INTEL_VPL を指定できる
   - H.264 / HEVC のハードウェアエンコード/デコードに対応
   - キーフレーム時に decoder_config.description (avcC/hvcC) を提供する
-  - Ubuntu のみ対応
+  - Ubuntu x86_64 のみ対応
 - [ADD] ImageDecoder を追加する (macOS)
   - WebCodecs ImageDecoder API を実装
   - macOS の Image I/O フレームワークを使用
   - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
+  - @voluntas
+
+### misc
+
+- [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
+  - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
   - @voluntas
 
 ## 2025.2.0
