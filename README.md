@@ -33,6 +33,12 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
     - AV1 デコードは M3 チップ以降で利用できる
 - Ubuntu x86_64 にて NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応
   - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
+  - AAC エンコード/デコードに対応
+  - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP8 / VP9 デコードに対応
+- Ubuntu x86_64 にて Intel VPL を利用したハードウェアアクセラレーション対応
+  - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP8 / VP9 デコードに対応
 - クロスプラットフォーム対応
   - macOS arm64
   - Ubuntu x86_64 および arm64
