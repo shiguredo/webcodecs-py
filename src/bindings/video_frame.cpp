@@ -1035,6 +1035,23 @@ nb::dict VideoFrame::metadata() const {
   }
 }
 
+void* VideoFrame::native_buffer_ptr() const {
+  if (native_buffer_.is_none()) {
+    return nullptr;
+  }
+  // PyCapsule からポインタを取得
+  // capsule 名が "CVPixelBufferRef" であることを確認
+  if (!nb::isinstance<nb::capsule>(native_buffer_)) {
+    return nullptr;
+  }
+  nb::capsule cap = nb::cast<nb::capsule>(native_buffer_);
+  const char* name = cap.name();
+  if (name == nullptr || strcmp(name, "CVPixelBufferRef") != 0) {
+    return nullptr;
+  }
+  return cap.data();
+}
+
 void init_video_frame(nb::module_& m) {
   nb::enum_<VideoPixelFormat>(m, "VideoPixelFormat")
       .value("I420", VideoPixelFormat::I420)
@@ -1079,6 +1096,12 @@ void init_video_frame(nb::module_& m) {
                    nb::sig("def flip(self, /) -> bool"))
       .def("metadata", &VideoFrame::metadata,
            nb::sig("def metadata(self, /) -> dict"))
+      .def_prop_rw(
+          "native_buffer", &VideoFrame::native_buffer,
+          &VideoFrame::set_native_buffer,
+          nb::for_getter(nb::sig("def native_buffer(self, /) -> object | None")),
+          nb::for_setter(
+              nb::sig("def native_buffer(self, value: object, /) -> None")))
       .def("plane", &VideoFrame::plane, "plane_index"_a,
            nb::sig("def plane(self, plane_index: int, /) -> "
                    "numpy.typing.NDArray[numpy.uint8]"))

@@ -59,6 +59,19 @@ class VideoFrame {
   bool flip() const { return flip_; }
   nb::dict metadata() const;
 
+  // ネイティブバッファ (PyCapsule) のアクセサ
+  nb::object native_buffer() const {
+    if (native_buffer_.is_valid()) {
+      return native_buffer_;
+    }
+    return nb::none();
+  }
+  void set_native_buffer(nb::object buffer) { native_buffer_ = buffer; }
+  bool has_native_buffer() const {
+    return native_buffer_.is_valid() && !native_buffer_.is_none();
+  }
+  void* native_buffer_ptr() const;
+
   // Data access
   nb::ndarray<nb::numpy> plane(int plane_index) const;
   nb::ndarray<nb::numpy> get_writable_plane(
@@ -119,6 +132,10 @@ class VideoFrame {
   uint32_t rotation_;
   bool flip_;
   std::optional<nb::dict> metadata_;
+
+  // ネイティブバッファ (PyCapsule)
+  // macOS: CVPixelBufferRef を保持
+  nb::object native_buffer_;
 
   // データストレージ（部分的ゼロコピーのため std::vector を使用）
   std::vector<uint8_t> data_;
