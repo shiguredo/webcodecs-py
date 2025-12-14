@@ -5,6 +5,7 @@ import pytest
 
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioEncoder,
     AudioEncoderConfig,
     AudioSampleFormat,
@@ -40,7 +41,7 @@ def test_opus_encoder_config_application_voip():
 
     # エンコードを実行
     data = np.zeros((960, 1), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -84,7 +85,7 @@ def test_opus_encoder_config_application_lowdelay():
 
     # エンコードを実行
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -128,7 +129,7 @@ def test_opus_encoder_config_signal_music():
 
     # エンコードを実行
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -172,7 +173,7 @@ def test_opus_encoder_config_signal_voice():
 
     # エンコードを実行
     data = np.zeros((960, 1), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -220,7 +221,7 @@ def test_opus_encoder_config_complexity():
 
         # エンコードを実行
         data = np.zeros((960, 2), dtype=np.int16)
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.S16,
             "sample_rate": 48000,
             "number_of_frames": 960,
@@ -264,7 +265,7 @@ def test_opus_encoder_config_packetlossperc():
 
     # エンコードを実行
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -309,7 +310,7 @@ def test_opus_encoder_config_useinbandfec():
 
     # エンコードを実行
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -353,7 +354,7 @@ def test_opus_encoder_config_usedtx():
 
     # エンコードを実行
     data = np.zeros((960, 1), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -403,7 +404,7 @@ def test_opus_encoder_config_combined():
 
     # エンコードを実行
     data = np.zeros((960, 1), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -450,7 +451,7 @@ def test_opus_encoder_config_music_high_quality():
 
     # エンコードを実行
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,

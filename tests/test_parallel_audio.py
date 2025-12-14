@@ -6,6 +6,7 @@ import numpy as np
 
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioDecoder,
     AudioDecoderConfig,
     AudioEncoder,
@@ -23,7 +24,7 @@ def create_test_audio(channels, sample_rate, frames, timestamp, value=0.5):
     noise = np.random.randn(*shape) * 0.01
     data += noise
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,

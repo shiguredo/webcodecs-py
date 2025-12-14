@@ -5,13 +5,13 @@ AudioData の作成、プロパティ、配列処理のテスト
 
 import numpy as np
 import pytest
-from webcodecs import AudioData, AudioSampleFormat
+from webcodecs import AudioData, AudioDataInit, AudioDataCopyToOptions, AudioSampleFormat
 
 
 def test_audio_data_creation():
     """AudioData の基本的な作成とプロパティ確認"""
     data = np.zeros((960, 2), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -39,7 +39,7 @@ def test_audio_data_mono():
     mono_data = np.ones((frames, 1), dtype=np.float32) * 0.5
 
     # AudioData を作成
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -67,7 +67,7 @@ def test_audio_data_stereo():
     stereo_data = np.ones((frames, channels), dtype=np.float32) * 0.5
 
     # AudioData を作成
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -109,7 +109,7 @@ def test_audio_data_invalid_shape_error():
 def test_audio_data_init_dict():
     """AudioDataInit dict を使った AudioData の作成 (WebCodecs API 準拠)"""
     data = np.zeros((960, 2), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -135,7 +135,7 @@ def test_audio_data_init_dict_mono():
     frames = 960
     mono_data = np.ones((frames, 1), dtype=np.float32) * 0.5
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -159,7 +159,7 @@ def test_audio_data_init_dict_missing_required_field():
     # format が欠けている
     with pytest.raises(ValueError):
         AudioData(
-            {
+            {  # type: ignore[typeddict-item]
                 "sample_rate": 48000,
                 "number_of_frames": 960,
                 "number_of_channels": 2,
@@ -171,7 +171,7 @@ def test_audio_data_init_dict_missing_required_field():
     # data が欠けている
     with pytest.raises(ValueError):
         AudioData(
-            {
+            {  # type: ignore[typeddict-item]
                 "format": AudioSampleFormat.F32,
                 "sample_rate": 48000,
                 "number_of_frames": 960,
@@ -191,7 +191,7 @@ def test_audio_data_clone():
     original_data = np.ones((frames, channels), dtype=np.float32) * 0.5
 
     # AudioData を作成
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -219,7 +219,7 @@ def test_audio_data_clone():
     assert not cloned.is_closed
 
     # 複製したデータの allocation_size を確認
-    options = {"plane_index": 0}
+    options: AudioDataCopyToOptions = {"plane_index": 0}
     assert cloned.allocation_size(options) == frames * channels * 4
 
     cloned.close()
@@ -233,7 +233,7 @@ def test_audio_data_copy_to_interleaved():
 
     # ステレオのインターリーブデータを作成
     original_data = np.arange(frames * channels, dtype=np.float32).reshape(frames, channels)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -244,7 +244,7 @@ def test_audio_data_copy_to_interleaved():
     audio = AudioData(init)
 
     # インターリーブフォーマットでは plane_index=0 のみ有効
-    options = {"plane_index": 0}
+    options: AudioDataCopyToOptions = {"plane_index": 0}
     size = audio.allocation_size(options)
     assert size == frames * channels * 4
 
@@ -267,7 +267,7 @@ def test_audio_data_copy_to_planar():
 
     # ステレオのプレーナーデータを作成 (channels, frames)
     original_data = np.arange(frames * channels, dtype=np.float32).reshape(channels, frames)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32_PLANAR,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -279,7 +279,7 @@ def test_audio_data_copy_to_planar():
 
     # プレーナーフォーマットでは各チャンネルが別のプレーン
     # plane_index=0 は最初のチャンネル
-    options = {"plane_index": 0}
+    options: AudioDataCopyToOptions = {"plane_index": 0}
     size = audio.allocation_size(options)
     assert size == frames * 4
 
@@ -292,7 +292,7 @@ def test_audio_data_copy_to_planar():
     np.testing.assert_array_equal(copied_data, original_data[0])
 
     # plane_index=1 で2番目のチャンネルをコピー
-    options = {"plane_index": 1}
+    options: AudioDataCopyToOptions = {"plane_index": 1}
     audio.copy_to(destination, options)
     copied_data = np.frombuffer(destination, dtype=np.float32)
     np.testing.assert_array_equal(copied_data, original_data[1])
@@ -308,7 +308,7 @@ def test_audio_data_copy_to_with_frame_offset():
 
     # データを作成
     original_data = np.arange(frames * channels, dtype=np.float32).reshape(frames, channels)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -319,7 +319,7 @@ def test_audio_data_copy_to_with_frame_offset():
     audio = AudioData(init)
 
     # frame_offset=50 で後半50フレームをコピー
-    options = {"plane_index": 0, "frame_offset": 50}
+    options: AudioDataCopyToOptions = {"plane_index": 0, "frame_offset": 50}
     size = audio.allocation_size(options)
     assert size == 50 * channels * 4
 
@@ -341,7 +341,7 @@ def test_audio_data_copy_to_with_frame_count():
 
     # データを作成
     original_data = np.arange(frames * channels, dtype=np.float32).reshape(frames, channels)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -352,7 +352,7 @@ def test_audio_data_copy_to_with_frame_count():
     audio = AudioData(init)
 
     # frame_offset=10, frame_count=20 で10-29フレームをコピー
-    options = {"plane_index": 0, "frame_offset": 10, "frame_count": 20}
+    options: AudioDataCopyToOptions = {"plane_index": 0, "frame_offset": 10, "frame_count": 20}
     size = audio.allocation_size(options)
     assert size == 20 * channels * 4
 
@@ -374,7 +374,7 @@ def test_audio_data_copy_to_invalid_plane_index():
 
     # インターリーブデータを作成
     original_data = np.zeros((frames, channels), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -385,7 +385,7 @@ def test_audio_data_copy_to_invalid_plane_index():
     audio = AudioData(init)
 
     # インターリーブフォーマットでは plane_index=0 のみ有効
-    options = {"plane_index": 1}
+    options: AudioDataCopyToOptions = {"plane_index": 1}
     with pytest.raises(RuntimeError):
         audio.allocation_size(options)
 
@@ -399,7 +399,7 @@ def test_audio_data_allocation_size_requires_options():
     channels = 2
 
     original_data = np.zeros((frames, channels), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -411,7 +411,7 @@ def test_audio_data_allocation_size_requires_options():
 
     # options なしで呼び出すとエラー
     with pytest.raises(TypeError):
-        audio.allocation_size()
+        audio.allocation_size()  # type: ignore[call-arg]
 
     audio.close()
 
@@ -423,7 +423,7 @@ def test_audio_data_context_manager():
     channels = 2
 
     data = np.ones((frames, channels), dtype=np.float32) * 0.5
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -449,7 +449,7 @@ def test_audio_data_context_manager_exception():
     channels = 2
 
     data = np.ones((frames, channels), dtype=np.float32) * 0.5
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,
@@ -476,7 +476,7 @@ def test_audio_data_context_manager_returns_self():
     channels = 2
 
     data = np.ones((frames, channels), dtype=np.float32) * 0.5
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": frames,

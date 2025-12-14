@@ -9,6 +9,7 @@ from audio_test_helpers import (
 
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioDecoder,
     AudioDecoderConfig,
     AudioEncoder,
@@ -60,7 +61,7 @@ def test_opus_encode_sine_wave():
 
         # AudioData を作成して numpy データをコピー
         num_frames, num_channels = frame_samples.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -183,7 +184,7 @@ def test_opus_encode_stereo():
 
         # AudioData を作成してステレオフレームをエンコード
         num_frames, num_channels = frame_samples.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -327,7 +328,7 @@ def test_opus_various_bitrates_quality():
             # タイムスタンプをマイクロ秒で計算
             timestamp = (idx * frame_size * 1000000) // sample_rate
             num_frames, num_channels = frame_samples.shape
-            init = {
+            init: AudioDataInit = {
                 "format": AudioSampleFormat.F32,
                 "sample_rate": sample_rate,
                 "number_of_frames": num_frames,
@@ -473,7 +474,7 @@ def test_opus_encode_decode_roundtrip():
     frame_size = 960
     frame_samples = original_samples[:frame_size].reshape(frame_size, 1)
     num_frames, num_channels = frame_samples.shape
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": num_frames,
@@ -611,7 +612,7 @@ def test_opus_voice_vs_music_modes():
         frame = frame.reshape(frame_size, 1)
         timestamp = (idx * frame_size * 1000000) // sample_rate
         num_frames, num_channels = frame.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -638,7 +639,7 @@ def test_opus_voice_vs_music_modes():
         frame = frame.reshape(frame_size, 1)
         timestamp = (idx * frame_size * 1000000) // sample_rate
         num_frames, num_channels = frame.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -808,7 +809,7 @@ def test_opus_packet_loss_resilience():
         frame = frame.reshape(frame_size, 1)
         timestamp = (idx * frame_size * 1000000) // sample_rate
         num_frames, num_channels = frame.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -893,7 +894,7 @@ def test_opus_variable_frame_sizes():
         # AudioData コンストラクタ用にサンプルを reshape
         frame_samples = samples[:frame_size].reshape(frame_size, 1)
         num_frames, num_channels = frame_samples.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,

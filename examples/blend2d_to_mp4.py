@@ -389,7 +389,8 @@ def main():
         vy = random.uniform(-4.0, 4.0)
         alpha = random.randint(150, 220)
 
-        circles.append(AnimatedCircle(x, y, radius, vx, vy, *color, alpha))
+        r, g, b = color
+        circles.append(AnimatedCircle(x, y, radius, vx, vy, r, g, b, alpha))
 
     # MP4 ライターを初期化
     mp4_writer = MP4Writer(args.output, width, height, fps, codec)

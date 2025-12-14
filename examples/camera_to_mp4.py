@@ -198,6 +198,7 @@ class MP4Writer:
                     duration=self.frame_duration,
                     data=frame_data,
                 )
+                assert self.muxer is not None
                 self.muxer.append_sample(sample)
                 self.frame_count += 1
                 self.sample_queue.task_done()
@@ -281,7 +282,7 @@ def main():
 
     # FourCC フォーマットを明示的に設定（高品質な非圧縮フォーマットを優先）
     # まず UYVY (YUV 4:2:2 非圧縮) を試す
-    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"UYVY"))
+    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"UYVY"))  # type: ignore[attr-defined]
     fourcc = camera.get(cv2.CAP_PROP_FOURCC)
     fourcc_str = "".join([chr((int(fourcc) >> 8 * i) & 0xFF) for i in range(4)])
     print(f"設定された FourCC: {fourcc_str}")
@@ -289,7 +290,7 @@ def main():
     # UYVY が使えない場合は YUYV を試す
     if fourcc == 0 or fourcc_str == "\x00\x00\x00\x00":
         print("UYVY が使えないため YUYV を試します")
-        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))
+        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))  # type: ignore[attr-defined]
         fourcc = camera.get(cv2.CAP_PROP_FOURCC)
         fourcc_str = "".join([chr((int(fourcc) >> 8 * i) & 0xFF) for i in range(4)])
         print(f"設定された FourCC: {fourcc_str}")
