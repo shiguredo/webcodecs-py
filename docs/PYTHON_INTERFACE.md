@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-09
+- 最終更新: 2025-12-14
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -752,6 +752,7 @@ print(result["capture_time"])  # 1234567890.0
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
 | **`planes()`** | o | x | o | **独自拡張**: 全プレーン (Y, U, V) をタプルで返す（I420/I422/I444 のみ） |
 | **`plane()`** | o | x | o | **独自拡張**: 指定したプレーンを返す（全フォーマット対応） |
+| **`native_buffer`** | o | x | o | **独自拡張**: ネイティブバッファ（PyCapsule）を保持するプロパティ（macOS のみ） |
 
 **clone() の動作**:
 
@@ -865,9 +866,63 @@ y_plane, u_plane, v_plane = frame.planes()
 y_plane[:] = 235  # 元の data も変更される
 ```
 
+#### native_buffer プロパティ
+
+**macOS 専用のゼロコピーエンコード用プロパティ**
+
+```python
+native_buffer: object | None  # 読み書き可能
+```
+
+- **目的**: CVPixelBufferRef を直接保持し、Video Toolbox エンコーダーでゼロコピーエンコードを実現
+- **対応プラットフォーム**: macOS のみ
+- **形式**: PyCapsule（名前: `"CVPixelBufferRef"`）
+
+**コンストラクタでの使用**:
+
+VideoFrame は data (numpy.ndarray) の代わりに PyCapsule を直接受け取ることができます:
+
+```python
+import ctypes
+from webcodecs import VideoFrame, VideoPixelFormat
+
+# CVPixelBufferRef を PyCapsule でラップ（実際のコードでは外部から取得）
+# capsule = create_cv_pixel_buffer_capsule(cv_pixel_buffer_ref)
+
+frame = VideoFrame(
+    capsule,  # data の代わりに PyCapsule を渡す
+    {
+        "format": VideoPixelFormat.NV12,
+        "coded_width": 640,
+        "coded_height": 480,
+        "timestamp": 0,
+    },
+)
+
+# エンコード時にゼロコピーで処理される
+encoder.encode(frame)
+```
+
+**制限事項**:
+
+native_buffer のみで作成した VideoFrame では、以下のメソッドは使用できません（RuntimeError が発生）:
+
+- `plane()` - プレーンデータにアクセスできない
+- `planes()` - プレーンデータにアクセスできない
+- `copy_to()` - データをコピーできない
+- `clone()` - データをコピーできない
+
+これらのメソッドが必要な場合は、data (numpy.ndarray) を使用して VideoFrame を作成してください。
+
+**ユースケース**:
+
+- カメラキャプチャから直接取得した CVPixelBufferRef をエンコード
+- GPU レンダリング結果の CVPixelBufferRef をエンコード
+- メモリコピーを最小化したリアルタイム処理
+
 ### VideoFrame のメモリ管理
 
-VideoFrame は以下の 2 つのモードで動作します：
+VideoFrame は以下の 3 つのモードで動作します：
 
 1. **外部メモリ参照モード** (コンストラクタで ndarray を渡した場合)
    - 元の ndarray への参照を保持
@@ -878,6 +933,11 @@ VideoFrame は以下の 2 つのモードで動作します：
    - 内部でメモリを確保し所有
    - planes() メソッドは内部メモリへのビューを返す
    - copy_to() メソッドはデータのコピーを返す
+
+3. **native_buffer モード** (コンストラクタで PyCapsule を渡した場合、macOS のみ)
+   - CVPixelBufferRef への参照のみを保持（データは保持しない）
+   - planes() / plane() / copy_to() は使用不可（RuntimeError）
+   - Video Toolbox エンコーダーでゼロコピーエンコードが可能
 
 ## その他の型定義
 

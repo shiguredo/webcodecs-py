@@ -26,6 +26,9 @@ class VideoFrame {
   // WebCodecs API 準拠コンストラクタ (dict を受け取る)
   VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init);
 
+  // native_buffer (PyCapsule) を受け取るコンストラクタ
+  VideoFrame(nb::capsule native_buffer, nb::dict init);
+
   // 内部用コンストラクタ（clone, convert_format, デコーダーで使用）
   // Python バインディングには公開しない
   VideoFrame(uint32_t width,
@@ -71,6 +74,9 @@ class VideoFrame {
     return native_buffer_.is_valid() && !native_buffer_.is_none();
   }
   void* native_buffer_ptr() const;
+
+  // データの存在チェック (native_buffer のみの場合は false)
+  bool has_data() const { return !data_.empty(); }
 
   // Data access
   nb::ndarray<nb::numpy> plane(int plane_index) const;
@@ -146,6 +152,9 @@ class VideoFrame {
   void calculate_plane_info();
   size_t get_frame_size() const;
   VideoPixelFormat string_to_format(const std::string& format_str) const;
+
+  // init_dict をパースして共通プロパティを初期化するヘルパー
+  void init_from_dict(nb::dict init_dict);
 
   // VideoFrameCopyToOptions をパースするヘルパー
   CopyToOptions parse_copy_to_options(nb::dict options) const;

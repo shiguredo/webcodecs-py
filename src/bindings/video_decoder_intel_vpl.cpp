@@ -116,7 +116,8 @@ bool VideoDecoder::decode_intel_vpl(const EncodedVideoChunk& chunk) {
   }
 
   // 新しいデータを追加
-  std::memcpy(bitstream->Data + bitstream->DataLength, data.data(), data.size());
+  std::memcpy(bitstream->Data + bitstream->DataLength, data.data(),
+              data.size());
   bitstream->DataLength += static_cast<mfxU32>(data.size());
   bitstream->TimeStamp = chunk.timestamp();
 
@@ -171,7 +172,8 @@ bool VideoDecoder::decode_intel_vpl(const EncodedVideoChunk& chunk) {
 
     // QueryIOSurf を呼ぶ
     mfxFrameAllocRequest alloc_request = {};
-    sts = dyn::MFXVideoDECODE_QueryIOSurf(session, &decode_params, &alloc_request);
+    sts = dyn::MFXVideoDECODE_QueryIOSurf(session, &decode_params,
+                                          &alloc_request);
     if (sts != MFX_ERR_NONE) {
       throw std::runtime_error(
           intel_vpl::make_error_message("Query IO surface requirements", sts));
@@ -246,9 +248,8 @@ bool VideoDecoder::decode_intel_vpl(const EncodedVideoChunk& chunk) {
       uint32_t height = surface_out->Info.CropH;
       uint32_t pitch = surface_out->Data.Pitch;
 
-      auto frame = std::make_unique<VideoFrame>(width, height,
-                                                VideoPixelFormat::NV12,
-                                                surface_out->Data.TimeStamp);
+      auto frame = std::make_unique<VideoFrame>(
+          width, height, VideoPixelFormat::NV12, surface_out->Data.TimeStamp);
 
       // Y プレーンをコピー
       uint8_t* dst_y = frame->mutable_plane_ptr(0);
@@ -317,9 +318,8 @@ void VideoDecoder::flush_intel_vpl() {
     uint32_t height = surface_out->Info.CropH;
     uint32_t pitch = surface_out->Data.Pitch;
 
-    auto frame = std::make_unique<VideoFrame>(width, height,
-                                              VideoPixelFormat::NV12,
-                                              surface_out->Data.TimeStamp);
+    auto frame = std::make_unique<VideoFrame>(
+        width, height, VideoPixelFormat::NV12, surface_out->Data.TimeStamp);
 
     // Y プレーンをコピー
     uint8_t* dst_y = frame->mutable_plane_ptr(0);
