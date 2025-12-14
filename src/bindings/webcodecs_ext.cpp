@@ -15,7 +15,7 @@ void init_audio_encoder(nb::module_& m);
 void init_video_codec_capabilities(nb::module_& m);
 void init_image_decoder(nb::module_& m);
 
-NB_MODULE(_webcodecs_py, m) {
+NB_MODULE(webcodecs_ext, m) {
   m.doc() = "Python bindings for media codecs with WebCodecs-like API";
 
   // 全てのサブモジュールを初期化

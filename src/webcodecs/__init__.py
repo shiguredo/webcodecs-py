@@ -2,7 +2,7 @@
 
 from typing import Any, TypedDict, NotRequired, Literal
 
-from ._webcodecs_py import (
+from .webcodecs_ext import (
     # Video types
     VideoPixelFormat,
     VideoFrame,
