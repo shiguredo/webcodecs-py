@@ -267,9 +267,14 @@ void VideoEncoder::encode(const VideoFrame& frame,
     encode_frame_videotoolbox(frame, options.keyframe, quantizer);
 
     // デキューコールバックを呼び出す
-    if (dequeue_callback_) {
+    nb::object dequeue_cb;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      dequeue_cb = dequeue_callback_;
+    }
+    if (dequeue_cb && !dequeue_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      dequeue_callback_();
+      dequeue_cb();
     }
     return;
   }
@@ -317,10 +322,14 @@ void VideoEncoder::encode(const VideoFrame& frame,
   queue_cv_.notify_one();
 
   // デキューコールバックを呼び出す
-  if (dequeue_callback_) {
-    // ここでは GIL を解放中なので、取得が必要
+  nb::object dequeue_cb;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb = dequeue_callback_;
+  }
+  if (dequeue_cb && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    dequeue_callback_();
+    dequeue_cb();
   }
 }
 
@@ -328,7 +337,12 @@ void VideoEncoder::handle_encoded_frame(const uint8_t* data,
                                         size_t size,
                                         int64_t timestamp,
                                         bool keyframe) {
-  if (output_callback_) {
+  nb::object output_cb;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_cb = output_callback_;
+  }
+  if (output_cb && !output_cb.is_none()) {
     std::vector<uint8_t> payload;
     // 生のビットストリームを出力
     payload.assign(data, data + size);
@@ -343,9 +357,14 @@ void VideoEncoder::handle_encoded_frame(const uint8_t* data,
   }
 
   // Call the dequeue callback if set
-  if (dequeue_callback_) {
+  nb::object dequeue_cb2;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb2 = dequeue_callback_;
+  }
+  if (dequeue_cb2 && !dequeue_cb2.is_none()) {
     nb::gil_scoped_acquire gil;
-    dequeue_callback_();
+    dequeue_cb2();
   }
 }
 
@@ -600,10 +619,15 @@ void VideoEncoder::worker_loop() {
         process_encode_task(task);
       } catch (const std::exception& e) {
         // エラーが発生した場合、エラーコールバックを呼び出す
-        if (error_callback_) {
+        nb::object error_cb;
+        {
+          nb::ft_lock_guard guard(callback_mutex_);
+          error_cb = error_callback_;
+        }
+        if (error_cb && !error_cb.is_none()) {
           nb::gil_scoped_acquire gil;
           try {
-            error_callback_(std::string(e.what()));
+            error_cb(std::string(e.what()));
           } catch (...) {
             // エラーコールバック自体のエラーは無視
           }
@@ -721,7 +745,12 @@ void VideoEncoder::handle_output(
   // コールバックを呼び出す (GIL を取得)
   // WebCodecs API では callback は (chunk, metadata?) で metadata は optional
   // Python では常に 2 引数で呼び出し、callback 側で metadata=None のデフォルト引数を使用する
-  if (output_callback_ && !entries_to_output.empty()) {
+  nb::object output_cb;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_cb = output_callback_;
+  }
+  if (output_cb && !output_cb.is_none() && !entries_to_output.empty()) {
     nb::gil_scoped_acquire gil;
     for (auto& entry : entries_to_output) {
       // コピーを作成して渡す (Python 側で所有権を持つ)
@@ -752,11 +781,11 @@ void VideoEncoder::handle_output(
       // Python 側では def on_output(chunk, metadata=None): と定義することを推奨
       // 後方互換性のため、まず 2 引数で呼び出しを試み、失敗したら 1 引数で呼び出す
       try {
-        output_callback_(chunk_copy, metadata_dict);
+        output_cb(chunk_copy, metadata_dict);
       } catch (const nb::python_error&) {
         // 2 引数呼び出しが失敗した場合は 1 引数で呼び出す (後方互換性)
         PyErr_Clear();
-        output_callback_(chunk_copy);
+        output_cb(chunk_copy);
       }
     }
   }

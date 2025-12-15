@@ -50,6 +50,7 @@ jobs:
             wheel_platform: macos-15_arm64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -129,6 +130,7 @@ jobs:
             runs_on: macos-15
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -204,6 +206,7 @@ jobs:
             runs_on: ubuntu-22.04-arm
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -268,6 +271,7 @@ jobs:
             runs_on: windows-2025
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}

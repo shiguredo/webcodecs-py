@@ -72,9 +72,16 @@ class VideoDecoder {
       const VideoDecoderConfig& config);
 
   // Callback setters
-  void on_output(OutputCallback callback) { output_callback_ = callback; }
-  void on_error(ErrorCallback callback) { error_callback_ = callback; }
+  void on_output(OutputCallback callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_callback_ = callback;
+  }
+  void on_error(ErrorCallback callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    error_callback_ = callback;
+  }
   void on_dequeue(std::function<void()> callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     dequeue_callback_ = callback;
   }
 
@@ -86,6 +93,7 @@ class VideoDecoder {
   OutputCallback output_callback_;
   ErrorCallback error_callback_;
   std::function<void()> dequeue_callback_;
+  nb::ft_mutex callback_mutex_;  // Free-Threading 用コールバック保護
   CodecState state_;
   VideoDecoderConfig config_;     // 内部で保持する設定
   CodecParameters codec_params_;  // パースしたコーデックパラメータ

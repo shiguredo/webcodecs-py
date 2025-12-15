@@ -449,6 +449,7 @@ endif()
 nanobind_add_module(
     webcodecs_ext
     NB_STATIC
+    FREE_THREADED
     src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp

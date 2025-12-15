@@ -24,6 +24,7 @@ jobs:
           - "3.12"
           - "3.13"
           - "3.14"
+          - "3.14t"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -72,6 +73,7 @@ jobs:
             arch: arm64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -139,6 +141,7 @@ jobs:
             runs_on: windows-2025
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -191,6 +194,7 @@ jobs:
           - name: windows-2025_x86_64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ubuntu-24.04
