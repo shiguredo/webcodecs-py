@@ -12,138 +12,19 @@ permissions:
   actions: read
 
 jobs:
-  # build_macos:
-  #   strategy:
-  #     matrix:
-  #       platform:
-  #         - name: macos-26_arm64
-  #           runs_on: macos-26
-  #         - name: macos-15_arm64
-  #           runs_on: macos-15
-  #       python_version:
-  #         - "3.12"
-  #         - "3.13"
-  #         - "3.14"
-  #         - "3.14t"
-  #   runs-on: ${{ matrix.platform.runs_on }}
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - uses: astral-sh/setup-uv@v7
-  #       with:
-  #         enable-cache: false
-  #         python-version: ${{ matrix.python_version }}
-
-  #     # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
-  #     - name: Cache dependencies
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: _deps
-  #         key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-deps-${{ matrix.platform.name }}-
-
-  #     - name: Install build dependencies
-  #       run: |
-  #         brew install nasm yasm
-
-  #     - run: uv build --wheel --out-dir wheelhouse
-  #     - name: Upload Artifact
-  #       uses: actions/upload-artifact@v5
-  #       with:
-  #         name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
-  #         path: wheelhouse/*.whl
-
-  # build_ubuntu:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       platform:
-  #         - name: ubuntu-24.04_x86_64
-  #           runs_on: ubuntu-24.04
-  #           arch: x86_64
-  #         - name: ubuntu-24.04_arm64
-  #           runs_on: ubuntu-24.04-arm
-  #           arch: arm64
-  #         - name: ubuntu-22.04_x86_64
-  #           runs_on: ubuntu-22.04
-  #           arch: x86_64
-  #         - name: ubuntu-22.04_arm64
-  #           runs_on: ubuntu-22.04-arm
-  #           arch: arm64
-  #       python_version:
-  #         - "3.14"
-  #         - "3.14t"
-  #         - "3.13"
-  #         - "3.12"
-  #   runs-on: ${{ matrix.platform.runs_on }}
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - uses: astral-sh/setup-uv@v7
-  #       with:
-  #         enable-cache: false
-  #         python-version: ${{ matrix.python_version }}
-
-  #     # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
-  #     - name: Cache dependencies
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: _deps
-  #         key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-deps-${{ matrix.platform.name }}-
-
-  #     # NVIDIA Video Codec SDK のビルドに必要な CUDA Toolkit をセットアップ
-  #     # x86_64 のみ (ARM64 では NVIDIA Video Codec SDK は使用不可)
-  #     - uses: shiguredo/github-actions/.github/actions/setup-cuda-toolkit@main
-  #       if: matrix.platform.arch == 'x86_64'
-  #       with:
-  #         cuda_version: "13.0.2"
-  #         platform: ${{ matrix.platform.runs_on }}
-
-  #     - name: Install build dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y build-essential nasm yasm
-
-  #     # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
-  #     # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
-  #     # Intel VPL は Linux では常に有効（ヘッダーは third_party/vpl/ にあり、libvpl は dlopen で動的ロード）
-  #     - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
-  #       if: matrix.platform.arch == 'x86_64'
-  #       run: uv build --wheel
-  #       env:
-  #         USE_NVIDIA_CUDA_TOOLKIT: true
-
-  #     # arm64 の場合は通常ビルド
-  #     - name: Build wheel (arm64)
-  #       if: matrix.platform.arch == 'arm64'
-  #       run: uv build --wheel
-
-  #     - name: Repair wheel with auditwheel
-  #       shell: bash
-  #       run: |
-  #         uvx auditwheel repair dist/*.whl --strip --only-plat
-  #     - name: Upload Repaired Wheels
-  #       uses: actions/upload-artifact@v5
-  #       with:
-  #         name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
-  #         path: wheelhouse/*.whl
-
-  build_windows:
+  build_macos:
     strategy:
-      fail-fast: false
       matrix:
         platform:
-          - name: windows-2025_x86_64
-            runs_on: windows-2025
+          - name: macos-26_arm64
+            runs_on: macos-26
+          - name: macos-15_arm64
+            runs_on: macos-15
         python_version:
-          # - "3.14"
-          # - "3.14t"
-          - "3.13t"
-          # - "3.13"
-          # - "3.12"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "3.14t"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -154,13 +35,134 @@ jobs:
           python-version: ${{ matrix.python_version }}
 
       # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
-      # - name: Cache dependencies
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: _deps
-      #     key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-deps-${{ matrix.platform.name }}-
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: _deps
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-${{ matrix.platform.name }}-
+
+      - name: Install build dependencies
+        run: |
+          brew install nasm yasm
+
+      - run: uv build --wheel --out-dir wheelhouse
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
+          path: wheelhouse/*.whl
+
+  build_ubuntu:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: ubuntu-24.04_x86_64
+            runs_on: ubuntu-24.04
+            arch: x86_64
+          - name: ubuntu-24.04_arm64
+            runs_on: ubuntu-24.04-arm
+            arch: arm64
+          - name: ubuntu-22.04_x86_64
+            runs_on: ubuntu-22.04
+            arch: x86_64
+          - name: ubuntu-22.04_arm64
+            runs_on: ubuntu-22.04-arm
+            arch: arm64
+        python_version:
+          - "3.14"
+          - "3.14t"
+          - "3.13"
+          - "3.12"
+    runs-on: ${{ matrix.platform.runs_on }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
+          python-version: ${{ matrix.python_version }}
+
+      # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: _deps
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-${{ matrix.platform.name }}-
+
+      # NVIDIA Video Codec SDK のビルドに必要な CUDA Toolkit をセットアップ
+      # x86_64 のみ (ARM64 では NVIDIA Video Codec SDK は使用不可)
+      - uses: shiguredo/github-actions/.github/actions/setup-cuda-toolkit@main
+        if: matrix.platform.arch == 'x86_64'
+        with:
+          cuda_version: "13.0.2"
+          platform: ${{ matrix.platform.runs_on }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nasm yasm
+
+      # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
+      # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
+      # Intel VPL は Linux では常に有効（ヘッダーは third_party/vpl/ にあり、libvpl は dlopen で動的ロード）
+      - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
+        if: matrix.platform.arch == 'x86_64'
+        run: uv build --wheel
+        env:
+          USE_NVIDIA_CUDA_TOOLKIT: true
+
+      # arm64 の場合は通常ビルド
+      - name: Build wheel (arm64)
+        if: matrix.platform.arch == 'arm64'
+        run: uv build --wheel
+
+      - name: Repair wheel with auditwheel
+        shell: bash
+        run: |
+          uvx auditwheel repair dist/*.whl --strip --only-plat
+      - name: Upload Repaired Wheels
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
+          path: wheelhouse/*.whl
+
+  build_windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: windows-2025_x86_64
+            runs_on: windows-2025
+        python_version:
+          - "3.14"
+          # Windows の Python 3.14t (free-threaded) は nanobind のビルドで
+          # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
+          # - "3.14t"
+          - "3.13"
+          - "3.13t"
+          - "3.12"
+    runs-on: ${{ matrix.platform.runs_on }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
+          python-version: ${{ matrix.python_version }}
+
+      # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: _deps
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
       - name: Build wheel
         run: uv build --wheel --out-dir wheelhouse
@@ -170,74 +172,80 @@ jobs:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
 
-  # test:
-  #   needs:
-  #     - build_macos
-  #     - build_ubuntu
-  #     - build_windows
-  #   uses: ./.github/workflows/test.yml
+  test:
+    needs:
+      - build_macos
+      - build_ubuntu
+      - build_windows
+    uses: ./.github/workflows/test.yml
 
-  # publish_wheel:
-  #   if: contains(github.ref, 'tags/202')
-  #   needs:
-  #     - test
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       platform:
-  #         - name: ubuntu-24.04_x86_64
-  #         - name: ubuntu-24.04_arm64
-  #         - name: ubuntu-22.04_x86_64
-  #         - name: ubuntu-22.04_arm64
-  #         # - name: macos-26_arm64
-  #         - name: macos-15_arm64
-  #         - name: windows-2025_x86_64
-  #       python_version:
-  #         - "3.14"
-  #         - "3.14t"
-  #         - "3.13"
-  #         - "3.12"
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 15
-  #   environment: pypi
-  #   permissions:
-  #     id-token: write
-  #   steps:
-  #     - uses: actions/download-artifact@v5
-  #       with:
-  #         name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
-  #         path: wheelhouse/
-  #     - name: Publish package to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         packages-dir: wheelhouse
+  publish_wheel:
+    if: contains(github.ref, 'tags/202')
+    needs:
+      - test
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: ubuntu-24.04_x86_64
+          - name: ubuntu-24.04_arm64
+          - name: ubuntu-22.04_x86_64
+          - name: ubuntu-22.04_arm64
+          # - name: macos-26_arm64
+          - name: macos-15_arm64
+          - name: windows-2025_x86_64
+        python_version:
+          - "3.14"
+          - "3.14t"
+          - "3.13"
+          - "3.13t"
+          - "3.12"
+        exclude:
+          # Windows の Python 3.14t は非対応
+          - platform:
+              name: windows-2025_x86_64
+            python_version: "3.14t"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
+          path: wheelhouse/
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: wheelhouse
 
-  # create-release:
-  #   if: contains(github.ref, 'tags/202')
-  #   needs:
-  #     - test
-  #   runs-on: ubuntu-24.04
-  #   timeout-minutes: 60
-  #   steps:
-  #     - uses: actions/checkout@v5
-  #     - name: Download all artifacts
-  #       uses: actions/download-artifact@v5
-  #       with:
-  #         path: artifacts/
-  #     - name: Create release files list
-  #       run: |
-  #         find artifacts -name "*.whl" -type f > release_files.txt
-  #     - name: Create GitHub Release
-  #       run: |
-  #         if [[ "${{ github.ref }}" == *"dev"* ]]; then
-  #           gh release create ${{ github.ref_name }} \
-  #             --title "${{ github.ref_name }}" \
-  #             --prerelease \
-  #             $(cat release_files.txt | xargs)
-  #         else
-  #           gh release create ${{ github.ref_name }} \
-  #             --title "${{ github.ref_name }}" \
-  #             $(cat release_files.txt | xargs)
-  #         fi
-  #       env:
-  #         GH_TOKEN: ${{ github.token }}
+  create-release:
+    if: contains(github.ref, 'tags/202')
+    needs:
+      - test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts/
+      - name: Create release files list
+        run: |
+          find artifacts -name "*.whl" -type f > release_files.txt
+      - name: Create GitHub Release
+        run: |
+          if [[ "${{ github.ref }}" == *"dev"* ]]; then
+            gh release create ${{ github.ref_name }} \
+              --title "${{ github.ref_name }}" \
+              --prerelease \
+              $(cat release_files.txt | xargs)
+          else
+            gh release create ${{ github.ref_name }} \
+              --title "${{ github.ref_name }}" \
+              $(cat release_files.txt | xargs)
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
