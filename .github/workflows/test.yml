@@ -62,7 +62,13 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-          python-version: ${{ matrix.python_version }}
+
+      # self-hosted runner では以前のインストールが残っている可能性があるため、
+      # 明示的に Python を再インストールする
+      - name: Reinstall Python
+        run: |
+          uv python uninstall ${{ matrix.python_version }} || true
+          uv python install ${{ matrix.python_version }}
 
       - name: Debug event info
         run: |
