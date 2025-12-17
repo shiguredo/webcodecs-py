@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
@@ -88,7 +88,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
@@ -154,7 +154,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
