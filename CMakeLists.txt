@@ -474,6 +474,15 @@ nanobind_add_module(webcodecs_ext
     ${WEBCODECS_SOURCES}
 )
 
+# Windows の free-threaded Python では Py_GIL_DISABLED を手動で定義する必要がある
+if(WIN32)
+    foreach(NB_TARGET nanobind-static-ft)
+        if(TARGET ${NB_TARGET})
+            target_compile_definitions(${NB_TARGET} PRIVATE Py_GIL_DISABLED=1)
+        endif()
+    endforeach()
+endif()
+
 # ビルド順序を保証するため依存関係を追加
 add_dependencies(webcodecs_ext opus_build flac_build libaom_build libyuv_build dav1d_build)
 if(APPLE OR UNIX)
