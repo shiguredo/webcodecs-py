@@ -56,9 +56,6 @@ jobs:
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
-    # selfhosted runner では一時ディレクトリを使用して毎回クリーンな Python 環境にする
-    env:
-      UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/uv-python
     steps:
       - uses: actions/checkout@v6
 
@@ -66,6 +63,10 @@ jobs:
         with:
           enable-cache: false
           python-version: ${{ matrix.python_version }}
+
+      # selfhosted runner では uv python pin で Python バージョンを固定する
+      - name: Pin Python version
+        run: uv python pin ${{ matrix.python_version }}
 
       - name: Debug event info
         run: |
