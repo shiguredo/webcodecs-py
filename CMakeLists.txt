@@ -469,7 +469,6 @@ set(WEBCODECS_SOURCES
 )
 
 nanobind_add_module(webcodecs_ext
-    NB_STATIC
     NB_DOMAIN webcodecs
     FREE_THREADED
     ${WEBCODECS_SOURCES}
