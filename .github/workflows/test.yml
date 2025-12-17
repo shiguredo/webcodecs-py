@@ -62,7 +62,6 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-          python-version: ${{ matrix.python_version }}
 
       # selfhosted runner では uv python pin で Python バージョンを固定する
       - name: Pin Python version
