@@ -63,12 +63,13 @@ jobs:
         with:
           enable-cache: false
 
-      # self-hosted runner では以前のインストールが残っている可能性があるため、
-      # 明示的に Python を再インストールする
-      - name: Reinstall Python
+      # selfhosted runner では以前のインストールが残っている可能性があるため、
+      # 明示的に Python を再インストールして pin する
+      - name: Setup Python
         run: |
           uv python uninstall ${{ matrix.python_version }} || true
           uv python install ${{ matrix.python_version }}
+          uv python pin ${{ matrix.python_version }}
 
       - name: Debug event info
         run: |
