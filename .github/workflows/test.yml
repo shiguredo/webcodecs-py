@@ -63,7 +63,7 @@ jobs:
         with:
           enable-cache: false
 
-      # selfhosted runner では uv python pin で Python バージョンを固定する
+      # self-hosted runner では uv python pin で Python バージョンを固定する
       - name: Pin Python version
         run: uv python pin ${{ matrix.python_version }}
 
