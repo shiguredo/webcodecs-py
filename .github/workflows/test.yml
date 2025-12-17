@@ -57,9 +57,9 @@ jobs:
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
           python-version: ${{ matrix.python_version }}
@@ -72,14 +72,14 @@ jobs:
 
       - name: Download wheel artifact (workflow_call)
         if: ${{ !github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.wheel_platform }}_python-${{ matrix.python_version }}
           path: wheelhouse/
 
       - name: Download wheel artifact (workflow_dispatch)
         if: ${{ github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
