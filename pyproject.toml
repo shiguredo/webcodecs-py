@@ -44,7 +44,6 @@ test = [
 ]
 lint = ["ruff", "ty"]
 example = ["opencv-python", "blend2d-py", "mp4-py"]
-pypi = ["auditwheel", "patchelf"]
 
 [tool.scikit-build]
 minimum-version = "0.11.3"

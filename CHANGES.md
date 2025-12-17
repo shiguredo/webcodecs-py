@@ -36,6 +36,9 @@
 
 ### misc
 
+- [CHANGE] GitHub Actions で auditwheel を uvx 経由で実行するように変更する
+  - pyproject.toml から pypi 依存グループを削除
+  - @voluntas
 - [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
   - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
   - @voluntas
