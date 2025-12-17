@@ -56,6 +56,9 @@ jobs:
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
+    # selfhosted runner では一時ディレクトリを使用して毎回クリーンな Python 環境にする
+    env:
+      UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/uv-python
     steps:
       - uses: actions/checkout@v6
 
@@ -63,11 +66,8 @@ jobs:
         with:
           enable-cache: false
 
-      # selfhosted runner では以前のインストールが残っている可能性があるため、
-      # 明示的に Python を再インストールして pin する
       - name: Setup Python
         run: |
-          uv python uninstall ${{ matrix.python_version }} || true
           uv python install ${{ matrix.python_version }}
           uv python pin ${{ matrix.python_version }}
 
