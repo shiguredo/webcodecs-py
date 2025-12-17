@@ -468,21 +468,12 @@ set(WEBCODECS_SOURCES
     src/bindings/image_decoder.cpp
 )
 
-# Windows では NB_STATIC を使用しない
-# nanobind + NB_STATIC + FREE_THREADED の組み合わせで Py_GIL_DISABLED が
-# 正しく検出されない問題があるため
-if(WIN32)
-    nanobind_add_module(webcodecs_ext
-        FREE_THREADED
-        ${WEBCODECS_SOURCES}
-    )
-else()
-    nanobind_add_module(webcodecs_ext
-        NB_STATIC
-        FREE_THREADED
-        ${WEBCODECS_SOURCES}
-    )
-endif()
+nanobind_add_module(webcodecs_ext
+    NB_STATIC
+    NB_DOMAIN webcodecs
+    FREE_THREADED
+    ${WEBCODECS_SOURCES}
+)
 
 # ビルド順序を保証するため依存関係を追加
 add_dependencies(webcodecs_ext opus_build flac_build libaom_build libyuv_build dav1d_build)
