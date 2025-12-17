@@ -446,10 +446,7 @@ endif()
 # 注意: video_encoder_*.cpp と video_decoder_*.cpp ファイルは
 # video_encoder.cpp と video_decoder.cpp に #include されるため、
 # 個別のコンパイル単位として追加しない
-nanobind_add_module(
-    webcodecs_ext
-    NB_STATIC
-    FREE_THREADED
+set(WEBCODECS_SOURCES
     src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp
@@ -470,6 +467,22 @@ nanobind_add_module(
     src/bindings/video_codec_capabilities.cpp
     src/bindings/image_decoder.cpp
 )
+
+# Windows では NB_STATIC を使用しない
+# nanobind + NB_STATIC + FREE_THREADED の組み合わせで Py_GIL_DISABLED が
+# 正しく検出されない問題があるため
+if(WIN32)
+    nanobind_add_module(webcodecs_ext
+        FREE_THREADED
+        ${WEBCODECS_SOURCES}
+    )
+else()
+    nanobind_add_module(webcodecs_ext
+        NB_STATIC
+        FREE_THREADED
+        ${WEBCODECS_SOURCES}
+    )
+endif()
 
 # ビルド順序を保証するため依存関係を追加
 add_dependencies(webcodecs_ext opus_build flac_build libaom_build libyuv_build dav1d_build)
