@@ -43,7 +43,7 @@ test = [
     "pillow",
 ]
 lint = ["ruff", "ty"]
-example = ["opencv-python", "blend2d-py", "mp4-py"]
+example = ["blend2d-py", "mp4-py"]
 
 [tool.scikit-build]
 minimum-version = "0.11"
