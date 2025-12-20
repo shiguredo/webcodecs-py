@@ -19,6 +19,9 @@ VideoEncoder::VideoEncoder(nb::object output, nb::object error)
   aom_iface_ = nullptr;
   vt_session_ = nullptr;
 
+  // コールバックフラグを設定
+  has_output_callback_ = !output_callback_.is_none();
+  has_error_callback_ = !error_callback_.is_none();
   // コンストラクタではコーデックの初期化は行わない
   // configure() で初期化する
 }
@@ -268,11 +271,13 @@ void VideoEncoder::encode(const VideoFrame& frame,
 
     // デキューコールバックを呼び出す
     nb::object dequeue_cb;
+    bool has_dequeue;
     {
       nb::ft_lock_guard guard(callback_mutex_);
       dequeue_cb = dequeue_callback_;
+      has_dequeue = has_dequeue_callback_;
     }
-    if (dequeue_cb && !dequeue_cb.is_none()) {
+    if (has_dequeue && !dequeue_cb.is_none()) {
       nb::gil_scoped_acquire gil;
       dequeue_cb();
     }
@@ -323,11 +328,13 @@ void VideoEncoder::encode(const VideoFrame& frame,
 
   // デキューコールバックを呼び出す
   nb::object dequeue_cb;
+  bool has_dequeue;
   {
     nb::ft_lock_guard guard(callback_mutex_);
     dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
   }
-  if (dequeue_cb && !dequeue_cb.is_none()) {
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
     dequeue_cb();
   }
@@ -338,11 +345,13 @@ void VideoEncoder::handle_encoded_frame(const uint8_t* data,
                                         int64_t timestamp,
                                         bool keyframe) {
   nb::object output_cb;
+  bool has_output;
   {
     nb::ft_lock_guard guard(callback_mutex_);
     output_cb = output_callback_;
+    has_output = has_output_callback_;
   }
-  if (output_cb && !output_cb.is_none()) {
+  if (has_output && !output_cb.is_none()) {
     std::vector<uint8_t> payload;
     // 生のビットストリームを出力
     payload.assign(data, data + size);
@@ -356,15 +365,17 @@ void VideoEncoder::handle_encoded_frame(const uint8_t* data,
     handle_output(current_sequence_, chunk);
   }
 
-  // Call the dequeue callback if set
-  nb::object dequeue_cb2;
+  // デキューコールバックを呼び出す
+  nb::object dequeue_cb;
+  bool has_dequeue;
   {
     nb::ft_lock_guard guard(callback_mutex_);
-    dequeue_cb2 = dequeue_callback_;
+    dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
   }
-  if (dequeue_cb2 && !dequeue_cb2.is_none()) {
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    dequeue_cb2();
+    dequeue_cb();
   }
 }
 
@@ -620,11 +631,13 @@ void VideoEncoder::worker_loop() {
       } catch (const std::exception& e) {
         // エラーが発生した場合、エラーコールバックを呼び出す
         nb::object error_cb;
+        bool has_error;
         {
           nb::ft_lock_guard guard(callback_mutex_);
           error_cb = error_callback_;
+          has_error = has_error_callback_;
         }
-        if (error_cb && !error_cb.is_none()) {
+        if (has_error && !error_cb.is_none()) {
           nb::gil_scoped_acquire gil;
           try {
             error_cb(std::string(e.what()));
@@ -746,11 +759,13 @@ void VideoEncoder::handle_output(
   // WebCodecs API では callback は (chunk, metadata?) で metadata は optional
   // Python では常に 2 引数で呼び出し、callback 側で metadata=None のデフォルト引数を使用する
   nb::object output_cb;
+  bool has_output;
   {
     nb::ft_lock_guard guard(callback_mutex_);
     output_cb = output_callback_;
+    has_output = has_output_callback_;
   }
-  if (output_cb && !output_cb.is_none() && !entries_to_output.empty()) {
+  if (has_output && !output_cb.is_none() && !entries_to_output.empty()) {
     nb::gil_scoped_acquire gil;
     for (auto& entry : entries_to_output) {
       // コピーを作成して渡す (Python 側で所有権を持つ)

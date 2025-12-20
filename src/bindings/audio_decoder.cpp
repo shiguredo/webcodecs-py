@@ -358,7 +358,8 @@ void AudioDecoder::handle_output(uint64_t sequence,
     nb::gil_scoped_acquire gil;
     for (auto& audio_data : data_to_output) {
       if (!output_cb.is_none()) {
-        output_cb(audio_data.release());
+        output_cb(
+            nb::cast(audio_data.release(), nb::rv_policy::take_ownership));
       }
     }
   }
