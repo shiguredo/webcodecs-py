@@ -1,6 +1,5 @@
 [build-system]
 requires = ["scikit-build-core>=0.11", "nanobind>=2.10.2", "meson>=1.9"]
-
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -43,7 +42,7 @@ test = [
     "pillow",
 ]
 lint = ["ruff", "ty"]
-example = ["blend2d-py", "mp4-py"]
+example = ["blend2d-py", "raw-player", "mp4-py"]
 
 [tool.scikit-build]
 minimum-version = "0.11"
