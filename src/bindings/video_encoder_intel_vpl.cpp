@@ -223,7 +223,8 @@ void VideoEncoder::init_intel_vpl_encoder() {
 
   // サーフェス要件を取得
   mfxFrameAllocRequest alloc_request = {};
-  sts = dyn::MFXVideoENCODE_QueryIOSurf(session, &encode_params, &alloc_request);
+  sts =
+      dyn::MFXVideoENCODE_QueryIOSurf(session, &encode_params, &alloc_request);
   if (sts != MFX_ERR_NONE) {
     cleanup_intel_vpl_encoder();
     throw std::runtime_error(
@@ -364,8 +365,8 @@ void VideoEncoder::encode_frame_intel_vpl(const VideoFrame& frame,
 
   // エンコード実行
   mfxSyncPoint syncp = nullptr;
-  mfxStatus sts = dyn::MFXVideoENCODE_EncodeFrameAsync(session, ctrl_ptr, surface,
-                                                       bitstream, &syncp);
+  mfxStatus sts = dyn::MFXVideoENCODE_EncodeFrameAsync(
+      session, ctrl_ptr, surface, bitstream, &syncp);
 
   if (sts == MFX_ERR_MORE_DATA) {
     pool->release(surface);
@@ -445,8 +446,8 @@ void VideoEncoder::flush_intel_vpl_encoder() {
     }
 
     if (syncp) {
-      sts = dyn::MFXVideoCORE_SyncOperation(session, syncp,
-                                            intel_vpl::VPL_FLUSH_SYNC_TIMEOUT_MS);
+      sts = dyn::MFXVideoCORE_SyncOperation(
+          session, syncp, intel_vpl::VPL_FLUSH_SYNC_TIMEOUT_MS);
       if (sts != MFX_ERR_NONE) {
         break;
       }
@@ -522,51 +523,53 @@ void VideoEncoder::build_vpl_description(const uint8_t* sps,
     std::vector<std::pair<const uint8_t*, size_t>> nalus;
 
     // SPS バッファから NAL ユニットを抽出
-    auto extract_nalus = [](const uint8_t* data, size_t size,
-                            std::vector<std::pair<const uint8_t*, size_t>>& out) {
-      size_t pos = 0;
-      while (pos < size) {
-        // start code を探す (0x000001 or 0x00000001)
-        size_t start = pos;
-        while (start + 3 <= size) {
-          if (data[start] == 0 && data[start + 1] == 0) {
-            if (data[start + 2] == 1) {
-              start += 3;
-              break;
-            } else if (start + 4 <= size && data[start + 2] == 0 &&
-                       data[start + 3] == 1) {
-              start += 4;
-              break;
+    auto extract_nalus =
+        [](const uint8_t* data, size_t size,
+           std::vector<std::pair<const uint8_t*, size_t>>& out) {
+          size_t pos = 0;
+          while (pos < size) {
+            // start code を探す (0x000001 or 0x00000001)
+            size_t start = pos;
+            while (start + 3 <= size) {
+              if (data[start] == 0 && data[start + 1] == 0) {
+                if (data[start + 2] == 1) {
+                  start += 3;
+                  break;
+                } else if (start + 4 <= size && data[start + 2] == 0 &&
+                           data[start + 3] == 1) {
+                  start += 4;
+                  break;
+                }
+              }
+              start++;
             }
+            if (start >= size)
+              break;
+
+            // 次の start code または終端を探す
+            size_t end = start;
+            while (end + 3 <= size) {
+              if (data[end] == 0 && data[end + 1] == 0 &&
+                  (data[end + 2] == 1 ||
+                   (end + 4 <= size && data[end + 2] == 0 &&
+                    data[end + 3] == 1))) {
+                break;
+              }
+              end++;
+            }
+            if (end == start)
+              end = size;
+
+            // trailing zero を除去
+            while (end > start && data[end - 1] == 0)
+              end--;
+
+            if (end > start) {
+              out.push_back({data + start, end - start});
+            }
+            pos = end;
           }
-          start++;
-        }
-        if (start >= size)
-          break;
-
-        // 次の start code または終端を探す
-        size_t end = start;
-        while (end + 3 <= size) {
-          if (data[end] == 0 && data[end + 1] == 0 &&
-              (data[end + 2] == 1 ||
-               (end + 4 <= size && data[end + 2] == 0 && data[end + 3] == 1))) {
-            break;
-          }
-          end++;
-        }
-        if (end == start)
-          end = size;
-
-        // trailing zero を除去
-        while (end > start && data[end - 1] == 0)
-          end--;
-
-        if (end > start) {
-          out.push_back({data + start, end - start});
-        }
-        pos = end;
-      }
-    };
+        };
 
     extract_nalus(sps, sps_size, nalus);
     extract_nalus(pps, pps_size, nalus);

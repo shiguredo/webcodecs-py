@@ -59,7 +59,9 @@ def test_encoder_is_config_supported(codec, expected_supported):
             "av01.0.04M.08",
             HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
             True,
-            marks=pytest.mark.skip(reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化"),
+            marks=pytest.mark.skip(
+                reason="AV1 Decoder を持っている GitHub Self-hosted Runner がないため無効化"
+            ),
         ),
     ],
 )
