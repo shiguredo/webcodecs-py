@@ -42,7 +42,7 @@ test = [
     "pillow",
 ]
 lint = ["ruff", "ty"]
-example = ["blend2d-py", "raw-player", "mp4-py"]
+example = ["uvc-py", "portaudio-py", "raw-player", "blend2d-py", "mp4-py"]
 
 [tool.scikit-build]
 minimum-version = "0.11"

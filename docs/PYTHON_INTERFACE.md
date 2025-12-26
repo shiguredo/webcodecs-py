@@ -949,10 +949,6 @@ from webcodecs import VideoFrame, VideoPixelFormat
 from PIL import Image
 img = Image.open("image.png").convert("RGB")
 rgb_data = np.array(img)  # shape: (height, width, 3)
-
-# OpenCV との連携例
-import cv2
-bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ```
 
 #### AudioSampleFormat
