@@ -1344,7 +1344,7 @@ def test_h264_encoder_avc_quantizer():
         "coded_height": height,
         "timestamp": 0,
     }
-    frame = VideoFrame(data, init)
+    frame = VideoFrame(data, init)  # type: ignore[arg-type]
 
     # avc.quantizer オプションを使用してエンコード（エラーなく受け入れられることを確認）
     encoder.encode(frame, {"key_frame": True, "avc": {"quantizer": 10}})
@@ -1426,7 +1426,9 @@ def test_h265_encoder_hevc_quantizer():
 
     width, height = 640, 480
     data_size = width * height * 3 // 2
-    data = np.random.randint(0, 255, data_size, dtype=np.uint8)
+    data: np.ndarray[tuple[int], np.dtype[np.uint8]] = np.random.randint(
+        0, 255, data_size, dtype=np.uint8
+    )
     init: VideoFrameBufferInit = {
         "format": VideoPixelFormat.I420,
         "coded_width": width,

@@ -16,6 +16,11 @@
   - Apple Video Toolbox エンコーダーでゼロコピーエンコードが可能
   - native_buffer のみの VideoFrame では plane()/planes()/copy_to()/clone() は RuntimeError
   - @voluntas
+- [ADD] Python 3.13t / 3.14t の Free-Threading ビルドに対応する
+  - VideoEncoder / VideoDecoder / AudioEncoder / AudioDecoder でスレッドセーフなコールバック管理を実装
+  - nanobind の nb::ft_mutex を使用した排他制御
+  - Windows 3.14t は nanobind ビルドの問題により非対応
+  - @voluntas
 - [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
   - WebCodecs API 準拠の自動選択動作を実装
   - HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を明示的に指定しなくても H.264/HEVC では Video Toolbox が使用される
@@ -41,6 +46,9 @@
 
 ### misc
 
+- [CHANGE] GitHub Actions で auditwheel を uvx 経由で実行するように変更する
+  - pyproject.toml から pypi 依存グループを削除
+  - @voluntas
 - [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
   - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
   - @voluntas

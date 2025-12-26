@@ -446,10 +446,8 @@ endif()
 # 注意: video_encoder_*.cpp と video_decoder_*.cpp ファイルは
 # video_encoder.cpp と video_decoder.cpp に #include されるため、
 # 個別のコンパイル単位として追加しない
-nanobind_add_module(
-    _webcodecs_py
-    NB_STATIC
-    src/bindings/module.cpp
+set(WEBCODECS_SOURCES
+    src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp
     src/bindings/video_frame.cpp
@@ -470,17 +468,23 @@ nanobind_add_module(
     src/bindings/image_decoder.cpp
 )
 
+nanobind_add_module(webcodecs_ext
+    NB_DOMAIN webcodecs
+    FREE_THREADED
+    ${WEBCODECS_SOURCES}
+)
+
 # ビルド順序を保証するため依存関係を追加
-add_dependencies(_webcodecs_py opus_build flac_build libaom_build libyuv_build dav1d_build)
+add_dependencies(webcodecs_ext opus_build flac_build libaom_build libyuv_build dav1d_build)
 if(APPLE OR UNIX)
-    add_dependencies(_webcodecs_py libvpx_build)
+    add_dependencies(webcodecs_ext libvpx_build)
 endif()
 if(INTEL_VPL_ENABLED)
-    add_dependencies(_webcodecs_py libvpl_download)
+    add_dependencies(webcodecs_ext libvpl_download)
 endif()
 
 # インクルードディレクトリ
-target_include_directories(_webcodecs_py PRIVATE
+target_include_directories(webcodecs_ext PRIVATE
     src/bindings
     ${OPUS_INSTALL_DIR}/include/opus
     ${FLAC_INSTALL_DIR}/include
@@ -489,14 +493,14 @@ target_include_directories(_webcodecs_py PRIVATE
     ${YUV_INSTALL_DIR}/include
 )
 if(APPLE OR UNIX)
-    target_include_directories(_webcodecs_py PRIVATE
+    target_include_directories(webcodecs_ext PRIVATE
         ${VPX_INSTALL_DIR}/include
     )
 endif()
 
 # NVIDIA Video Codec SDK を使用する場合のインクルードディレクトリ
 if(USE_NVIDIA_CUDA_TOOLKIT)
-    target_include_directories(_webcodecs_py PRIVATE
+    target_include_directories(webcodecs_ext PRIVATE
         ${NVCODEC_DIR}/Interface
         ${NVCODEC_DIR}/Utils
         ${NVCODEC_DIR}/NvCodec/NvEncoder
@@ -504,20 +508,20 @@ if(USE_NVIDIA_CUDA_TOOLKIT)
         ${CUDAToolkit_INCLUDE_DIRS}
     )
     # NvCodec ソースファイルを追加
-    target_sources(_webcodecs_py PRIVATE
+    target_sources(webcodecs_ext PRIVATE
         ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoder.cpp
         ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoderCuda.cpp
         ${NVCODEC_DIR}/NvCodec/NvDecoder/NvDecoder.cpp
     )
     # コンパイル定義を追加
-    target_compile_definitions(_webcodecs_py PRIVATE USE_NVIDIA_CUDA_TOOLKIT=1)
+    target_compile_definitions(webcodecs_ext PRIVATE USE_NVIDIA_CUDA_TOOLKIT=1)
 endif()
 
 # ライブラリをリンク
 # Windows では絶対パスを明確に指定
 if(WIN32)
     # Windows では文字列として扱って絶対パスを確保
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         "${OPUS_LIB}"
         "${FLAC_LIB}"
         "${AOM_LIB}"
@@ -525,9 +529,9 @@ if(WIN32)
         "${YUV_LIB}"
     )
     # FLAC を静的リンクする場合に必要
-    target_compile_definitions(_webcodecs_py PRIVATE FLAC__NO_DLL)
+    target_compile_definitions(webcodecs_ext PRIVATE FLAC__NO_DLL)
 else()
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         ${OPUS_LIB}
         ${FLAC_LIB}
         ${AOM_LIB}
@@ -538,14 +542,14 @@ endif()
 
 # libvpx (macOS / Linux)
 if(APPLE OR UNIX)
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         ${VPX_LIB}
     )
 endif()
 
 # macOS フレームワーク
 if(APPLE)
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         "-framework CoreFoundation"
         "-framework CoreVideo"
         "-framework VideoToolbox"
@@ -561,7 +565,7 @@ endif()
 # これにより、GPU がない環境でもモジュールをインポートできる
 if(USE_NVIDIA_CUDA_TOOLKIT)
     # dlopen/dlsym に必要
-    target_link_libraries(_webcodecs_py PRIVATE dl)
+    target_link_libraries(webcodecs_ext PRIVATE dl)
 endif()
 
 # Intel VPL (Linux のみ)
@@ -569,25 +573,25 @@ endif()
 # これにより、Intel GPU がない環境でもモジュールをインポートできる
 # C++ コードでは #if defined(__linux__) で判定する
 if(INTEL_VPL_ENABLED)
-    target_include_directories(_webcodecs_py PRIVATE ${VPL_DIR})
+    target_include_directories(webcodecs_ext PRIVATE ${VPL_DIR})
     # dlopen/dlsym に必要
-    target_link_libraries(_webcodecs_py PRIVATE dl)
+    target_link_libraries(webcodecs_ext PRIVATE dl)
 endif()
 
 # .pyi スタブファイルを生成
 nanobind_add_stub(
-    _webcodecs_py_stub
-    MODULE _webcodecs_py
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_webcodecs_py.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:_webcodecs_py>
-    DEPENDS _webcodecs_py
+    webcodecs_ext_stub
+    MODULE webcodecs_ext
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/webcodecs_ext.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:webcodecs_ext>
+    DEPENDS webcodecs_ext
 )
 
 # モジュールをインストール
-install(TARGETS _webcodecs_py LIBRARY DESTINATION webcodecs)
+install(TARGETS webcodecs_ext LIBRARY DESTINATION webcodecs)
 
 # .pyi スタブファイルをインストール
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/_webcodecs_py.pyi DESTINATION webcodecs)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/webcodecs_ext.pyi DESTINATION webcodecs)
 
 # py.typed マーカーファイルをインストール（型情報を含むパッケージであることを示す）
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/webcodecs/py.typed DESTINATION webcodecs)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OpenCV カメラキャプチャからエンコードして MP4 ファイルに保存するサンプル
+uvc-py カメラキャプチャからエンコードして MP4 ファイルに保存するサンプル
 
 必要な依存関係:
     uv sync --group example
@@ -18,8 +18,8 @@ import sys
 import threading
 import time
 
-import cv2
 import numpy as np
+import uvc
 
 from mp4 import (
     Mp4FileMuxer,
@@ -41,21 +41,6 @@ from webcodecs import (
     VideoFrameBufferInit,
     VideoPixelFormat,
 )
-
-
-def bgr_to_i420(bgr_frame: np.ndarray) -> np.ndarray:
-    """BGR フレームを I420 (YUV420p) フォーマットに変換する
-
-    Args:
-        bgr_frame: BGR フォーマットの numpy 配列 (height, width, 3)
-
-    Returns:
-        I420 フォーマットの numpy 配列 (height * 3 // 2, width)
-    """
-    # BGR → YUV 変換（OpenCV を使用）
-    yuv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2YUV_I420)
-
-    return yuv_frame
 
 
 class MP4Writer:
@@ -181,10 +166,8 @@ class MP4Writer:
                 frame_data, keyframe = item
 
                 # 最初のフレームでサンプルエントリーを作成
-                sample_entry = None
                 if self.sample_entry is None:
                     self.sample_entry = self._create_sample_entry()
-                    sample_entry = self.sample_entry
 
                 # H.264/H.265 の場合は Annex-B から length-prefixed に変換
                 if self.codec in ("h264", "h265"):
@@ -192,12 +175,13 @@ class MP4Writer:
 
                 sample = Mp4MuxSample(
                     track_kind="video",
-                    sample_entry=sample_entry,
+                    sample_entry=self.sample_entry,
                     keyframe=keyframe,
                     timescale=self.timescale,
                     duration=self.frame_duration,
                     data=frame_data,
                 )
+                assert self.muxer is not None
                 self.muxer.append_sample(sample)
                 self.frame_count += 1
                 self.sample_queue.task_done()
@@ -223,7 +207,7 @@ class MP4Writer:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="OpenCV カメラキャプチャからエンコードして MP4 ファイルに保存"
+        description="uvc-py カメラキャプチャからエンコードして MP4 ファイルに保存"
     )
     parser.add_argument("--width", type=int, default=640, help="映像の幅（デフォルト: 640）")
     parser.add_argument("--height", type=int, default=480, help="映像の高さ（デフォルト: 480）")
@@ -239,10 +223,10 @@ def main():
         help="コーデック（デフォルト: av1）",
     )
     parser.add_argument(
-        "--frames",
+        "--duration",
         type=int,
-        default=None,
-        help="キャプチャするフレーム数（デフォルト: 無制限、Ctrl+C で停止）",
+        default=30,
+        help="録画時間（秒）（デフォルト: 30）",
     )
     parser.add_argument(
         "--output", type=str, default="output.mp4", help="出力ファイル名（デフォルト: output.mp4）"
@@ -251,7 +235,7 @@ def main():
         "--raw-output",
         type=str,
         default=None,
-        help="エンコード前の生 I420 データを保存する Y4M ファイル名（オプション）",
+        help="エンコード前の生 NV12 データを保存する Y4M ファイル名（オプション）",
     )
     parser.add_argument("--camera", type=int, default=0, help="カメラデバイス番号（デフォルト: 0）")
 
@@ -259,62 +243,54 @@ def main():
 
     codec = args.codec
 
-    print("=== OpenCV カメラキャプチャ → エンコード ===")
+    print("=== uvc-py カメラキャプチャ -> エンコード ===")
     print(f"コーデック: {codec.upper()}")
     print(f"解像度: {args.width}x{args.height}")
     print(f"フレームレート: {args.fps} fps")
     print(f"ビットレート: {args.bitrate} bps")
-    print(f"フレーム数: {args.frames if args.frames is not None else '無制限 (Ctrl+C で停止)'}")
+    print(f"録画時間: {args.duration} 秒")
     print(f"出力ファイル: {args.output}")
     print()
 
-    # カメラを開く（macOS では AVFoundation バックエンドを使用）
-    camera = cv2.VideoCapture(args.camera, cv2.CAP_AVFOUNDATION)
-    if not camera.isOpened():
-        print(f"エラー: カメラ {args.camera} を開けませんでした", file=sys.stderr)
+    # カメラデバイス一覧を取得
+    devices = uvc.list_devices()
+    if not devices:
+        print("エラー: UVC デバイスが見つかりません", file=sys.stderr)
         return 1
 
-    # カメラの解像度と FPS を設定
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-    camera.set(cv2.CAP_PROP_FPS, args.fps)
+    print("利用可能なカメラ:")
+    for device_info in devices:
+        print(f"  [{device_info.index}] {device_info.name}")
+    print()
 
-    # FourCC フォーマットを明示的に設定（高品質な非圧縮フォーマットを優先）
-    # まず UYVY (YUV 4:2:2 非圧縮) を試す
-    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"UYVY"))
-    fourcc = camera.get(cv2.CAP_PROP_FOURCC)
-    fourcc_str = "".join([chr((int(fourcc) >> 8 * i) & 0xFF) for i in range(4)])
-    print(f"設定された FourCC: {fourcc_str}")
+    if args.camera >= len(devices):
+        print(f"エラー: カメラ {args.camera} が見つかりません", file=sys.stderr)
+        return 1
 
-    # UYVY が使えない場合は YUYV を試す
-    if fourcc == 0 or fourcc_str == "\x00\x00\x00\x00":
-        print("UYVY が使えないため YUYV を試します")
-        camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))
-        fourcc = camera.get(cv2.CAP_PROP_FOURCC)
-        fourcc_str = "".join([chr((int(fourcc) >> 8 * i) & 0xFF) for i in range(4)])
-        print(f"設定された FourCC: {fourcc_str}")
+    # カメラを開く
+    device = uvc.open(args.camera)
+    print(f"カメラをオープン: {device.info.name}")
 
-    # カメラの画質設定を最適化
-    # 自動露出を有効化（明るさ調整）
-    camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3)  # 3 = Auto mode
-    # 自動ホワイトバランスを有効化
-    camera.set(cv2.CAP_PROP_AUTO_WB, 1)
-    # オートフォーカスを有効化（対応カメラのみ）
-    camera.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+    # サポートされているフォーマットを表示
+    formats = device.get_supported_formats()
+    print("サポートされているフォーマット:")
+    for format_info in formats[:10]:
+        print(f"  {format_info}")
+    if len(formats) > 10:
+        print(f"  ... 他 {len(formats) - 10} 件")
+    print()
 
-    # 実際の解像度と fps を取得
-    actual_width = int(camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-    actual_height = int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    actual_fps = camera.get(cv2.CAP_PROP_FPS)
-    print(f"カメラの実際の解像度: {actual_width}x{actual_height}")
-    print(f"カメラの FPS 設定: {actual_fps}")
+    # キャプチャを開始（NV12 で直接キャプチャ）
+    device.start(
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        capture_format=uvc.Format.NV12,
+    )
 
-    # カメラ設定の確認
-    auto_exposure = camera.get(cv2.CAP_PROP_AUTO_EXPOSURE)
-    auto_wb = camera.get(cv2.CAP_PROP_AUTO_WB)
-    autofocus = camera.get(cv2.CAP_PROP_AUTOFOCUS)
-    print(f"カメラ設定: 自動露出={auto_exposure}, 自動WB={auto_wb}, オートフォーカス={autofocus}")
-    print("注意: FPS 設定値は参考値です。実際のキャプチャレートは録画後に表示されます。")
+    actual_width = args.width
+    actual_height = args.height
+    print(f"キャプチャ設定: {actual_width}x{actual_height} @ {args.fps} fps")
     print()
 
     # MP4 ライターを初期化
@@ -325,7 +301,7 @@ def main():
     raw_file = None
     if args.raw_output:
         raw_file = open(args.raw_output, "wb")
-        # Y4M ヘッダーを書き込み
+        # Y4M ヘッダーを書き込み（NV12 は C420jpeg として扱う）
         y4m_header = f"YUV4MPEG2 W{actual_width} H{actual_height} F{args.fps}:1 Ip A0:0 C420jpeg\n"
         raw_file.write(y4m_header.encode("ascii"))
         print(f"生データ出力: {args.raw_output}")
@@ -415,12 +391,12 @@ def main():
     start_time = time.time()
     last_frame_time = start_time
     try:
-        while args.frames is None or frame_count < args.frames:
-            ret, bgr_frame = camera.read()
+        target_frames = args.duration * args.fps
+        while frame_count < target_frames:
+            frame = device.get_frame()
+            if frame is None:
+                continue
             current_time = time.time()
-            if not ret:
-                print("エラー: フレームを読み込めませんでした", file=sys.stderr)
-                break
 
             # フレーム間隔をログ出力（最初の10フレームのみ）
             if frame_count < 10:
@@ -428,26 +404,39 @@ def main():
                 print(f"フレーム {frame_count}: 間隔 {interval:.1f} ms")
             last_frame_time = current_time
 
-            # BGR → I420 変換
-            i420_data = bgr_to_i420(bgr_frame)
+            # NV12 データを取得
+            y_plane, uv_plane = frame.to_nv12()
+            nv12_data = np.concatenate([y_plane.flatten(), uv_plane.flatten()])
 
-            # 生データを Y4M ファイルに保存（オプション）
-            if raw_file:
-                raw_file.write(b"FRAME\n")
-                raw_file.write(i420_data.tobytes())
-
-            # with 文で VideoFrame を使用（自動的に close される）
-            init: VideoFrameBufferInit = {
-                "format": VideoPixelFormat.I420,
+            # NV12 で VideoFrame を作成
+            nv12_init: VideoFrameBufferInit = {
+                "format": VideoPixelFormat.NV12,
                 "coded_width": actual_width,
                 "coded_height": actual_height,
                 "timestamp": timestamp,
             }
-            with VideoFrame(i420_data, init) as video_frame:
-                # エンコード（最初のフレームと 20 秒ごとにキーフレームを強制）
-                # WebCodecs API ではアプリケーション側で明示的にキーフレームを制御する
-                keyframe = frame_count == 0 or frame_count % (args.fps * 20) == 0
-                encoder.encode(video_frame, {"key_frame": keyframe})
+            with VideoFrame(nv12_data, nv12_init) as nv12_frame:
+                # libyuv を使って I420 に変換
+                i420_size = nv12_frame.allocation_size({"format": VideoPixelFormat.I420})
+                i420_data = np.zeros(i420_size, dtype=np.uint8)
+                nv12_frame.copy_to(i420_data, {"format": VideoPixelFormat.I420})
+
+                # 生データを Y4M ファイルに保存（オプション）
+                if raw_file:
+                    raw_file.write(b"FRAME\n")
+                    raw_file.write(i420_data.tobytes())
+
+                # I420 で VideoFrame を作成してエンコード
+                i420_init: VideoFrameBufferInit = {
+                    "format": VideoPixelFormat.I420,
+                    "coded_width": actual_width,
+                    "coded_height": actual_height,
+                    "timestamp": timestamp,
+                }
+                with VideoFrame(i420_data, i420_init) as video_frame:
+                    # エンコード（最初のフレームと 2 秒ごとにキーフレームを強制）
+                    keyframe = frame_count == 0 or frame_count % (args.fps * 2) == 0
+                    encoder.encode(video_frame, {"key_frame": keyframe})
 
             frame_count += 1
             timestamp += frame_duration
@@ -456,7 +445,7 @@ def main():
         print("\nキャプチャを中断しました")
     finally:
         # カメラと Y4M ファイルを必ず閉じる
-        camera.release()
+        device.stop()
         if raw_file:
             raw_file.close()
 

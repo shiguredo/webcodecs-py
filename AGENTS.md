@@ -62,6 +62,12 @@
 
 - `make format` でフォーマットすること
 
+### pyi スタブファイル
+
+- pyi ファイルは nanobind の stubgen で自動生成されるため、直接編集しないこと
+- 型情報を変更したい場合は C++ バインディングで nanobind の `nb::sig` を使用すること
+- `make develop` でビルドすると pyi ファイルが再生成される
+
 ## ビルド
 
 - ビルドは timeout は 300 秒以内に収めること

@@ -13,7 +13,9 @@ from webcodecs import (
     HardwareAccelerationEngine,
     VideoDecoder,
     VideoEncoder,
+    VideoEncoderConfig,
     VideoFrame,
+    VideoFrameBufferInit,
     VideoPixelFormat,
 )
 
@@ -29,7 +31,7 @@ def create_test_frame(width: int, height: int, timestamp: int) -> VideoFrame:
     y_size = width * height
     uv_size = width * height // 2
     data = np.full(y_size + uv_size, 128, dtype=np.uint8)
-    init = {
+    init: VideoFrameBufferInit = {
         "format": VideoPixelFormat.NV12,
         "coded_width": width,
         "coded_height": height,
@@ -68,7 +70,7 @@ def test_description(codec):
 
     # エンコード
     encoder = VideoEncoder(on_encode_output, on_encode_error)
-    config = {
+    config: VideoEncoderConfig = {
         "codec": codec,
         "width": 320,
         "height": 240,

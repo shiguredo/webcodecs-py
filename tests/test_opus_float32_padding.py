@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioEncoder,
     AudioEncoderConfig,
     AudioSampleFormat,
@@ -48,7 +49,7 @@ def test_opus_encoder_float32_padding():
     # AudioData を作成してエンコード
     frame = padded_samples.reshape(frame_size, 1)
     num_frames, num_channels = frame.shape
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": num_frames,
@@ -98,7 +99,7 @@ def test_float64_vs_float32_padding():
     # 正しい float32 配列で AudioData を作成
     frame = correct_padded.reshape(frame_size, 1)
     num_frames, num_channels = frame.shape
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": sample_rate,
         "number_of_frames": num_frames,

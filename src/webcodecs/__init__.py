@@ -2,7 +2,9 @@
 
 from typing import Any, TypedDict, NotRequired, Literal
 
-from ._webcodecs_py import (
+import numpy.typing
+
+from .webcodecs_ext import (
     # Video types
     VideoPixelFormat,
     VideoFrame,
@@ -38,7 +40,8 @@ from ._webcodecs_py import (
     VideoMatrixCoefficients,
     # Codec capabilities
     HardwareAccelerationEngine,
-    _get_video_codec_capabilities_impl,
+    # stubgen はプライベート関数をスキップするため type: ignore が必要
+    _get_video_codec_capabilities_impl,  # type: ignore[attr-defined]
 )
 
 
@@ -300,6 +303,20 @@ class VideoEncoderEncodeOptionsForHevc(TypedDict, total=False):
     quantizer: int | None
 
 
+class VideoEncoderEncodeOptionsForVp8(TypedDict, total=False):
+    """VP8 エンコードオプション (WebCodecs VP8 Codec Registration 準拠)"""
+
+    # 0-63 の範囲
+    quantizer: int | None
+
+
+class VideoEncoderEncodeOptionsForVp9(TypedDict, total=False):
+    """VP9 エンコードオプション (WebCodecs VP9 Codec Registration 準拠)"""
+
+    # 0-63 の範囲
+    quantizer: int | None
+
+
 class VideoEncoderEncodeOptions(TypedDict, total=False):
     """VideoEncoder.encode() のオプション"""
 
@@ -311,6 +328,10 @@ class VideoEncoderEncodeOptions(TypedDict, total=False):
     avc: VideoEncoderEncodeOptionsForAvc | None
     # HEVC 固有のオプション
     hevc: VideoEncoderEncodeOptionsForHevc | None
+    # VP8 固有のオプション
+    vp8: VideoEncoderEncodeOptionsForVp8 | None
+    # VP9 固有のオプション
+    vp9: VideoEncoderEncodeOptionsForVp9 | None
 
 
 # Support 型定義（is_config_supported の戻り値）
@@ -476,6 +497,8 @@ __all__ = [
     "VideoEncoderEncodeOptionsForAv1",
     "VideoEncoderEncodeOptionsForAvc",
     "VideoEncoderEncodeOptionsForHevc",
+    "VideoEncoderEncodeOptionsForVp8",
+    "VideoEncoderEncodeOptionsForVp9",
     # Support types
     "VideoEncoderSupport",
     "VideoDecoderSupport",

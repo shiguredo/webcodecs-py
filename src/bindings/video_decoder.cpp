@@ -26,22 +26,14 @@ VideoCodec VideoDecoder::string_to_codec(const std::string& codec) {
 }
 
 VideoDecoder::VideoDecoder(nb::object output, nb::object error)
-    : output_callback_([output](std::unique_ptr<VideoFrame> frame) {
-        if (output) {
-          nb::gil_scoped_acquire gil;
-          output(std::move(frame));
-        }
-      }),
-      error_callback_([error](const std::string& err) {
-        if (error) {
-          nb::gil_scoped_acquire gil;
-          error(err);
-        }
-      }),
-      dequeue_callback_(nullptr),
+    : output_callback_(output),
+      error_callback_(error),
       state_(CodecState::UNCONFIGURED),
       decoder_context_(nullptr),
-      config_() {  // デフォルトコンストラクタ
+      config_() {
+  // コールバックフラグを設定
+  has_output_callback_ = !output_callback_.is_none();
+  has_error_callback_ = !error_callback_.is_none();
   // コンストラクタではコーデックの初期化は行わない
   // configure() で初期化する
 }
@@ -129,15 +121,31 @@ void VideoDecoder::decode(const EncodedVideoChunk& chunk) {
     // シーケンス番号を設定して直接デコード
     current_sequence_ = next_sequence_number_++;
     bool success = decode_internal(chunk);
-    if (!success && error_callback_) {
-      nb::gil_scoped_acquire gil;
-      error_callback_("Decode failed");
+    if (!success) {
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
+        nb::gil_scoped_acquire gil;
+        error_cb("Decode failed");
+      }
     }
 
     // デキューコールバックを呼び出す
-    if (dequeue_callback_) {
+    nb::object dequeue_cb;
+    bool has_dequeue;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      dequeue_cb = dequeue_callback_;
+      has_dequeue = has_dequeue_callback_;
+    }
+    if (has_dequeue && !dequeue_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      dequeue_callback_();
+      dequeue_cb();
     }
     return;
   }
@@ -157,10 +165,16 @@ void VideoDecoder::decode(const EncodedVideoChunk& chunk) {
   queue_cv_.notify_one();
 
   // デキューコールバックを呼び出す
-  if (dequeue_callback_) {
-    // ここでは GIL を解放中なので、取得が必要
+  nb::object dequeue_cb;
+  bool has_dequeue;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
+  }
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    dequeue_callback_();
+    dequeue_cb();
   }
 }
 
@@ -207,10 +221,19 @@ void VideoDecoder::flush() {
     }
 
     // コールバックを呼び出す（GIL を取得）
-    if (output_callback_ && !frames_to_output.empty()) {
+    nb::object output_cb;
+    bool has_output;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      output_cb = output_callback_;
+      has_output = has_output_callback_;
+    }
+    if (has_output && !frames_to_output.empty()) {
       nb::gil_scoped_acquire gil;
       for (auto& frame : frames_to_output) {
-        output_callback_(std::move(frame));
+        if (!output_cb.is_none()) {
+          output_cb(nb::cast(frame.release(), nb::rv_policy::take_ownership));
+        }
       }
     }
 
@@ -532,23 +555,40 @@ bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
     case VideoCodec::AV1:
       return decode_dav1d(chunk);
     case VideoCodec::H264:
-    case VideoCodec::H265:
+    case VideoCodec::H265: {
       // H.264/H.265 は uses_apple_video_toolbox()/uses_intel_vpl() で処理されるため、ここには到達しない
-      if (error_callback_) {
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
         nb::gil_scoped_acquire gil;
-        error_callback_("H.264/H.265 not supported on this platform");
+        error_cb("H.264/H.265 not supported on this platform");
       }
       return false;
+    }
     case VideoCodec::VP8:
     case VideoCodec::VP9:
 #if defined(__APPLE__) || defined(__linux__)
       return decode_vpx(chunk);
 #else
-      if (error_callback_) {
+    {
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
         nb::gil_scoped_acquire gil;
-        error_callback_("VP8/VP9 not supported on this platform");
+        error_cb("VP8/VP9 not supported on this platform");
       }
       return false;
+    }
 #endif
     default:
       return false;
@@ -691,9 +731,16 @@ void VideoDecoder::process_decode_task(const DecodeTask& task) {
 
   if (!success) {
     // エラー処理
-    if (error_callback_) {
+    nb::object error_cb;
+    bool has_error;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      error_cb = error_callback_;
+      has_error = has_error_callback_;
+    }
+    if (has_error && !error_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      error_callback_(std::string("Failed to decode chunk"));
+      error_cb(std::string("Failed to decode chunk"));
     }
   }
 
@@ -722,11 +769,19 @@ void VideoDecoder::handle_output(uint64_t sequence,
   }
 
   // コールバックを呼び出す（GIL を取得）
-  if (output_callback_ && !frames_to_output.empty()) {
+  nb::object output_cb;
+  bool has_output;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_cb = output_callback_;
+    has_output = has_output_callback_;
+  }
+  if (has_output && !frames_to_output.empty()) {
     nb::gil_scoped_acquire gil;
-    for (auto& frame : frames_to_output) {
-      if (frame) {  // null チェック
-        output_callback_(std::move(frame));
+    for (auto& output_frame : frames_to_output) {
+      if (output_frame && !output_cb.is_none()) {
+        output_cb(
+            nb::cast(output_frame.release(), nb::rv_policy::take_ownership));
       }
     }
   }
@@ -795,33 +850,13 @@ void init_video_decoder(nb::module_& m) {
                   "webcodecs.VideoDecoderConfig, /) -> "
                   "webcodecs.VideoDecoderSupport"))
       .def(
-          "on_output",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_output([callback](std::unique_ptr<VideoFrame> frame) {
-              nb::gil_scoped_acquire gil;
-              callback(frame.release());
-            });
-          },
+          "on_output", &VideoDecoder::on_output,
           nb::sig("def on_output(self, callback: typing.Callable[[VideoFrame], "
                   "None], /) -> None"))
-      .def(
-          "on_error",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_error([callback](const std::string& error) {
-              nb::gil_scoped_acquire gil;
-              callback(error);
-            });
-          },
-          nb::sig("def on_error(self, callback: typing.Callable[[str], None], "
-                  "/) -> None"))
-      .def(
-          "on_dequeue",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_dequeue([callback]() {
-              nb::gil_scoped_acquire gil;
-              callback();
-            });
-          },
-          nb::sig("def on_dequeue(self, callback: typing.Callable[[], None], "
-                  "/) -> None"));
+      .def("on_error", &VideoDecoder::on_error,
+           nb::sig("def on_error(self, callback: typing.Callable[[str], None], "
+                   "/) -> None"))
+      .def("on_dequeue", &VideoDecoder::on_dequeue,
+           nb::sig("def on_dequeue(self, callback: typing.Callable[[], None], "
+                   "/) -> None"));
 }

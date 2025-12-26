@@ -119,11 +119,16 @@ void AudioDecoder::decode(const EncodedAudioChunk& chunk) {
   queue_cv_.notify_one();
 
   // デキューコールバックを呼び出す
-  if (has_dequeue_callback_) {
+  nb::object dequeue_cb;
+  bool has_dequeue;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
+  }
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    if (!dequeue_callback_.is_none()) {
-      dequeue_callback_();
-    }
+    dequeue_cb();
   }
 }
 
@@ -132,11 +137,16 @@ void AudioDecoder::handle_decoded_frame(std::unique_ptr<AudioData> data) {
   handle_output(current_sequence_, std::move(data));
 
   // デキューコールバックが設定されている場合は呼び出す
-  if (has_dequeue_callback_) {
+  nb::object dequeue_cb;
+  bool has_dequeue;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
+  }
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    if (!dequeue_callback_.is_none()) {
-      dequeue_callback_();
-    }
+    dequeue_cb();
   }
 }
 
@@ -337,11 +347,19 @@ void AudioDecoder::handle_output(uint64_t sequence,
   }
 
   // コールバックを呼び出す（GIL を取得）
-  if (has_output_callback_ && !data_to_output.empty()) {
+  nb::object output_cb;
+  bool has_output;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_cb = output_callback_;
+    has_output = has_output_callback_;
+  }
+  if (has_output && !data_to_output.empty()) {
     nb::gil_scoped_acquire gil;
     for (auto& audio_data : data_to_output) {
-      if (!output_callback_.is_none()) {
-        output_callback_(audio_data.release());
+      if (!output_cb.is_none()) {
+        output_cb(
+            nb::cast(audio_data.release(), nb::rv_policy::take_ownership));
       }
     }
   }

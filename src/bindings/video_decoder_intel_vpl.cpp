@@ -337,9 +337,16 @@ void VideoDecoder::flush_intel_vpl() {
     }
 
     // flush では直接コールバックを呼ぶ
-    if (output_callback_) {
+    nb::object output_cb;
+    bool has_output;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      output_cb = output_callback_;
+      has_output = has_output_callback_;
+    }
+    if (has_output && !output_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      output_callback_(std::move(frame));
+      output_cb(nb::cast(frame.release(), nb::rv_policy::take_ownership));
     }
   }
 
