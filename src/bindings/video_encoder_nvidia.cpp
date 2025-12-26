@@ -9,6 +9,7 @@
 #include <nvEncodeAPI.h>
 
 #include <cstring>
+#include <mutex>
 #include <stdexcept>
 
 #include "../dyn/cuda.h"
@@ -20,22 +21,28 @@ namespace nb = nanobind;
 
 namespace {
 
+// NVENC API 初期化用の静的変数
+std::once_flag nvenc_init_flag;
+NV_ENCODE_API_FUNCTION_LIST nvenc_funcs = {};
+bool nvenc_initialized = false;
+std::string nvenc_init_error_message;
+
 // NVENC API 関数テーブルをロードするヘルパー
+// std::call_once でスレッドセーフに初期化
 NV_ENCODE_API_FUNCTION_LIST* load_nvenc_api() {
-  static NV_ENCODE_API_FUNCTION_LIST nvenc_funcs = {};
-  static bool initialized = false;
+  std::call_once(nvenc_init_flag, []() {
+    nvenc_funcs.version = NV_ENCODE_API_FUNCTION_LIST_VER;
+    NVENCSTATUS status = dyn::NvEncodeAPICreateInstance(&nvenc_funcs);
+    if (status != NV_ENC_SUCCESS) {
+      nvenc_init_error_message = "Failed to create NVENC API instance";
+      return;
+    }
+    nvenc_initialized = true;
+  });
 
-  if (initialized) {
-    return &nvenc_funcs;
+  if (!nvenc_initialized) {
+    throw std::runtime_error(nvenc_init_error_message);
   }
-
-  nvenc_funcs.version = NV_ENCODE_API_FUNCTION_LIST_VER;
-  NVENCSTATUS status = dyn::NvEncodeAPICreateInstance(&nvenc_funcs);
-  if (status != NV_ENC_SUCCESS) {
-    throw std::runtime_error("Failed to create NVENC API instance");
-  }
-
-  initialized = true;
   return &nvenc_funcs;
 }
 

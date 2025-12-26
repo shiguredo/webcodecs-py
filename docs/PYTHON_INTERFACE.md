@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-09
+- 最終更新: 2025-12-26
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -1458,6 +1458,78 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 - `close()` メソッドによる明示的なリソース解放をサポート
 - ワーカースレッドでの shared_ptr 使用によるメモリ安全性の確保
 
+## Free Threading 対応
+
+Python 3.13t / 3.14t の Free Threading ビルド（GIL 無効化）に対応しています。
+
+### 対応状況
+
+| クラス | 対応状況 | 備考 |
+|--------|----------|------|
+| VideoEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoFrame | - | コールバック機構なし（対応不要） |
+| AudioData | - | コールバック機構なし（対応不要） |
+| EncodedVideoChunk | - | イミュータブル（対応不要） |
+| EncodedAudioChunk | - | イミュータブル（対応不要） |
+
+### サポートプラットフォーム
+
+| プラットフォーム | Python 3.13t | Python 3.14t |
+|------------------|--------------|--------------|
+| macOS | o | o |
+| Ubuntu | o | o |
+| Windows | o | x（nanobind ビルドの問題） |
+
+### 実装詳細
+
+Free Threading 環境でのスレッドセーフ性を確保するため、以下の同期メカニズムを使用しています:
+
+- **`nb::ft_mutex`**: Python オブジェクト（コールバック）の保護
+- **`std::mutex`**: C++ 内部状態（キュー、バッファ）の保護
+- **`std::atomic<>`**: スレッドセーフなフラグ管理
+
+コールバックの変更と呼び出しは排他制御されており、複数スレッドから同時にアクセスしても安全です:
+
+```python
+import threading
+from webcodecs import VideoEncoder, VideoEncoderConfig
+
+def on_output(chunk, metadata=None):
+    pass
+
+def on_error(err):
+    pass
+
+encoder = VideoEncoder(on_output, on_error)
+encoder.configure({
+    "codec": "av01.0.04M.08",
+    "width": 320,
+    "height": 240,
+})
+
+# 複数スレッドから同時にコールバックを変更しても安全
+def modify_callback(thread_id):
+    for i in range(100):
+        def new_output(chunk, metadata=None, tid=thread_id, idx=i):
+            pass
+        encoder.on_output(new_output)
+
+threads = [threading.Thread(target=modify_callback, args=(i,)) for i in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+encoder.close()
+```
+
+### GIL ビルドとの互換性
+
+Free Threading 対応コードは GIL ビルド（通常の Python）でも動作します。`nb::ft_mutex` は GIL ビルドではノーオペレーションとなるため、パフォーマンスへの影響はありません。
+
 ## メモリ管理とパフォーマンス
 
 ### メモリ管理の実装方式
@@ -1492,8 +1564,9 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
    - planes() でビューを取得した場合、VideoFrame/AudioData の生存期間に注意
    - ハードウェアエンコーダーを使用する場合は copy_to() を推奨
 1. **スレッドセーフティ**
-   - エンコーダー/デコーダーはシングルスレッドでの使用を想定
-   - 複数スレッドから同時アクセスする場合は外部で同期が必要
+   - エンコーダー/デコーダーは Free Threading 環境（Python 3.13t / 3.14t）でスレッドセーフ
+   - コールバックの変更・呼び出しは内部で排他制御される
+   - 詳細は「Free Threading 対応」セクションを参照
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ

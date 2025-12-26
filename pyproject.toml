@@ -1,6 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "nanobind>=2.10.1", "meson>=1.9"]
-
+requires = ["scikit-build-core", "nanobind>=2.10.2", "meson>=1.9"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -54,7 +53,8 @@ build-dir = "_build/{wheel_tag}"
 verbose = false
 
 [tool.scikit-build.cmake]
-version = ">=4.1"
+version = ">=4.2"
+define = { "CMAKE_CXX_STANDARD" = "20" }
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
 # 環境変数 USE_NVIDIA_CUDA_TOOLKIT=1 が設定されている場合
