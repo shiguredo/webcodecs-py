@@ -1530,7 +1530,7 @@ Python 3.13t / 3.14t の Free Threading ビルド（GIL 無効化）に対応し
 | VideoDecoder | o | コールバックの並列変更・呼び出しに対応 |
 | AudioEncoder | o | コールバックの並列変更・呼び出しに対応 |
 | AudioDecoder | o | コールバックの並列変更・呼び出しに対応 |
-| VideoFrame | - | コールバック機構なし（対応不要） |
+| VideoFrame | - | コールバック機構なし（対応不要）、native_buffer 含む |
 | AudioData | - | コールバック機構なし（対応不要） |
 | EncodedVideoChunk | - | イミュータブル（対応不要） |
 | EncodedAudioChunk | - | イミュータブル（対応不要） |
