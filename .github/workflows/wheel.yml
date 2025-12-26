@@ -142,7 +142,9 @@ jobs:
             runs_on: windows-2025
         python_version:
           - "3.14"
-          - "3.14t"
+          # Windows の Python 3.14t (free-threaded) は nanobind のビルドで
+          # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
+          # - "3.14t"
           - "3.13"
           - "3.13t"
           - "3.12"
