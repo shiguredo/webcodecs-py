@@ -206,7 +206,10 @@ encoder.close()
 ## Python
 
 - 3.14
+- 3.14t
+  - Windows のみ非対応
 - 3.13
+- 3.13t
 - 3.12
 
 ## プラットフォーム
@@ -217,8 +220,8 @@ encoder.close()
 - Ubuntu 24.04 LTS arm64
 - Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
-- Windows 11 x86_64
 - Windows Server 2025 x86_64
+- Windows 11 x86_64
 
 ## ビルド
 
