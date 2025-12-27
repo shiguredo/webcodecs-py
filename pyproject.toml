@@ -81,6 +81,9 @@ python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Property-Based Testing (PBT) は prop_ prefix を使用する
+python_files = ["test_*.py", "prop_*.py"]
+python_functions = ["test_*", "prop_*"]
 # benchmark を有効にした場合は以下をコメントアウトする
 # python_files = ["test_*.py", "bench_*.py"]
 # addopts = "--benchmark-disable"
