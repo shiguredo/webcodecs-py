@@ -10,7 +10,7 @@ wheels/
 .venv/
 .pytest_cache/
 .ruff_cache/
-
+.hypothesis/
 
 # CMake dependencies
 _deps/
