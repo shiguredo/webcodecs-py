@@ -70,35 +70,29 @@ include(ExternalProject)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/deps.json DEPS_JSON)
 
 # Opus の設定を解析
-string(JSON OPUS_VERSION GET ${DEPS_JSON} libopus version)
-string(JSON OPUS_GIT_REPOSITORY GET ${DEPS_JSON} libopus repository)
-set(OPUS_GIT_TAG "v${OPUS_VERSION}")
+string(JSON OPUS_GIT_TAG GET ${DEPS_JSON} libopus tag)
+string(JSON OPUS_GIT_REPOSITORY GET ${DEPS_JSON} libopus url)
 
 # FLAC の設定を解析
-string(JSON FLAC_VERSION GET ${DEPS_JSON} libflac version)
-string(JSON FLAC_GIT_REPOSITORY GET ${DEPS_JSON} libflac repository)
-set(FLAC_GIT_TAG "${FLAC_VERSION}")
+string(JSON FLAC_GIT_TAG GET ${DEPS_JSON} libflac tag)
+string(JSON FLAC_GIT_REPOSITORY GET ${DEPS_JSON} libflac url)
 
 # AOM の設定を解析
-string(JSON AOM_VERSION GET ${DEPS_JSON} libaom version)
-string(JSON AOM_GIT_REPOSITORY GET ${DEPS_JSON} libaom repository)
-set(AOM_GIT_TAG "v${AOM_VERSION}")  # タグ用に v プレフィックスを追加
+string(JSON AOM_GIT_TAG GET ${DEPS_JSON} libaom tag)
+string(JSON AOM_GIT_REPOSITORY GET ${DEPS_JSON} libaom url)
 
 # dav1d の設定を解析
-string(JSON DAV1D_VERSION GET ${DEPS_JSON} libdav1d version)
-string(JSON DAV1D_GIT_REPOSITORY GET ${DEPS_JSON} libdav1d repository)
-set(DAV1D_GIT_TAG "${DAV1D_VERSION}")
+string(JSON DAV1D_GIT_TAG GET ${DEPS_JSON} libdav1d tag)
+string(JSON DAV1D_GIT_REPOSITORY GET ${DEPS_JSON} libdav1d url)
 
 # YUV の設定を解析
-string(JSON YUV_VERSION GET ${DEPS_JSON} libyuv version)
-string(JSON YUV_GIT_REPOSITORY GET ${DEPS_JSON} libyuv repository)
-set(YUV_GIT_TAG ${YUV_VERSION})  # コミットハッシュを使用
+string(JSON YUV_GIT_REF GET ${DEPS_JSON} libyuv ref)
+string(JSON YUV_GIT_REPOSITORY GET ${DEPS_JSON} libyuv url)
 
 # VPL の設定を解析（Linux のみ）
 if(NOT APPLE AND NOT WIN32)
-    string(JSON VPL_VERSION GET ${DEPS_JSON} libvpl version)
-    string(JSON VPL_GIT_REPOSITORY GET ${DEPS_JSON} libvpl repository)
-    set(VPL_GIT_TAG "v${VPL_VERSION}")
+    string(JSON VPL_GIT_TAG GET ${DEPS_JSON} libvpl tag)
+    string(JSON VPL_GIT_REPOSITORY GET ${DEPS_JSON} libvpl url)
 endif()
 
 # 静的ライブラリのビルドオプションを設定
@@ -118,9 +112,9 @@ endif()
 
 # ========== libopus ==========
 message(STATUS "Setting up libopus...")
-set(OPUS_SOURCE_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/source")
-set(OPUS_BUILD_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/build")
-set(OPUS_INSTALL_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/install")
+set(OPUS_SOURCE_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/source")
+set(OPUS_BUILD_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/build")
+set(OPUS_INSTALL_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -166,9 +160,9 @@ endif()
 
 # ========== libflac ==========
 message(STATUS "Setting up libflac...")
-set(FLAC_SOURCE_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/source")
-set(FLAC_BUILD_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/build")
-set(FLAC_INSTALL_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/install")
+set(FLAC_SOURCE_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/source")
+set(FLAC_BUILD_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/build")
+set(FLAC_INSTALL_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -215,9 +209,9 @@ endif()
 
 # ========== libaom ==========
 message(STATUS "Setting up libaom...")
-set(AOM_SOURCE_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/source")
-set(AOM_BUILD_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/build")
-set(AOM_INSTALL_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/install")
+set(AOM_SOURCE_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/source")
+set(AOM_BUILD_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/build")
+set(AOM_INSTALL_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -266,9 +260,9 @@ endif()
 
 # ========== dav1d ==========
 message(STATUS "Setting up dav1d...")
-set(DAV1D_SOURCE_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/source")
-set(DAV1D_BUILD_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/build")
-set(DAV1D_INSTALL_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/install")
+set(DAV1D_SOURCE_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/source")
+set(DAV1D_BUILD_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/build")
+set(DAV1D_INSTALL_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/install")
 
 # Windows でも meson は libdav1d.a として生成する（MSVC でもリンク可能）
 set(DAV1D_LIB ${DAV1D_INSTALL_DIR}/lib/libdav1d.a)
@@ -306,9 +300,9 @@ endif()
 
 # ========== libyuv ==========
 message(STATUS "Setting up libyuv...")
-set(YUV_SOURCE_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/source")
-set(YUV_BUILD_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/build")
-set(YUV_INSTALL_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/install")
+set(YUV_SOURCE_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/source")
+set(YUV_BUILD_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/build")
+set(YUV_INSTALL_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -326,7 +320,7 @@ else()
     ExternalProject_Add(
         libyuv_build
         GIT_REPOSITORY ${YUV_GIT_REPOSITORY}
-        GIT_TAG ${YUV_GIT_TAG}
+        GIT_TAG ${YUV_GIT_REF}
         GIT_SHALLOW FALSE
         SOURCE_DIR ${YUV_SOURCE_DIR}
         BINARY_DIR ${YUV_BUILD_DIR}
@@ -348,7 +342,7 @@ endif()
 # ========== libvpl (Linux のみ、ヘッダーのみ) ==========
 if(INTEL_VPL_ENABLED)
     message(STATUS "Setting up libvpl...")
-    set(VPL_SOURCE_DIR "${DEPS_DIR}/vpl/${VPL_VERSION}/source")
+    set(VPL_SOURCE_DIR "${DEPS_DIR}/vpl/${VPL_GIT_TAG}/source")
 
     # ヘッダーディレクトリの存在チェック
     if(EXISTS "${VPL_SOURCE_DIR}/api/vpl/mfx.h")
@@ -378,14 +372,13 @@ endif()
 # ========== libvpx (macOS / Linux) ==========
 if(APPLE OR UNIX)
     # VPX の設定を解析
-    string(JSON VPX_VERSION GET ${DEPS_JSON} libvpx version)
-    string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx repository)
-    set(VPX_GIT_TAG "v${VPX_VERSION}")
+    string(JSON VPX_GIT_TAG GET ${DEPS_JSON} libvpx tag)
+    string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx url)
 
     message(STATUS "Setting up libvpx...")
-    set(VPX_SOURCE_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/source")
-    set(VPX_BUILD_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/build")
-    set(VPX_INSTALL_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/install")
+    set(VPX_SOURCE_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/source")
+    set(VPX_BUILD_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/build")
+    set(VPX_INSTALL_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/install")
 
     set(VPX_LIB ${VPX_INSTALL_DIR}/lib/libvpx.a)
 
