@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-09
+- 最終更新: 2025-12-26
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -288,7 +288,7 @@ destination = np.zeros(chunk.byte_length, dtype=np.uint8)
 chunk.copy_to(destination)
 ```
 
-**ゼロコピーアクセス**: コピーが不要な場合は `planes()` メソッド（独自拡張）を使用してください。
+**直接アクセス**: 内部バッファに直接アクセスする場合は `planes()` メソッド（独自拡張）を使用してください。
 
 ## 基本的な利用例
 
@@ -752,6 +752,7 @@ print(result["capture_time"])  # 1234567890.0
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
 | **`planes()`** | o | x | o | **独自拡張**: 全プレーン (Y, U, V) をタプルで返す（I420/I422/I444 のみ） |
 | **`plane()`** | o | x | o | **独自拡張**: 指定したプレーンを返す（全フォーマット対応） |
+| **`native_buffer`** | o | x | o | **独自拡張**: ネイティブバッファ（PyCapsule）を保持するプロパティ（macOS のみ） |
 
 **clone() の動作**:
 
@@ -826,13 +827,13 @@ def on_output(chunk, metadata=None):
 
 #### planes() メソッド
 
-**ゼロコピービューを返す独自拡張メソッド**
+**内部バッファに直接アクセスする独自拡張メソッド**
 
 ```python
 def planes() -> tuple[ndarray, ndarray, ndarray]
 ```
 
-- **目的**: 高速なメモリアクセスが必要な場合に、データのコピーを作成せずに直接プレーンへのビューを提供
+- **目的**: 内部バッファに直接アクセスし、入出力に利用できる ndarray を返す
 - **対応フォーマット**: I420, I422, I444
 - **戻り値**: (Y プレーン, U プレーン, V プレーン) のタプル
 - **注意事項**:
@@ -858,26 +859,85 @@ init: VideoFrameBufferInit = {
 
 frame = VideoFrame(data, init)
 
-# ゼロコピービューを取得
+# 内部バッファに直接アクセス
 y_plane, u_plane, v_plane = frame.planes()
 
 # ビューへの書き込みは元のデータを変更
 y_plane[:] = 235  # 元の data も変更される
 ```
 
+#### native_buffer プロパティ
+
+**エンコーダーが直接利用できるプロパティ（macOS 専用）**
+
+```python
+native_buffer: object | None  # 読み書き可能
+```
+
+- **目的**: CVPixelBufferRef を保持し、Video Toolbox エンコーダーが直接利用できる
+- **対応プラットフォーム**: macOS のみ
+- **形式**: PyCapsule（名前: `"CVPixelBufferRef"`）
+
+**コンストラクタでの使用**:
+
+VideoFrame は data (numpy.ndarray) の代わりに PyCapsule を直接受け取ることができます:
+
+```python
+import ctypes
+from webcodecs import VideoFrame, VideoPixelFormat
+
+# CVPixelBufferRef を PyCapsule でラップ（実際のコードでは外部から取得）
+# capsule = create_cv_pixel_buffer_capsule(cv_pixel_buffer_ref)
+
+frame = VideoFrame(
+    capsule,  # data の代わりに PyCapsule を渡す
+    {
+        "format": VideoPixelFormat.NV12,
+        "coded_width": 640,
+        "coded_height": 480,
+        "timestamp": 0,
+    },
+)
+
+# エンコーダーが直接利用する
+encoder.encode(frame)
+```
+
+**制限事項**:
+
+native_buffer のみで作成した VideoFrame では、以下のメソッドは使用できません（RuntimeError が発生）:
+
+- `plane()` - プレーンデータにアクセスできない
+- `planes()` - プレーンデータにアクセスできない
+- `copy_to()` - データをコピーできない
+- `clone()` - データをコピーできない
+
+これらのメソッドが必要な場合は、data (numpy.ndarray) を使用して VideoFrame を作成してください。
+
+**ユースケース**:
+
+- カメラキャプチャから直接取得した CVPixelBufferRef をエンコード
+- GPU レンダリング結果の CVPixelBufferRef をエンコード
+- メモリコピーを最小化したリアルタイム処理
+
 ### VideoFrame のメモリ管理
 
-VideoFrame は以下の 2 つのモードで動作します：
+VideoFrame は以下の 3 つのモードで動作します：
 
 1. **外部メモリ参照モード** (コンストラクタで ndarray を渡した場合)
    - 元の ndarray への参照を保持
-   - planes() メソッドはゼロコピービューを返す
+   - planes() メソッドは内部バッファに直接アクセスできる
    - copy_to() メソッドはデータのコピーを返す
 
 2. **内部メモリ所有モード** (width, height, format で作成した場合)
    - 内部でメモリを確保し所有
    - planes() メソッドは内部メモリへのビューを返す
    - copy_to() メソッドはデータのコピーを返す
+
+3. **native_buffer モード** (コンストラクタで PyCapsule を渡した場合、macOS のみ)
+   - CVPixelBufferRef への参照のみを保持（データは保持しない）
+   - planes() / plane() / copy_to() は使用不可（RuntimeError）
+   - Video Toolbox エンコーダーが直接利用可能
 
 ## その他の型定義
 
@@ -949,10 +1009,6 @@ from webcodecs import VideoFrame, VideoPixelFormat
 from PIL import Image
 img = Image.open("image.png").convert("RGB")
 rgb_data = np.array(img)  # shape: (height, width, 3)
-
-# OpenCV との連携例
-import cv2
-bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ```
 
 #### AudioSampleFormat
@@ -1462,6 +1518,78 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 - `close()` メソッドによる明示的なリソース解放をサポート
 - ワーカースレッドでの shared_ptr 使用によるメモリ安全性の確保
 
+## Free Threading 対応
+
+Python 3.13t / 3.14t の Free Threading ビルド（GIL 無効化）に対応しています。
+
+### 対応状況
+
+| クラス | 対応状況 | 備考 |
+|--------|----------|------|
+| VideoEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoFrame | - | コールバック機構なし（対応不要）、native_buffer 含む |
+| AudioData | - | コールバック機構なし（対応不要） |
+| EncodedVideoChunk | - | イミュータブル（対応不要） |
+| EncodedAudioChunk | - | イミュータブル（対応不要） |
+
+### サポートプラットフォーム
+
+| プラットフォーム | Python 3.13t | Python 3.14t |
+|------------------|--------------|--------------|
+| macOS | o | o |
+| Ubuntu | o | o |
+| Windows | o | x（nanobind ビルドの問題） |
+
+### 実装詳細
+
+Free Threading 環境でのスレッドセーフ性を確保するため、以下の同期メカニズムを使用しています:
+
+- **`nb::ft_mutex`**: Python オブジェクト（コールバック）の保護
+- **`std::mutex`**: C++ 内部状態（キュー、バッファ）の保護
+- **`std::atomic<>`**: スレッドセーフなフラグ管理
+
+コールバックの変更と呼び出しは排他制御されており、複数スレッドから同時にアクセスしても安全です:
+
+```python
+import threading
+from webcodecs import VideoEncoder, VideoEncoderConfig
+
+def on_output(chunk, metadata=None):
+    pass
+
+def on_error(err):
+    pass
+
+encoder = VideoEncoder(on_output, on_error)
+encoder.configure({
+    "codec": "av01.0.04M.08",
+    "width": 320,
+    "height": 240,
+})
+
+# 複数スレッドから同時にコールバックを変更しても安全
+def modify_callback(thread_id):
+    for i in range(100):
+        def new_output(chunk, metadata=None, tid=thread_id, idx=i):
+            pass
+        encoder.on_output(new_output)
+
+threads = [threading.Thread(target=modify_callback, args=(i,)) for i in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+encoder.close()
+```
+
+### GIL ビルドとの互換性
+
+Free Threading 対応コードは GIL ビルド（通常の Python）でも動作します。`nb::ft_mutex` は GIL ビルドではノーオペレーションとなるため、パフォーマンスへの影響はありません。
+
 ## メモリ管理とパフォーマンス
 
 ### メモリ管理の実装方式
@@ -1496,8 +1624,9 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
    - planes() でビューを取得した場合、VideoFrame/AudioData の生存期間に注意
    - ハードウェアエンコーダーを使用する場合は copy_to() を推奨
 1. **スレッドセーフティ**
-   - エンコーダー/デコーダーはシングルスレッドでの使用を想定
-   - 複数スレッドから同時アクセスする場合は外部で同期が必要
+   - エンコーダー/デコーダーは Free Threading 環境（Python 3.13t / 3.14t）でスレッドセーフ
+   - コールバックの変更・呼び出しは内部で排他制御される
+   - 詳細は「Free Threading 対応」セクションを参照
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ

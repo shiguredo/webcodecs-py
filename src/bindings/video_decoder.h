@@ -1,11 +1,8 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/function.h>
-#include <nanobind/stl/unique_ptr.h>
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -43,9 +40,6 @@ enum class VideoCodec {
 
 class VideoDecoder {
  public:
-  using OutputCallback = std::function<void(std::unique_ptr<VideoFrame>)>;
-  using ErrorCallback = std::function<void(const std::string&)>;
-
   // デコードタスクを表す構造体
   struct DecodeTask {
     std::optional<EncodedVideoChunk> chunk;
@@ -72,10 +66,20 @@ class VideoDecoder {
       const VideoDecoderConfig& config);
 
   // Callback setters
-  void on_output(OutputCallback callback) { output_callback_ = callback; }
-  void on_error(ErrorCallback callback) { error_callback_ = callback; }
-  void on_dequeue(std::function<void()> callback) {
+  void on_output(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_callback_ = callback;
+    has_output_callback_ = !callback.is_none();
+  }
+  void on_error(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    error_callback_ = callback;
+    has_error_callback_ = !callback.is_none();
+  }
+  void on_dequeue(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     dequeue_callback_ = callback;
+    has_dequeue_callback_ = !callback.is_none();
   }
 
   // VideoToolbox コールバック用に public にする
@@ -83,9 +87,13 @@ class VideoDecoder {
                      std::unique_ptr<VideoFrame> frame);  // 出力処理
 
  private:
-  OutputCallback output_callback_;
-  ErrorCallback error_callback_;
-  std::function<void()> dequeue_callback_;
+  nb::object output_callback_;
+  nb::object error_callback_;
+  nb::object dequeue_callback_;
+  nb::ft_mutex callback_mutex_;  // Free-Threading 用コールバック保護
+  bool has_output_callback_{false};
+  bool has_error_callback_{false};
+  bool has_dequeue_callback_{false};
   CodecState state_;
   VideoDecoderConfig config_;     // 内部で保持する設定
   CodecParameters codec_params_;  // パースしたコーデックパラメータ

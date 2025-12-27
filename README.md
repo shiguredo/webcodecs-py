@@ -31,6 +31,7 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
   - H.264 / H.265 のハードウェアエンコード/デコードに対応
   - VP9 / AV1 デコードに対応
     - AV1 デコードは M3 チップ以降で利用できる
+  - CVPixelBufferRef をエンコーダーが直接利用可能
 - Ubuntu x86_64 にて NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応
   - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
   - AAC エンコード/デコードに対応
@@ -206,7 +207,10 @@ encoder.close()
 ## Python
 
 - 3.14
+- 3.14t
+  - Windows のみ非対応
 - 3.13
+- 3.13t
 - 3.12
 
 ## プラットフォーム
@@ -217,8 +221,8 @@ encoder.close()
 - Ubuntu 24.04 LTS arm64
 - Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
-- Windows 11 x86_64
 - Windows Server 2025 x86_64
+- Windows 11 x86_64
 
 ## ビルド
 

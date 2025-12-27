@@ -409,60 +409,72 @@ void VideoEncoder::encode_frame_videotoolbox(
   }
   auto session = (VTCompressionSessionRef)vt_session_;
 
-  // Prepare CVPixelBuffer from pool
-  CVPixelBufferPoolRef pool = VTCompressionSessionGetPixelBufferPool(session);
-  if (!pool) {
-    throw std::runtime_error("Failed to get CVPixelBufferPool");
-  }
-
-  // Make sure we have NV12 source
-  std::unique_ptr<VideoFrame> nv12;
-  if (frame.format() != VideoPixelFormat::NV12) {
-    nv12 = frame.convert_format(VideoPixelFormat::NV12);
-  }
-  const VideoFrame& src = nv12 ? *nv12 : frame;
-
   CVPixelBufferRef pb = nullptr;
-  CVReturn r =
-      CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pb);
-  if (r != kCVReturnSuccess || !pb) {
-    throw std::runtime_error("Failed to create CVPixelBuffer");
-  }
+  bool pb_from_native = false;
 
-  // Copy planes into CVPixelBuffer
-  CVPixelBufferLockBaseAddress(pb, 0);
-  uint8_t* dst_y = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0);
-  size_t dst_stride_y = CVPixelBufferGetBytesPerRowOfPlane(pb, 0);
-  uint8_t* dst_uv = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1);
-  size_t dst_stride_uv = CVPixelBufferGetBytesPerRowOfPlane(pb, 1);
-
-  const uint8_t* src_y = src.plane_ptr(0);
-  const uint8_t* src_uv = src.plane_ptr(1);
-  int width = static_cast<int>(src.width());
-  int height = static_cast<int>(src.height());
-  int chroma_height = (height + 1) / 2;
-  // Y plane
-  // ストライドが width と等しければ一括コピー
-  if (dst_stride_y == static_cast<size_t>(width)) {
-    memcpy(dst_y, src_y, static_cast<size_t>(width * height));
-  } else {
-    for (int i = 0; i < height; ++i) {
-      memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
+  // native_buffer (CVPixelBufferRef) がある場合は直接使用
+  if (frame.has_native_buffer()) {
+    void* native_ptr = frame.native_buffer_ptr();
+    if (native_ptr != nullptr) {
+      pb = static_cast<CVPixelBufferRef>(native_ptr);
+      CVPixelBufferRetain(pb);
+      pb_from_native = true;
     }
   }
-  // UV plane (interleaved)
-  int chroma_row_bytes = ((width + 1) / 2) * 2;  // even width
-  // ストライドが chroma_row_bytes と等しければ一括コピー
-  if (dst_stride_uv == static_cast<size_t>(chroma_row_bytes)) {
-    memcpy(dst_uv, src_uv,
-           static_cast<size_t>(chroma_row_bytes * chroma_height));
-  } else {
-    for (int i = 0; i < chroma_height; ++i) {
-      memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
-             chroma_row_bytes);
+
+  // native_buffer がない場合は従来通りプールから作成してコピー
+  if (!pb_from_native) {
+    CVPixelBufferPoolRef pool = VTCompressionSessionGetPixelBufferPool(session);
+    if (!pool) {
+      throw std::runtime_error("Failed to get CVPixelBufferPool");
     }
+
+    // Make sure we have NV12 source
+    std::unique_ptr<VideoFrame> nv12;
+    if (frame.format() != VideoPixelFormat::NV12) {
+      nv12 = frame.convert_format(VideoPixelFormat::NV12);
+    }
+    const VideoFrame& src = nv12 ? *nv12 : frame;
+
+    CVReturn r =
+        CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pb);
+    if (r != kCVReturnSuccess || !pb) {
+      throw std::runtime_error("Failed to create CVPixelBuffer");
+    }
+
+    // Copy planes into CVPixelBuffer
+    CVPixelBufferLockBaseAddress(pb, 0);
+    uint8_t* dst_y = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0);
+    size_t dst_stride_y = CVPixelBufferGetBytesPerRowOfPlane(pb, 0);
+    uint8_t* dst_uv = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1);
+    size_t dst_stride_uv = CVPixelBufferGetBytesPerRowOfPlane(pb, 1);
+
+    const uint8_t* src_y = src.plane_ptr(0);
+    const uint8_t* src_uv = src.plane_ptr(1);
+    int width = static_cast<int>(src.width());
+    int height = static_cast<int>(src.height());
+    int chroma_height = (height + 1) / 2;
+    // Y plane
+    if (dst_stride_y == static_cast<size_t>(width)) {
+      memcpy(dst_y, src_y, static_cast<size_t>(width * height));
+    } else {
+      for (int i = 0; i < height; ++i) {
+        memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
+      }
+    }
+    // UV plane (interleaved)
+    int chroma_row_bytes = ((width + 1) / 2) * 2;
+    if (dst_stride_uv == static_cast<size_t>(chroma_row_bytes)) {
+      memcpy(dst_uv, src_uv,
+             static_cast<size_t>(chroma_row_bytes * chroma_height));
+    } else {
+      for (int i = 0; i < chroma_height; ++i) {
+        memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
+               chroma_row_bytes);
+      }
+    }
+    CVPixelBufferUnlockBaseAddress(pb, 0);
   }
-  CVPixelBufferUnlockBaseAddress(pb, 0);
 
   // VideoToolbox はフレームごとの quantizer 指定をサポートしていないため、
   // avc.quantizer オプションは無視される

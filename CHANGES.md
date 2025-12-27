@@ -11,6 +11,16 @@
 
 ## develop
 
+- [ADD] VideoFrame に native_buffer サポートを追加する (macOS)
+  - コンストラクタで PyCapsule (CVPixelBufferRef) を直接受け取れるようになる
+  - Apple Video Toolbox エンコーダーが直接利用可能
+  - native_buffer のみの VideoFrame では plane()/planes()/copy_to()/clone() は RuntimeError
+  - @voluntas
+- [ADD] Python 3.13t / 3.14t の Free-Threading ビルドに対応する
+  - VideoEncoder / VideoDecoder / AudioEncoder / AudioDecoder でスレッドセーフなコールバック管理を実装
+  - nanobind の nb::ft_mutex を使用した排他制御
+  - Windows 3.14t は nanobind ビルドの問題により非対応
+  - @voluntas
 - [UPDATE] Opus を 1.6 にアップデートする
   - @voluntas
 - [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する

@@ -446,9 +446,7 @@ endif()
 # 注意: video_encoder_*.cpp と video_decoder_*.cpp ファイルは
 # video_encoder.cpp と video_decoder.cpp に #include されるため、
 # 個別のコンパイル単位として追加しない
-nanobind_add_module(
-    webcodecs_ext
-    NB_STATIC
+set(WEBCODECS_SOURCES
     src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp
@@ -468,6 +466,12 @@ nanobind_add_module(
     src/bindings/encoded_audio_chunk.cpp
     src/bindings/video_codec_capabilities.cpp
     src/bindings/image_decoder.cpp
+)
+
+nanobind_add_module(webcodecs_ext
+    NB_DOMAIN webcodecs
+    FREE_THREADED
+    ${WEBCODECS_SOURCES}
 )
 
 # ビルド順序を保証するため依存関係を追加

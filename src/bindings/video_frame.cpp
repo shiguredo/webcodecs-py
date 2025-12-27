@@ -30,9 +30,8 @@ VideoFrame::VideoFrame(uint32_t width,
   calculate_plane_info();
 }
 
-// WebCodecs API 準拠コンストラクタ (dict を受け取る)
-VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
-    : closed_(false) {
+// init_dict をパースして共通プロパティを初期化するヘルパー
+void VideoFrame::init_from_dict(nb::dict init_dict) {
   // 必須パラメータのチェック
   if (!init_dict.contains("format")) {
     throw nb::value_error("format is required");
@@ -126,6 +125,12 @@ VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
   // 実際の表示サイズを決定
   width_ = static_cast<uint32_t>(visible_rect_->width);
   height_ = static_cast<uint32_t>(visible_rect_->height);
+}
+
+// WebCodecs API 準拠コンストラクタ (dict を受け取る)
+VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
+    : closed_(false) {
+  init_from_dict(init_dict);
 
   // フレームサイズを計算 - coded_width/height を基準に計算
   size_t frame_size;
@@ -174,11 +179,30 @@ VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
     throw std::runtime_error("Data size mismatch with format and dimensions");
   }
 
-  // データをコピー（部分的ゼロコピー実装のため）
+  // データをコピー
   data_.resize(frame_size);
   std::memcpy(data_.data(), data.data(), frame_size);
 
   calculate_plane_info();
+}
+
+// native_buffer (PyCapsule) を受け取るコンストラクタ
+VideoFrame::VideoFrame(nb::capsule native_buffer, nb::dict init_dict)
+    : closed_(false) {
+  // capsule 名の検証
+  const char* capsule_name = native_buffer.name();
+  if (capsule_name == nullptr ||
+      strcmp(capsule_name, "CVPixelBufferRef") != 0) {
+    throw nb::value_error(
+        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
+  }
+
+  init_from_dict(init_dict);
+
+  // native_buffer を設定（data_ は空のまま）
+  native_buffer_ = native_buffer;
+
+  // plane_offsets_ と plane_sizes_ は空のまま（データアクセスはエラーになる）
 }
 
 VideoFrame::~VideoFrame() {
@@ -438,6 +462,13 @@ nb::ndarray<nb::numpy> VideoFrame::plane(int plane_index) const {
     throw std::runtime_error("VideoFrame is closed");
   }
 
+  // native_buffer のみの場合はデータにアクセスできない
+  if (!has_data()) {
+    throw std::runtime_error(
+        "Cannot access plane data: VideoFrame was created with native_buffer "
+        "only");
+  }
+
   if (plane_index < 0 || plane_index >= plane_offsets_.size()) {
     throw std::out_of_range("Invalid plane index");
   }
@@ -459,7 +490,7 @@ nb::ndarray<nb::numpy> VideoFrame::plane(int plane_index) const {
   }
 
   size_t shape[2] = {plane_height, plane_width};
-  // 内部データへのビューを返す（ゼロコピー）
+  // 内部データへのビューを返す
   return nb::ndarray<nb::numpy>(
       const_cast<uint8_t*>(data_.data()) + plane_offsets_[plane_index], 2,
       shape, nb::handle(), nullptr, nb::dtype<uint8_t>());
@@ -491,7 +522,7 @@ nb::ndarray<nb::numpy> VideoFrame::get_writable_plane(int plane_index) {
   }
 
   size_t shape[2] = {plane_height, plane_width};
-  // 内部データへのビューを返す（部分的ゼロコピー）
+  // 内部データへのビューを返す
   return nb::ndarray<nb::numpy>(
       const_cast<uint8_t*>(data_.data()) + plane_offsets_[plane_index], 2,
       shape, nb::handle(), nullptr, nb::dtype<uint8_t>());
@@ -603,6 +634,12 @@ std::unique_ptr<VideoFrame> VideoFrame::clone() const {
     throw std::runtime_error("VideoFrame is closed");
   }
 
+  // native_buffer のみの場合はクローンできない
+  if (!has_data()) {
+    throw std::runtime_error(
+        "Cannot clone: VideoFrame was created with native_buffer only");
+  }
+
   auto cloned =
       std::make_unique<VideoFrame>(width_, height_, format_, timestamp_);
   cloned->set_duration(duration_);
@@ -654,6 +691,12 @@ std::vector<PlaneLayout> VideoFrame::copy_to(
     nb::ndarray<nb::numpy> destination) {
   if (closed_) {
     throw std::runtime_error("VideoFrame is closed");
+  }
+
+  // native_buffer のみの場合はデータにアクセスできない
+  if (!has_data()) {
+    throw std::runtime_error(
+        "Cannot copy data: VideoFrame was created with native_buffer only");
   }
 
   // destination のサイズを検証
@@ -758,6 +801,12 @@ std::vector<PlaneLayout> VideoFrame::copy_to(nb::ndarray<nb::numpy> destination,
                                              nb::dict options) {
   if (closed_) {
     throw std::runtime_error("VideoFrame is closed");
+  }
+
+  // native_buffer のみの場合はデータにアクセスできない
+  if (!has_data()) {
+    throw std::runtime_error(
+        "Cannot copy data: VideoFrame was created with native_buffer only");
   }
 
   CopyToOptions opts = parse_copy_to_options(options);
@@ -961,6 +1010,13 @@ nb::tuple VideoFrame::planes() {
   if (closed_) {
     throw std::runtime_error("VideoFrame is closed");
   }
+
+  // native_buffer のみの場合はデータにアクセスできない
+  if (!has_data()) {
+    throw std::runtime_error(
+        "Cannot access planes: VideoFrame was created with native_buffer only");
+  }
+
   if (!(format_ == VideoPixelFormat::I420 ||
         format_ == VideoPixelFormat::I422 ||
         format_ == VideoPixelFormat::I444)) {
@@ -985,7 +1041,7 @@ nb::tuple VideoFrame::planes() {
     v_width /= 2;
   }
 
-  // 内部データへのビューを作成（部分的ゼロコピー）
+  // 内部データへのビューを作成
   nb::handle owner = nb::handle();  // データは std::vector が所有
 
   size_t y_shape[2] = {y_height, y_width};
@@ -1035,6 +1091,22 @@ nb::dict VideoFrame::metadata() const {
   }
 }
 
+void* VideoFrame::native_buffer_ptr() const {
+  // has_native_buffer() で有効性をチェック
+  // （is_valid() && !is_none() を確認）
+  if (!has_native_buffer()) {
+    return nullptr;
+  }
+  // PyCapsule からポインタを取得
+  // capsule 名が "CVPixelBufferRef" であることを確認
+  nb::capsule cap = nb::cast<nb::capsule>(native_buffer_);
+  const char* name = cap.name();
+  if (name == nullptr || strcmp(name, "CVPixelBufferRef") != 0) {
+    return nullptr;
+  }
+  return cap.data();
+}
+
 void init_video_frame(nb::module_& m) {
   nb::enum_<VideoPixelFormat>(m, "VideoPixelFormat")
       .value("I420", VideoPixelFormat::I420)
@@ -1051,6 +1123,7 @@ void init_video_frame(nb::module_& m) {
           nb::init<nb::ndarray<nb::numpy>, nb::dict>(), "data"_a, "init"_a,
           nb::sig("def __init__(self, data: numpy.typing.NDArray[numpy.uint8], "
                   "init: VideoFrameBufferInit, /) -> None"))
+      .def(nb::init<nb::capsule, nb::dict>(), "native_buffer"_a, "init"_a)
       .def_prop_ro("format", &VideoFrame::format,
                    nb::sig("def format(self, /) -> VideoPixelFormat"))
       .def_prop_ro("timestamp", &VideoFrame::timestamp,
@@ -1079,6 +1152,12 @@ void init_video_frame(nb::module_& m) {
                    nb::sig("def flip(self, /) -> bool"))
       .def("metadata", &VideoFrame::metadata,
            nb::sig("def metadata(self, /) -> dict"))
+      .def_prop_rw("native_buffer", &VideoFrame::native_buffer,
+                   &VideoFrame::set_native_buffer,
+                   nb::for_getter(
+                       nb::sig("def native_buffer(self, /) -> object | None")),
+                   nb::for_setter(nb::sig(
+                       "def native_buffer(self, value: object, /) -> None")))
       .def("plane", &VideoFrame::plane, "plane_index"_a,
            nb::sig("def plane(self, plane_index: int, /) -> "
                    "numpy.typing.NDArray[numpy.uint8]"))
