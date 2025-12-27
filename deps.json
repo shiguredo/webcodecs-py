@@ -20,7 +20,7 @@
     "url": "https://github.com/videolan/dav1d"
   },
   "libvpl": {
-    "tag": "v2.15.0",
+    "tag": "v2.16.0",
     "url": "https://github.com/intel/libvpl"
   },
   "libyuv": {

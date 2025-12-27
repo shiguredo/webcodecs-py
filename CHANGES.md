@@ -11,7 +11,9 @@
 
 ## develop
 
-- [UPDATE] Opus を 1.6 にアップデートする
+- [UPDATE] libvpl を v2.16.0 にアップデートする
+  - @voluntas
+- [UPDATE] libopus を v1.6 にアップデートする
   - @voluntas
 - [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
   - WebCodecs API 準拠の自動選択動作を実装
