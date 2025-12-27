@@ -35,6 +35,108 @@ from mp4 import (
     Mp4SampleEntryMp4a,
 )
 
+
+def parse_avcc(
+    avcc_data: bytes,
+) -> tuple[int, int, int, list[bytes], list[bytes], int | None, int | None, int | None]:
+    """avcC box をパースして profile, compatibility, level, SPS リスト, PPS リスト,
+    chroma_format, bit_depth_luma_minus8, bit_depth_chroma_minus8 を返す
+    """
+    if len(avcc_data) < 7:
+        raise ValueError("avcC data is too short")
+
+    profile_idc = avcc_data[1]
+    profile_compatibility = avcc_data[2]
+    level_idc = avcc_data[3]
+    num_sps = avcc_data[5] & 0x1F
+
+    pos = 6
+    sps_list = []
+    for _ in range(num_sps):
+        if pos + 2 > len(avcc_data):
+            raise ValueError("avcC data is truncated (SPS length)")
+        sps_length = int.from_bytes(avcc_data[pos : pos + 2], "big")
+        pos += 2
+        if pos + sps_length > len(avcc_data):
+            raise ValueError("avcC data is truncated (SPS data)")
+        sps_list.append(avcc_data[pos : pos + sps_length])
+        pos += sps_length
+
+    if pos >= len(avcc_data):
+        raise ValueError("avcC data is truncated (num PPS)")
+    num_pps = avcc_data[pos]
+    pos += 1
+
+    pps_list = []
+    for _ in range(num_pps):
+        if pos + 2 > len(avcc_data):
+            raise ValueError("avcC data is truncated (PPS length)")
+        pps_length = int.from_bytes(avcc_data[pos : pos + 2], "big")
+        pos += 2
+        if pos + pps_length > len(avcc_data):
+            raise ValueError("avcC data is truncated (PPS data)")
+        pps_list.append(avcc_data[pos : pos + pps_length])
+        pos += pps_length
+
+    chroma_format = None
+    bit_depth_luma_minus8 = None
+    bit_depth_chroma_minus8 = None
+
+    if profile_idc in (100, 110, 122, 244, 44, 83, 86, 118, 128, 138, 139, 134):
+        if pos + 4 <= len(avcc_data):
+            chroma_format = avcc_data[pos] & 0x03
+            pos += 1
+            bit_depth_luma_minus8 = avcc_data[pos] & 0x07
+            pos += 1
+            bit_depth_chroma_minus8 = avcc_data[pos] & 0x07
+            pos += 1
+
+    return (
+        profile_idc,
+        profile_compatibility,
+        level_idc,
+        sps_list,
+        pps_list,
+        chroma_format,
+        bit_depth_luma_minus8,
+        bit_depth_chroma_minus8,
+    )
+
+
+def parse_hvcc(hvcc_data: bytes) -> tuple[int, int, list[int], list[bytes]]:
+    """hvcC box をパースして profile_idc, level_idc, NAL unit types, NAL unit data を返す"""
+    if len(hvcc_data) < 23:
+        raise ValueError("hvcC data is too short")
+
+    general_profile_idc = hvcc_data[1] & 0x1F
+    general_level_idc = hvcc_data[12]
+    num_arrays = hvcc_data[22]
+    pos = 23
+
+    nalu_types = []
+    nalu_data = []
+
+    for _ in range(num_arrays):
+        if pos + 3 > len(hvcc_data):
+            break
+        nal_unit_type = hvcc_data[pos] & 0x3F
+        pos += 1
+        num_nalus = int.from_bytes(hvcc_data[pos : pos + 2], "big")
+        pos += 2
+
+        for _ in range(num_nalus):
+            if pos + 2 > len(hvcc_data):
+                break
+            nalu_length = int.from_bytes(hvcc_data[pos : pos + 2], "big")
+            pos += 2
+            if pos + nalu_length > len(hvcc_data):
+                break
+            nalu_types.append(nal_unit_type)
+            nalu_data.append(hvcc_data[pos : pos + nalu_length])
+            pos += nalu_length
+
+    return general_profile_idc, general_level_idc, nalu_types, nalu_data
+
 from webcodecs import (
     AudioData,
     AudioEncoder,
@@ -140,6 +242,11 @@ class MP4Writer:
             Mp4SampleEntryAv01 | Mp4SampleEntryAvc1 | Mp4SampleEntryHev1 | None
         ) = None
         self.audio_sample_entry: Mp4SampleEntryMp4a | None = None
+        self.description: bytes | None = None
+
+    def set_description(self, description: bytes):
+        """metadata.decoder_config.description を設定する (avcC/hvcC)"""
+        self.description = description
 
     def start(self):
         """ライタースレッドを開始"""
@@ -154,13 +261,14 @@ class MP4Writer:
 
     def _create_video_sample_entry(
         self,
+        chunk_data: bytes,
     ) -> Mp4SampleEntryAv01 | Mp4SampleEntryAvc1 | Mp4SampleEntryHev1:
         """コーデックに応じた映像サンプルエントリーを作成"""
         if self.video_codec == "av1":
             return Mp4SampleEntryAv01(
                 width=self.width,
                 height=self.height,
-                config_obus=b"",
+                config_obus=chunk_data,
                 seq_profile=0,
                 seq_level_idx_0=8,
                 seq_tier_0=0,
@@ -172,23 +280,45 @@ class MP4Writer:
                 chroma_sample_position=0,
             )
         elif self.video_codec == "h264":
+            if self.description is None:
+                raise RuntimeError(
+                    "H.264: metadata.decoder_config.description が設定されていません"
+                )
+            (
+                profile_idc,
+                profile_compat,
+                level_idc,
+                sps_list,
+                pps_list,
+                chroma_format,
+                bit_depth_luma_minus8,
+                bit_depth_chroma_minus8,
+            ) = parse_avcc(self.description)
             return Mp4SampleEntryAvc1(
                 width=self.width,
                 height=self.height,
-                avc_profile_indication=77,
-                profile_compatibility=0,
-                avc_level_indication=40,
-                sps_data=[],
-                pps_data=[],
+                avc_profile_indication=profile_idc,
+                profile_compatibility=profile_compat,
+                avc_level_indication=level_idc,
+                sps_data=sps_list,
+                pps_data=pps_list,
+                chroma_format=chroma_format,
+                bit_depth_luma_minus8=bit_depth_luma_minus8,
+                bit_depth_chroma_minus8=bit_depth_chroma_minus8,
             )
         elif self.video_codec == "h265":
+            if self.description is None:
+                raise RuntimeError(
+                    "H.265: metadata.decoder_config.description が設定されていません"
+                )
+            profile_idc, level_idc, nalu_types, nalu_data = parse_hvcc(self.description)
             return Mp4SampleEntryHev1(
                 width=self.width,
                 height=self.height,
-                general_profile_idc=1,
-                general_level_idc=120,
-                nalu_types=[],
-                nalu_data=[],
+                general_profile_idc=profile_idc,
+                general_level_idc=level_idc,
+                nalu_types=nalu_types,
+                nalu_data=nalu_data,
             )
         else:
             raise RuntimeError(f"サポートされていない映像コーデック: {self.video_codec}")
@@ -211,46 +341,6 @@ class MP4Writer:
             max_bitrate=self.audio_bitrate or 128000,
         )
 
-    def _convert_annex_b_to_length_prefixed(self, chunk_data: bytes) -> bytes:
-        """Annex-B フォーマットを length-prefixed フォーマットに変換する"""
-        result = bytearray()
-        pos = 0
-
-        while pos < len(chunk_data):
-            start_code_len = 0
-            if pos + 4 <= len(chunk_data) and chunk_data[pos : pos + 4] == b"\x00\x00\x00\x01":
-                start_code_len = 4
-            elif pos + 3 <= len(chunk_data) and chunk_data[pos : pos + 3] == b"\x00\x00\x01":
-                start_code_len = 3
-
-            if start_code_len == 0:
-                pos += 1
-                continue
-
-            nalu_start = pos + start_code_len
-            next_pos = nalu_start
-            while next_pos < len(chunk_data):
-                if (
-                    next_pos + 4 <= len(chunk_data)
-                    and chunk_data[next_pos : next_pos + 4] == b"\x00\x00\x00\x01"
-                ):
-                    break
-                if (
-                    next_pos + 3 <= len(chunk_data)
-                    and chunk_data[next_pos : next_pos + 3] == b"\x00\x00\x01"
-                ):
-                    break
-                next_pos += 1
-
-            nalu = chunk_data[nalu_start:next_pos]
-            if len(nalu) > 0:
-                result.extend(len(nalu).to_bytes(4, byteorder="big"))
-                result.extend(nalu)
-
-            pos = next_pos if next_pos < len(chunk_data) else len(chunk_data)
-
-        return bytes(result)
-
     def _writer_loop(self):
         """ライタースレッドのメインループ"""
         while self.running or not self.sample_queue.empty():
@@ -266,10 +356,7 @@ class MP4Writer:
                     key_frame = key_frame_or_duration
 
                     if self.video_sample_entry is None:
-                        self.video_sample_entry = self._create_video_sample_entry()
-
-                    if self.video_codec in ("h264", "h265"):
-                        frame_data = self._convert_annex_b_to_length_prefixed(frame_data)
+                        self.video_sample_entry = self._create_video_sample_entry(frame_data)
 
                     sample = Mp4MuxSample(
                         track_kind="video",
@@ -558,8 +645,15 @@ def main():
 
     encoded_video_frame_count = 0
 
-    def on_video_output(chunk):
+    def on_video_output(chunk, metadata=None):
         nonlocal encoded_video_frame_count
+        if metadata is not None:
+            decoder_config = metadata.get("decoder_config")
+            if decoder_config is not None:
+                description = decoder_config.get("description")
+                if description is not None:
+                    mp4_writer.set_description(bytes(description))
+
         destination = np.zeros(chunk.byte_length, dtype=np.uint8)
         chunk.copy_to(destination)
         frame_data = bytes(destination)
