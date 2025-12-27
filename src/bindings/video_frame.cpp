@@ -179,7 +179,7 @@ VideoFrame::VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init_dict)
     throw std::runtime_error("Data size mismatch with format and dimensions");
   }
 
-  // データをコピー（部分的ゼロコピー実装のため）
+  // データをコピー
   data_.resize(frame_size);
   std::memcpy(data_.data(), data.data(), frame_size);
 
@@ -490,7 +490,7 @@ nb::ndarray<nb::numpy> VideoFrame::plane(int plane_index) const {
   }
 
   size_t shape[2] = {plane_height, plane_width};
-  // 内部データへのビューを返す（ゼロコピー）
+  // 内部データへのビューを返す
   return nb::ndarray<nb::numpy>(
       const_cast<uint8_t*>(data_.data()) + plane_offsets_[plane_index], 2,
       shape, nb::handle(), nullptr, nb::dtype<uint8_t>());
@@ -522,7 +522,7 @@ nb::ndarray<nb::numpy> VideoFrame::get_writable_plane(int plane_index) {
   }
 
   size_t shape[2] = {plane_height, plane_width};
-  // 内部データへのビューを返す（部分的ゼロコピー）
+  // 内部データへのビューを返す
   return nb::ndarray<nb::numpy>(
       const_cast<uint8_t*>(data_.data()) + plane_offsets_[plane_index], 2,
       shape, nb::handle(), nullptr, nb::dtype<uint8_t>());
@@ -1041,7 +1041,7 @@ nb::tuple VideoFrame::planes() {
     v_width /= 2;
   }
 
-  // 内部データへのビューを作成（部分的ゼロコピー）
+  // 内部データへのビューを作成
   nb::handle owner = nb::handle();  // データは std::vector が所有
 
   size_t y_shape[2] = {y_height, y_width};

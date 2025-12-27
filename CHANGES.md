@@ -13,7 +13,7 @@
 
 - [ADD] VideoFrame に native_buffer サポートを追加する (macOS)
   - コンストラクタで PyCapsule (CVPixelBufferRef) を直接受け取れるようになる
-  - Apple Video Toolbox エンコーダーでゼロコピーエンコードが可能
+  - Apple Video Toolbox エンコーダーが直接利用可能
   - native_buffer のみの VideoFrame では plane()/planes()/copy_to()/clone() は RuntimeError
   - @voluntas
 - [ADD] Python 3.13t / 3.14t の Free-Threading ビルドに対応する

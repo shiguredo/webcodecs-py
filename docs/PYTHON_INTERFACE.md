@@ -288,7 +288,7 @@ destination = np.zeros(chunk.byte_length, dtype=np.uint8)
 chunk.copy_to(destination)
 ```
 
-**ゼロコピーアクセス**: コピーが不要な場合は `planes()` メソッド（独自拡張）を使用してください。
+**直接アクセス**: 内部バッファに直接アクセスする場合は `planes()` メソッド（独自拡張）を使用してください。
 
 ## 基本的な利用例
 
@@ -827,13 +827,13 @@ def on_output(chunk, metadata=None):
 
 #### planes() メソッド
 
-**ゼロコピービューを返す独自拡張メソッド**
+**内部バッファに直接アクセスする独自拡張メソッド**
 
 ```python
 def planes() -> tuple[ndarray, ndarray, ndarray]
 ```
 
-- **目的**: 高速なメモリアクセスが必要な場合に、データのコピーを作成せずに直接プレーンへのビューを提供
+- **目的**: 内部バッファに直接アクセスし、入出力に利用できる ndarray を返す
 - **対応フォーマット**: I420, I422, I444
 - **戻り値**: (Y プレーン, U プレーン, V プレーン) のタプル
 - **注意事項**:
@@ -859,7 +859,7 @@ init: VideoFrameBufferInit = {
 
 frame = VideoFrame(data, init)
 
-# ゼロコピービューを取得
+# 内部バッファに直接アクセス
 y_plane, u_plane, v_plane = frame.planes()
 
 # ビューへの書き込みは元のデータを変更
@@ -868,13 +868,13 @@ y_plane[:] = 235  # 元の data も変更される
 
 #### native_buffer プロパティ
 
-**macOS 専用のゼロコピーエンコード用プロパティ**
+**エンコーダーが直接利用できるプロパティ（macOS 専用）**
 
 ```python
 native_buffer: object | None  # 読み書き可能
 ```
 
-- **目的**: CVPixelBufferRef を直接保持し、Video Toolbox エンコーダーでゼロコピーエンコードを実現
+- **目的**: CVPixelBufferRef を保持し、Video Toolbox エンコーダーが直接利用できる
 - **対応プラットフォーム**: macOS のみ
 - **形式**: PyCapsule（名前: `"CVPixelBufferRef"`）
 
@@ -899,7 +899,7 @@ frame = VideoFrame(
     },
 )
 
-# エンコード時にゼロコピーで処理される
+# エンコーダーが直接利用する
 encoder.encode(frame)
 ```
 
@@ -926,7 +926,7 @@ VideoFrame は以下の 3 つのモードで動作します：
 
 1. **外部メモリ参照モード** (コンストラクタで ndarray を渡した場合)
    - 元の ndarray への参照を保持
-   - planes() メソッドはゼロコピービューを返す
+   - planes() メソッドは内部バッファに直接アクセスできる
    - copy_to() メソッドはデータのコピーを返す
 
 2. **内部メモリ所有モード** (width, height, format で作成した場合)
@@ -937,7 +937,7 @@ VideoFrame は以下の 3 つのモードで動作します：
 3. **native_buffer モード** (コンストラクタで PyCapsule を渡した場合、macOS のみ)
    - CVPixelBufferRef への参照のみを保持（データは保持しない）
    - planes() / plane() / copy_to() は使用不可（RuntimeError）
-   - Video Toolbox エンコーダーでゼロコピーエンコードが可能
+   - Video Toolbox エンコーダーが直接利用可能
 
 ## その他の型定義
 

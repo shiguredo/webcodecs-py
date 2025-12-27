@@ -10,7 +10,7 @@ uvc-py と portaudio-py を使ってカメラとマイクからキャプチャ�
     uv run python examples/device_to_mp4.py
     uv run python examples/device_to_mp4.py --width 1920 --height 1080 --fps 30
     uv run python examples/device_to_mp4.py --video-codec h264 --output output.mp4
-    uv run python examples/device_to_mp4.py --video-codec h264 --native-buffer  # macOS でゼロコピー
+    uv run python examples/device_to_mp4.py --video-codec h264 --native-buffer  # macOS で native buffer を利用
     uv run python examples/device_to_mp4.py --audio  # 音声も録音（実験的）
 """
 
@@ -463,7 +463,7 @@ def main():
     parser.add_argument(
         "--native-buffer",
         action="store_true",
-        help="macOS で native buffer (CVPixelBufferRef) を使用してゼロコピーエンコード",
+        help="macOS で native buffer (CVPixelBufferRef) を使用",
     )
     parser.add_argument(
         "--audio",
@@ -538,7 +538,7 @@ def main():
     print(f"録画時間: {args.duration} 秒")
     print(f"出力ファイル: {args.output}")
     if use_native_buffer:
-        print("native buffer: 有効 (ゼロコピー)")
+        print("native buffer: 有効")
     print()
 
     video_devices = uvc.list_devices()

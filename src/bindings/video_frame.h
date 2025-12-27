@@ -108,7 +108,7 @@ class VideoFrame {
   std::vector<PlaneLayout> copy_to(nb::ndarray<nb::numpy> destination,
                                    nb::dict options);
 
-  // planes(): ゼロコピービューを返す（独自拡張）
+  // planes(): 内部バッファに直接アクセスする（独自拡張）
   nb::tuple planes();
 
   // WebCodecs-like methods
@@ -143,7 +143,7 @@ class VideoFrame {
   // macOS: CVPixelBufferRef を保持
   nb::object native_buffer_;
 
-  // データストレージ（部分的ゼロコピーのため std::vector を使用）
+  // データストレージ
   std::vector<uint8_t> data_;
 
   std::vector<size_t> plane_offsets_;

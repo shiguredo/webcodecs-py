@@ -412,7 +412,7 @@ void VideoEncoder::encode_frame_videotoolbox(
   CVPixelBufferRef pb = nullptr;
   bool pb_from_native = false;
 
-  // native_buffer (CVPixelBufferRef) がある場合は直接使用（ゼロコピー）
+  // native_buffer (CVPixelBufferRef) がある場合は直接使用
   if (frame.has_native_buffer()) {
     void* native_ptr = frame.native_buffer_ptr();
     if (native_ptr != nullptr) {

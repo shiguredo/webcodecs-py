@@ -257,7 +257,7 @@ void VideoEncoder::encode_frame_aom(const VideoFrame& frame,
                       static_cast<int>(quantizer.value()));
   }
 
-  // Wrap I420 memory from VideoFrame directly (ゼロコピー)
+  // Wrap I420 memory from VideoFrame directly
   aom_image_t img;
   // VideoFrame のメモリは Y, U, V が連続配置（I420）
   unsigned char* base = const_cast<unsigned char*>(frame.plane_ptr(0));
