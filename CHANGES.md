@@ -11,6 +11,12 @@
 
 ## develop
 
+- [UPDATE] Opus を 1.6 にアップデートする
+  - @voluntas
+- [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
+  - WebCodecs API 準拠の自動選択動作を実装
+  - HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を明示的に指定しなくても H.264/HEVC では Video Toolbox が使用される
+  - @voluntas
 - [ADD] VideoFrame に native_buffer サポートを追加する (macOS)
   - コンストラクタで PyCapsule (CVPixelBufferRef) を直接受け取れるようになる
   - Apple Video Toolbox エンコーダーが直接利用可能
@@ -20,12 +26,6 @@
   - VideoEncoder / VideoDecoder / AudioEncoder / AudioDecoder でスレッドセーフなコールバック管理を実装
   - nanobind の nb::ft_mutex を使用した排他制御
   - Windows 3.14t は nanobind ビルドの問題により非対応
-  - @voluntas
-- [UPDATE] Opus を 1.6 にアップデートする
-  - @voluntas
-- [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
-  - WebCodecs API 準拠の自動選択動作を実装
-  - HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を明示的に指定しなくても H.264/HEVC では Video Toolbox が使用される
   - @voluntas
 - [ADD] Apple Video Toolbox で VP9/AV1 デコーダーをサポートする
   - VideoDecoderConfig で hardware_acceleration_engine に HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を指定した場合のみ有効
