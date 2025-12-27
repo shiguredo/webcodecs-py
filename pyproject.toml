@@ -37,9 +37,9 @@ test = [
     "pytest-repeat",
     "pytest-timeout",
     "pytest-benchmark",
+    "hypothesis",
     "numpy",
     "blend2d-py",
-    "pillow",
 ]
 lint = ["ruff", "ty"]
 example = ["uvc-py", "portaudio-py", "raw-player", "blend2d-py", "mp4-py"]
