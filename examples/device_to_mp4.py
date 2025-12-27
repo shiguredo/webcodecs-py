@@ -25,6 +25,23 @@ import numpy as np
 import portaudio
 import uvc
 
+from webcodecs import (
+    AudioData,
+    AudioEncoder,
+    AudioEncoderConfig,
+    AudioSampleFormat,
+    EncodedAudioChunk,
+    EncodedVideoChunkType,
+    HardwareAccelerationEngine,
+    LatencyMode,
+    VideoEncoder,
+    VideoEncoderBitrateMode,
+    VideoEncoderConfig,
+    VideoFrame,
+    VideoFrameBufferInit,
+    VideoPixelFormat,
+)
+
 from mp4 import (
     Mp4FileMuxer,
     Mp4FileMuxerOptions,
@@ -136,23 +153,6 @@ def parse_hvcc(hvcc_data: bytes) -> tuple[int, int, list[int], list[bytes]]:
             pos += nalu_length
 
     return general_profile_idc, general_level_idc, nalu_types, nalu_data
-
-from webcodecs import (
-    AudioData,
-    AudioEncoder,
-    AudioEncoderConfig,
-    AudioSampleFormat,
-    EncodedAudioChunk,
-    EncodedVideoChunkType,
-    HardwareAccelerationEngine,
-    LatencyMode,
-    VideoEncoder,
-    VideoEncoderBitrateMode,
-    VideoEncoderConfig,
-    VideoFrame,
-    VideoFrameBufferInit,
-    VideoPixelFormat,
-)
 
 
 def list_devices():

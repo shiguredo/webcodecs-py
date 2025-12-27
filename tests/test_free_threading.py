@@ -14,15 +14,11 @@ import pytest
 from webcodecs import (
     AudioData,
     AudioDecoder,
-    AudioDecoderConfig,
     AudioEncoder,
     AudioEncoderConfig,
     AudioSampleFormat,
-    EncodedAudioChunk,
-    EncodedVideoChunk,
     LatencyMode,
     VideoDecoder,
-    VideoDecoderConfig,
     VideoEncoder,
     VideoEncoderConfig,
     VideoFrame,
@@ -168,7 +164,7 @@ def test_concurrent_video_decode_encode():
     # エラーがないことを確認
     assert len(encode_errors) == 0, f"Encode errors: {encode_errors}"
     # エンコードされたチャンクを確認
-    assert len(encoded_chunks) > 0, f"No chunks produced"
+    assert len(encoded_chunks) > 0, "No chunks produced"
 
 
 @pytest.mark.skipif(not is_free_threading, reason="Free-Threading build required")
