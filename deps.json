@@ -1,6 +1,6 @@
 {
   "libopus": {
-    "version": "1.5.2",
+    "version": "1.6",
     "repository": "https://github.com/xiph/opus"
   },
   "libflac": {
