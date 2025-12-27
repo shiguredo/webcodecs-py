@@ -26,6 +26,9 @@ class VideoFrame {
   // WebCodecs API 準拠コンストラクタ (dict を受け取る)
   VideoFrame(nb::ndarray<nb::numpy> data, nb::dict init);
 
+  // native_buffer (PyCapsule) を受け取るコンストラクタ
+  VideoFrame(nb::capsule native_buffer, nb::dict init);
+
   // 内部用コンストラクタ（clone, convert_format, デコーダーで使用）
   // Python バインディングには公開しない
   VideoFrame(uint32_t width,
@@ -59,6 +62,22 @@ class VideoFrame {
   bool flip() const { return flip_; }
   nb::dict metadata() const;
 
+  // ネイティブバッファ (PyCapsule) のアクセサ
+  nb::object native_buffer() const {
+    if (native_buffer_.is_valid()) {
+      return native_buffer_;
+    }
+    return nb::none();
+  }
+  void set_native_buffer(nb::object buffer) { native_buffer_ = buffer; }
+  bool has_native_buffer() const {
+    return native_buffer_.is_valid() && !native_buffer_.is_none();
+  }
+  void* native_buffer_ptr() const;
+
+  // データの存在チェック (native_buffer のみの場合は false)
+  bool has_data() const { return !data_.empty(); }
+
   // Data access
   nb::ndarray<nb::numpy> plane(int plane_index) const;
   nb::ndarray<nb::numpy> get_writable_plane(
@@ -89,7 +108,7 @@ class VideoFrame {
   std::vector<PlaneLayout> copy_to(nb::ndarray<nb::numpy> destination,
                                    nb::dict options);
 
-  // planes(): ゼロコピービューを返す（独自拡張）
+  // planes(): 内部バッファに直接アクセスする（独自拡張）
   nb::tuple planes();
 
   // WebCodecs-like methods
@@ -120,7 +139,11 @@ class VideoFrame {
   bool flip_;
   std::optional<nb::dict> metadata_;
 
-  // データストレージ（部分的ゼロコピーのため std::vector を使用）
+  // ネイティブバッファ (PyCapsule)
+  // macOS: CVPixelBufferRef を保持
+  nb::object native_buffer_;
+
+  // データストレージ
   std::vector<uint8_t> data_;
 
   std::vector<size_t> plane_offsets_;
@@ -129,6 +152,9 @@ class VideoFrame {
   void calculate_plane_info();
   size_t get_frame_size() const;
   VideoPixelFormat string_to_format(const std::string& format_str) const;
+
+  // init_dict をパースして共通プロパティを初期化するヘルパー
+  void init_from_dict(nb::dict init_dict);
 
   // VideoFrameCopyToOptions をパースするヘルパー
   CopyToOptions parse_copy_to_options(nb::dict options) const;
