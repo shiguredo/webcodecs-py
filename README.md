@@ -40,6 +40,8 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 - Ubuntu x86_64 にて Intel VPL を利用したハードウェアアクセラレーション対応
   - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
   - VP8 / VP9 デコードに対応
+- PyCapsule 経由で CVPixelBuffer を直接受け取るネイティブバッファー対応 (macOS)
+- Python [Free-Threading](https://docs.python.org/3/howto/free-threading-python.html) 対応
 - クロスプラットフォーム対応
   - macOS arm64
   - Ubuntu x86_64 および arm64
