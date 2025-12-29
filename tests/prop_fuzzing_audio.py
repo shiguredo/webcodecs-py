@@ -35,16 +35,17 @@ PLANAR_AUDIO_FORMATS = [
 
 def get_audio_dtype(audio_format: AudioSampleFormat) -> np.dtype:
     """AudioSampleFormat に対応する numpy dtype を返す"""
-    if audio_format in (AudioSampleFormat.U8, AudioSampleFormat.U8_PLANAR):
-        return np.dtype(np.uint8)
-    elif audio_format in (AudioSampleFormat.S16, AudioSampleFormat.S16_PLANAR):
-        return np.dtype(np.int16)
-    elif audio_format in (AudioSampleFormat.S32, AudioSampleFormat.S32_PLANAR):
-        return np.dtype(np.int32)
-    elif audio_format in (AudioSampleFormat.F32, AudioSampleFormat.F32_PLANAR):
-        return np.dtype(np.float32)
-    else:
-        raise ValueError(f"未知のオーディオフォーマット: {audio_format}")
+    match audio_format:
+        case AudioSampleFormat.U8 | AudioSampleFormat.U8_PLANAR:
+            return np.dtype(np.uint8)
+        case AudioSampleFormat.S16 | AudioSampleFormat.S16_PLANAR:
+            return np.dtype(np.int16)
+        case AudioSampleFormat.S32 | AudioSampleFormat.S32_PLANAR:
+            return np.dtype(np.int32)
+        case AudioSampleFormat.F32 | AudioSampleFormat.F32_PLANAR:
+            return np.dtype(np.float32)
+        case _:
+            raise ValueError(f"未知のオーディオフォーマット: {audio_format}")
 
 
 def is_planar_format(audio_format: AudioSampleFormat) -> bool:
@@ -75,42 +76,43 @@ def audio_data_strategy(draw):
         shape = (number_of_frames, number_of_channels)
 
     # ランダムなオーディオデータを生成
-    if dtype == np.float32:
-        # float32 の場合は -1.0 から 1.0 の範囲
-        data = draw(
-            arrays(
-                dtype=dtype,
-                shape=shape,
-                elements=st.floats(
-                    min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False
-                ),
+    match dtype:
+        case np.float32:
+            # float32 の場合は -1.0 から 1.0 の範囲
+            data = draw(
+                arrays(
+                    dtype=dtype,
+                    shape=shape,
+                    elements=st.floats(
+                        min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False
+                    ),
+                )
             )
-        )
-    elif dtype == np.uint8:
-        data = draw(
-            arrays(
-                dtype=dtype,
-                shape=shape,
-                elements=st.integers(min_value=0, max_value=255),
+        case np.uint8:
+            data = draw(
+                arrays(
+                    dtype=dtype,
+                    shape=shape,
+                    elements=st.integers(min_value=0, max_value=255),
+                )
             )
-        )
-    elif dtype == np.int16:
-        data = draw(
-            arrays(
-                dtype=dtype,
-                shape=shape,
-                elements=st.integers(min_value=-32768, max_value=32767),
+        case np.int16:
+            data = draw(
+                arrays(
+                    dtype=dtype,
+                    shape=shape,
+                    elements=st.integers(min_value=-32768, max_value=32767),
+                )
             )
-        )
-    else:
-        # int32
-        data = draw(
-            arrays(
-                dtype=dtype,
-                shape=shape,
-                elements=st.integers(min_value=-(2**31), max_value=2**31 - 1),
+        case _:
+            # int32
+            data = draw(
+                arrays(
+                    dtype=dtype,
+                    shape=shape,
+                    elements=st.integers(min_value=-(2**31), max_value=2**31 - 1),
+                )
             )
-        )
 
     return {
         "format": audio_format,

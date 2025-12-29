@@ -17,18 +17,19 @@ from webcodecs import (
 
 def calculate_video_buffer_size(pixel_format: VideoPixelFormat, width: int, height: int) -> int:
     """ピクセルフォーマットに応じたバッファサイズを計算"""
-    if pixel_format in (VideoPixelFormat.I420, VideoPixelFormat.NV12):
-        return width * height * 3 // 2
-    elif pixel_format == VideoPixelFormat.I422:
-        return width * height * 2
-    elif pixel_format == VideoPixelFormat.I444:
-        return width * height * 3
-    elif pixel_format in (VideoPixelFormat.RGBA, VideoPixelFormat.BGRA):
-        return width * height * 4
-    elif pixel_format in (VideoPixelFormat.RGB, VideoPixelFormat.BGR):
-        return width * height * 3
-    else:
-        raise ValueError(f"未知のピクセルフォーマット: {pixel_format}")
+    match pixel_format:
+        case VideoPixelFormat.I420 | VideoPixelFormat.NV12:
+            return width * height * 3 // 2
+        case VideoPixelFormat.I422:
+            return width * height * 2
+        case VideoPixelFormat.I444:
+            return width * height * 3
+        case VideoPixelFormat.RGBA | VideoPixelFormat.BGRA:
+            return width * height * 4
+        case VideoPixelFormat.RGB | VideoPixelFormat.BGR:
+            return width * height * 3
+        case _:
+            raise ValueError(f"未知のピクセルフォーマット: {pixel_format}")
 
 
 # I420 と NV12 は UV サブサンプリングがあるため偶数のみ
