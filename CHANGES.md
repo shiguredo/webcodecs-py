@@ -11,6 +11,10 @@
 
 ## develop
 
+## 2025.3.0
+
+**リリース日**:: 2025-12-30
+
 - [UPDATE] libvpl を v2.16.0 にアップデートする
   - @voluntas
 - [UPDATE] libopus を v1.6 にアップデートする
