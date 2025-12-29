@@ -82,7 +82,8 @@
 
 - pip を使わず uv を使うこと
 - 直接 python を使わず uv 経由で使うこと
-- numpy.ndarray を利用すること
+- `match` を利用すること
+- `numpy.ndarray` を利用すること
 - `make format` でフォーマットすること
 - `uv run ty check` で型チェックを行うこと
 - `uv run pytest` でテストを実行すること
