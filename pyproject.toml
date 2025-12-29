@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "webcodecs-py"
 authors = [{ name = "Shiguredo Inc.", email = "contact+pypi@shiguredo.jp" }]
 dynamic = ["version"]
-description = "webcodecs-py"
+description = "WebCodecs API for Python"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
