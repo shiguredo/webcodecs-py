@@ -240,7 +240,7 @@ make test
 ## サンプル
 
 ```bash
-uv sync --group example
+uv sync
 make develop
 uv run python examples/blend2d_to_mp4.py
 ```
