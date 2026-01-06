@@ -24,7 +24,6 @@ jobs:
           - "3.14"
           - "3.14t"
           - "3.13"
-          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -76,7 +75,6 @@ jobs:
           - "3.14"
           - "3.14t"
           - "3.13"
-          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -146,7 +144,6 @@ jobs:
           # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
           # - "3.14t"
           - "3.13"
-          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -200,7 +197,6 @@ jobs:
           - "3.14"
           - "3.14t"
           - "3.13"
-          - "3.13t"
           - "3.12"
         exclude:
           # Windows の Python 3.14t は非対応
