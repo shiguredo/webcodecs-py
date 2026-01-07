@@ -21,11 +21,11 @@ else()
 endif()
 
 # NVIDIA Video Codec SDK の設定
-# ビルド方法: NVIDIA_CUDA_TOOLKIT=1 uv build --wheel
-option(NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
+# ビルド方法: USE_NVIDIA_CUDA_TOOLKIT=1 uv build --wheel
+option(USE_NVIDIA_CUDA_TOOLKIT "Enable NVIDIA Video Codec SDK support" OFF)
 
 # NVIDIA Video Codec SDK のパス設定
-if(NVIDIA_CUDA_TOOLKIT)
+if(USE_NVIDIA_CUDA_TOOLKIT)
     # third_party/NvCodec を使用
     set(NVCODEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/NvCodec")
     message(STATUS "NVIDIA Video Codec SDK path: ${NVCODEC_DIR}")
@@ -39,6 +39,13 @@ if(NVIDIA_CUDA_TOOLKIT)
     if(APPLE)
         message(FATAL_ERROR "NVIDIA Video Codec SDK is not supported on macOS")
     endif()
+endif()
+
+# Intel VPL (Video Processing Library) の設定
+# Linux では常に有効（ヘッダーは _deps からダウンロード、libvpl は dlopen で動的ロード）
+if(NOT APPLE AND NOT WIN32)
+    set(INTEL_VPL_ENABLED ON)
+    message(STATUS "Intel VPL enabled (Linux)")
 endif()
 
 # レイアウト: ExternalProject の依存関係は _deps 配下で管理
@@ -63,29 +70,30 @@ include(ExternalProject)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/deps.json DEPS_JSON)
 
 # Opus の設定を解析
-string(JSON OPUS_VERSION GET ${DEPS_JSON} libopus version)
-string(JSON OPUS_GIT_REPOSITORY GET ${DEPS_JSON} libopus repository)
-set(OPUS_GIT_TAG "v${OPUS_VERSION}")
+string(JSON OPUS_GIT_TAG GET ${DEPS_JSON} libopus tag)
+string(JSON OPUS_GIT_REPOSITORY GET ${DEPS_JSON} libopus url)
 
 # FLAC の設定を解析
-string(JSON FLAC_VERSION GET ${DEPS_JSON} libflac version)
-string(JSON FLAC_GIT_REPOSITORY GET ${DEPS_JSON} libflac repository)
-set(FLAC_GIT_TAG "${FLAC_VERSION}")
+string(JSON FLAC_GIT_TAG GET ${DEPS_JSON} libflac tag)
+string(JSON FLAC_GIT_REPOSITORY GET ${DEPS_JSON} libflac url)
 
 # AOM の設定を解析
-string(JSON AOM_VERSION GET ${DEPS_JSON} libaom version)
-string(JSON AOM_GIT_REPOSITORY GET ${DEPS_JSON} libaom repository)
-set(AOM_GIT_TAG "v${AOM_VERSION}")  # タグ用に v プレフィックスを追加
+string(JSON AOM_GIT_TAG GET ${DEPS_JSON} libaom tag)
+string(JSON AOM_GIT_REPOSITORY GET ${DEPS_JSON} libaom url)
 
 # dav1d の設定を解析
-string(JSON DAV1D_VERSION GET ${DEPS_JSON} libdav1d version)
-string(JSON DAV1D_GIT_REPOSITORY GET ${DEPS_JSON} libdav1d repository)
-set(DAV1D_GIT_TAG "${DAV1D_VERSION}")
+string(JSON DAV1D_GIT_TAG GET ${DEPS_JSON} libdav1d tag)
+string(JSON DAV1D_GIT_REPOSITORY GET ${DEPS_JSON} libdav1d url)
 
 # YUV の設定を解析
-string(JSON YUV_VERSION GET ${DEPS_JSON} libyuv version)
-string(JSON YUV_GIT_REPOSITORY GET ${DEPS_JSON} libyuv repository)
-set(YUV_GIT_TAG ${YUV_VERSION})  # コミットハッシュを使用
+string(JSON YUV_GIT_REF GET ${DEPS_JSON} libyuv ref)
+string(JSON YUV_GIT_REPOSITORY GET ${DEPS_JSON} libyuv url)
+
+# VPL の設定を解析（Linux のみ）
+if(NOT APPLE AND NOT WIN32)
+    string(JSON VPL_GIT_TAG GET ${DEPS_JSON} libvpl tag)
+    string(JSON VPL_GIT_REPOSITORY GET ${DEPS_JSON} libvpl url)
+endif()
 
 # 静的ライブラリのビルドオプションを設定
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "静的ライブラリをビルド" FORCE)
@@ -104,9 +112,9 @@ endif()
 
 # ========== libopus ==========
 message(STATUS "Setting up libopus...")
-set(OPUS_SOURCE_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/source")
-set(OPUS_BUILD_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/build")
-set(OPUS_INSTALL_DIR "${DEPS_DIR}/opus/${OPUS_VERSION}/install")
+set(OPUS_SOURCE_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/source")
+set(OPUS_BUILD_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/build")
+set(OPUS_INSTALL_DIR "${DEPS_DIR}/opus/${OPUS_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -152,9 +160,9 @@ endif()
 
 # ========== libflac ==========
 message(STATUS "Setting up libflac...")
-set(FLAC_SOURCE_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/source")
-set(FLAC_BUILD_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/build")
-set(FLAC_INSTALL_DIR "${DEPS_DIR}/flac/${FLAC_VERSION}/install")
+set(FLAC_SOURCE_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/source")
+set(FLAC_BUILD_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/build")
+set(FLAC_INSTALL_DIR "${DEPS_DIR}/flac/${FLAC_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -201,9 +209,9 @@ endif()
 
 # ========== libaom ==========
 message(STATUS "Setting up libaom...")
-set(AOM_SOURCE_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/source")
-set(AOM_BUILD_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/build")
-set(AOM_INSTALL_DIR "${DEPS_DIR}/aom/${AOM_VERSION}/install")
+set(AOM_SOURCE_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/source")
+set(AOM_BUILD_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/build")
+set(AOM_INSTALL_DIR "${DEPS_DIR}/aom/${AOM_GIT_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -252,9 +260,9 @@ endif()
 
 # ========== dav1d ==========
 message(STATUS "Setting up dav1d...")
-set(DAV1D_SOURCE_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/source")
-set(DAV1D_BUILD_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/build")
-set(DAV1D_INSTALL_DIR "${DEPS_DIR}/dav1d/${DAV1D_VERSION}/install")
+set(DAV1D_SOURCE_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/source")
+set(DAV1D_BUILD_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/build")
+set(DAV1D_INSTALL_DIR "${DEPS_DIR}/dav1d/${DAV1D_GIT_TAG}/install")
 
 # Windows でも meson は libdav1d.a として生成する（MSVC でもリンク可能）
 set(DAV1D_LIB ${DAV1D_INSTALL_DIR}/lib/libdav1d.a)
@@ -292,9 +300,9 @@ endif()
 
 # ========== libyuv ==========
 message(STATUS "Setting up libyuv...")
-set(YUV_SOURCE_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/source")
-set(YUV_BUILD_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/build")
-set(YUV_INSTALL_DIR "${DEPS_DIR}/yuv/${YUV_VERSION}/install")
+set(YUV_SOURCE_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/source")
+set(YUV_BUILD_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/build")
+set(YUV_INSTALL_DIR "${DEPS_DIR}/yuv/${YUV_GIT_REF}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -312,7 +320,7 @@ else()
     ExternalProject_Add(
         libyuv_build
         GIT_REPOSITORY ${YUV_GIT_REPOSITORY}
-        GIT_TAG ${YUV_GIT_TAG}
+        GIT_TAG ${YUV_GIT_REF}
         GIT_SHALLOW FALSE
         SOURCE_DIR ${YUV_SOURCE_DIR}
         BINARY_DIR ${YUV_BUILD_DIR}
@@ -331,17 +339,46 @@ else()
     )
 endif()
 
+# ========== libvpl (Linux のみ、ヘッダーのみ) ==========
+if(INTEL_VPL_ENABLED)
+    message(STATUS "Setting up libvpl...")
+    set(VPL_SOURCE_DIR "${DEPS_DIR}/vpl/${VPL_GIT_TAG}/source")
+
+    # ヘッダーディレクトリの存在チェック
+    if(EXISTS "${VPL_SOURCE_DIR}/api/vpl/mfx.h")
+        message(STATUS "libvpl already downloaded: ${VPL_SOURCE_DIR}")
+        add_custom_target(libvpl_download)
+    else()
+        message(STATUS "Downloading libvpl...")
+        ExternalProject_Add(
+            libvpl_download
+            GIT_REPOSITORY ${VPL_GIT_REPOSITORY}
+            GIT_TAG ${VPL_GIT_TAG}
+            GIT_SHALLOW TRUE
+            SOURCE_DIR ${VPL_SOURCE_DIR}
+            UPDATE_COMMAND ""
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+        )
+    endif()
+
+    # ヘッダーディレクトリを設定
+    set(VPL_DIR "${VPL_SOURCE_DIR}/api/vpl")
+    message(STATUS "Intel VPL header path: ${VPL_DIR}")
+endif()
+
 # ========== libvpx (macOS / Linux) ==========
 if(APPLE OR UNIX)
     # VPX の設定を解析
-    string(JSON VPX_VERSION GET ${DEPS_JSON} libvpx version)
-    string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx repository)
-    set(VPX_GIT_TAG "v${VPX_VERSION}")
+    string(JSON VPX_GIT_TAG GET ${DEPS_JSON} libvpx tag)
+    string(JSON VPX_GIT_REPOSITORY GET ${DEPS_JSON} libvpx url)
 
     message(STATUS "Setting up libvpx...")
-    set(VPX_SOURCE_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/source")
-    set(VPX_BUILD_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/build")
-    set(VPX_INSTALL_DIR "${DEPS_DIR}/vpx/${VPX_VERSION}/install")
+    set(VPX_SOURCE_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/source")
+    set(VPX_BUILD_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/build")
+    set(VPX_INSTALL_DIR "${DEPS_DIR}/vpx/${VPX_GIT_TAG}/install")
 
     set(VPX_LIB ${VPX_INSTALL_DIR}/lib/libvpx.a)
 
@@ -402,10 +439,8 @@ endif()
 # 注意: video_encoder_*.cpp と video_decoder_*.cpp ファイルは
 # video_encoder.cpp と video_decoder.cpp に #include されるため、
 # 個別のコンパイル単位として追加しない
-nanobind_add_module(
-    _webcodecs_py
-    NB_STATIC
-    src/bindings/module.cpp
+set(WEBCODECS_SOURCES
+    src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp
     src/bindings/video_frame.cpp
@@ -423,16 +458,26 @@ nanobind_add_module(
     src/bindings/encoded_video_chunk.cpp
     src/bindings/encoded_audio_chunk.cpp
     src/bindings/video_codec_capabilities.cpp
+    src/bindings/image_decoder.cpp
+)
+
+nanobind_add_module(webcodecs_ext
+    NB_DOMAIN webcodecs
+    FREE_THREADED
+    ${WEBCODECS_SOURCES}
 )
 
 # ビルド順序を保証するため依存関係を追加
-add_dependencies(_webcodecs_py opus_build flac_build libaom_build libyuv_build dav1d_build)
+add_dependencies(webcodecs_ext opus_build flac_build libaom_build libyuv_build dav1d_build)
 if(APPLE OR UNIX)
-    add_dependencies(_webcodecs_py libvpx_build)
+    add_dependencies(webcodecs_ext libvpx_build)
+endif()
+if(INTEL_VPL_ENABLED)
+    add_dependencies(webcodecs_ext libvpl_download)
 endif()
 
 # インクルードディレクトリ
-target_include_directories(_webcodecs_py PRIVATE
+target_include_directories(webcodecs_ext PRIVATE
     src/bindings
     ${OPUS_INSTALL_DIR}/include/opus
     ${FLAC_INSTALL_DIR}/include
@@ -441,14 +486,14 @@ target_include_directories(_webcodecs_py PRIVATE
     ${YUV_INSTALL_DIR}/include
 )
 if(APPLE OR UNIX)
-    target_include_directories(_webcodecs_py PRIVATE
+    target_include_directories(webcodecs_ext PRIVATE
         ${VPX_INSTALL_DIR}/include
     )
 endif()
 
 # NVIDIA Video Codec SDK を使用する場合のインクルードディレクトリ
-if(NVIDIA_CUDA_TOOLKIT)
-    target_include_directories(_webcodecs_py PRIVATE
+if(USE_NVIDIA_CUDA_TOOLKIT)
+    target_include_directories(webcodecs_ext PRIVATE
         ${NVCODEC_DIR}/Interface
         ${NVCODEC_DIR}/Utils
         ${NVCODEC_DIR}/NvCodec/NvEncoder
@@ -456,20 +501,20 @@ if(NVIDIA_CUDA_TOOLKIT)
         ${CUDAToolkit_INCLUDE_DIRS}
     )
     # NvCodec ソースファイルを追加
-    target_sources(_webcodecs_py PRIVATE
+    target_sources(webcodecs_ext PRIVATE
         ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoder.cpp
         ${NVCODEC_DIR}/NvCodec/NvEncoder/NvEncoderCuda.cpp
         ${NVCODEC_DIR}/NvCodec/NvDecoder/NvDecoder.cpp
     )
     # コンパイル定義を追加
-    target_compile_definitions(_webcodecs_py PRIVATE NVIDIA_CUDA_TOOLKIT=1)
+    target_compile_definitions(webcodecs_ext PRIVATE USE_NVIDIA_CUDA_TOOLKIT=1)
 endif()
 
 # ライブラリをリンク
 # Windows では絶対パスを明確に指定
 if(WIN32)
     # Windows では文字列として扱って絶対パスを確保
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         "${OPUS_LIB}"
         "${FLAC_LIB}"
         "${AOM_LIB}"
@@ -477,9 +522,9 @@ if(WIN32)
         "${YUV_LIB}"
     )
     # FLAC を静的リンクする場合に必要
-    target_compile_definitions(_webcodecs_py PRIVATE FLAC__NO_DLL)
+    target_compile_definitions(webcodecs_ext PRIVATE FLAC__NO_DLL)
 else()
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         ${OPUS_LIB}
         ${FLAC_LIB}
         ${AOM_LIB}
@@ -490,44 +535,56 @@ endif()
 
 # libvpx (macOS / Linux)
 if(APPLE OR UNIX)
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         ${VPX_LIB}
     )
 endif()
 
 # macOS フレームワーク
 if(APPLE)
-    target_link_libraries(_webcodecs_py PRIVATE
+    target_link_libraries(webcodecs_ext PRIVATE
         "-framework CoreFoundation"
         "-framework CoreVideo"
         "-framework VideoToolbox"
         "-framework CoreMedia"
         "-framework AudioToolbox"
+        "-framework CoreGraphics"
+        "-framework ImageIO"
     )
 endif()
 
 # NVIDIA Video Codec SDK ライブラリ (Ubuntu のみ対応)
 # CUDA ライブラリは dlopen で動的にロードするため、直接リンクしない
 # これにより、GPU がない環境でもモジュールをインポートできる
-if(NVIDIA_CUDA_TOOLKIT)
+if(USE_NVIDIA_CUDA_TOOLKIT)
     # dlopen/dlsym に必要
-    target_link_libraries(_webcodecs_py PRIVATE dl)
+    target_link_libraries(webcodecs_ext PRIVATE dl)
+endif()
+
+# Intel VPL (Linux のみ)
+# libvpl は dlopen で動的にロードするため、直接リンクしない
+# これにより、Intel GPU がない環境でもモジュールをインポートできる
+# C++ コードでは #if defined(__linux__) で判定する
+if(INTEL_VPL_ENABLED)
+    target_include_directories(webcodecs_ext PRIVATE ${VPL_DIR})
+    # dlopen/dlsym に必要
+    target_link_libraries(webcodecs_ext PRIVATE dl)
 endif()
 
 # .pyi スタブファイルを生成
 nanobind_add_stub(
-    _webcodecs_py_stub
-    MODULE _webcodecs_py
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_webcodecs_py.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:_webcodecs_py>
-    DEPENDS _webcodecs_py
+    webcodecs_ext_stub
+    MODULE webcodecs_ext
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/webcodecs_ext.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:webcodecs_ext>
+    DEPENDS webcodecs_ext
 )
 
 # モジュールをインストール
-install(TARGETS _webcodecs_py LIBRARY DESTINATION webcodecs)
+install(TARGETS webcodecs_ext LIBRARY DESTINATION webcodecs)
 
 # .pyi スタブファイルをインストール
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/_webcodecs_py.pyi DESTINATION webcodecs)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/webcodecs_ext.pyi DESTINATION webcodecs)
 
 # py.typed マーカーファイルをインストール（型情報を含むパッケージであることを示す）
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/webcodecs/py.typed DESTINATION webcodecs)

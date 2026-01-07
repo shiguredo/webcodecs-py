@@ -32,7 +32,7 @@
 typedef const struct __CFString* CFStringRef;
 #endif
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 #include <cuda.h>
 #include <nvEncodeAPI.h>
 #endif
@@ -107,9 +107,21 @@ class VideoEncoder {
   CodecState state() const { return state_; }
   uint32_t encode_queue_size() const { return pending_tasks_.load(); }
 
-  void on_output(nb::object callback) { output_callback_ = callback; }
-  void on_error(nb::object callback) { error_callback_ = callback; }
-  void on_dequeue(nb::object callback) { dequeue_callback_ = callback; }
+  void on_output(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_callback_ = callback;
+    has_output_callback_ = !callback.is_none();
+  }
+  void on_error(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    error_callback_ = callback;
+    has_error_callback_ = !callback.is_none();
+  }
+  void on_dequeue(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_callback_ = callback;
+    has_dequeue_callback_ = !callback.is_none();
+  }
 
   // Static method to check if configuration is supported
   static VideoEncoderSupport is_config_supported(
@@ -135,6 +147,10 @@ class VideoEncoder {
   nb::object output_callback_;
   nb::object error_callback_;
   nb::object dequeue_callback_;
+  nb::ft_mutex callback_mutex_;  // Free-Threading 用コールバック保護
+  bool has_output_callback_{false};
+  bool has_error_callback_{false};
+  bool has_dequeue_callback_{false};
 
   // 並列処理のためのメンバー
   std::queue<EncodeTask> encode_queue_;     // エンコード待ちタスクのキュー
@@ -219,13 +235,14 @@ class VideoEncoder {
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK (NVENC) 関連のメンバー
   void* nvenc_encoder_ = nullptr;
   void* nvenc_cuda_context_ = nullptr;
   NV_ENCODE_API_FUNCTION_LIST* nvenc_api_ = nullptr;
   void* nvenc_input_buffer_ = nullptr;
   void* nvenc_output_buffer_ = nullptr;
+  std::vector<uint8_t> nvenc_description_;
 
   // NVENC 関連のメソッド
   void init_nvenc_encoder();
@@ -234,7 +251,45 @@ class VideoEncoder {
                           std::optional<uint16_t> quantizer = std::nullopt);
   void flush_nvenc_encoder();
   void cleanup_nvenc_encoder();
+  void build_nvenc_description(const uint8_t* sps,
+                               size_t sps_size,
+                               const uint8_t* pps,
+                               size_t pps_size,
+                               bool is_hevc);
+  void build_nvenc_hevc_description(const uint8_t* vps,
+                                    size_t vps_size,
+                                    const uint8_t* sps,
+                                    size_t sps_size,
+                                    const uint8_t* pps,
+                                    size_t pps_size);
 #endif
+
+#if defined(__linux__)
+  // Intel VPL 関連のメンバー
+  void* vpl_loader_ = nullptr;
+  void* vpl_session_ = nullptr;
+  std::vector<uint8_t> vpl_bitstream_buffer_;
+  std::vector<uint8_t> vpl_description_;
+  std::vector<uint8_t> vpl_surface_buffer_;
+  void* vpl_frame_info_ = nullptr;
+  void* vpl_bitstream_ = nullptr;
+  void* vpl_surface_pool_ = nullptr;
+
+  // Intel VPL 関連のメソッド
+  void init_intel_vpl_encoder();
+  void encode_frame_intel_vpl(const VideoFrame& frame,
+                              bool keyframe,
+                              std::optional<uint16_t> quantizer = std::nullopt);
+  void flush_intel_vpl_encoder();
+  void cleanup_intel_vpl_encoder();
+  void build_vpl_description(const uint8_t* sps,
+                             uint16_t sps_size,
+                             const uint8_t* pps,
+                             uint16_t pps_size,
+                             bool is_hevc);
+#endif
+
+  bool uses_intel_vpl() const;
 };
 
 void init_video_encoder(nb::module_& m);

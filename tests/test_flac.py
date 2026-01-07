@@ -2,6 +2,7 @@ import numpy as np
 
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioDecoder,
     AudioDecoderConfig,
     AudioEncoder,
@@ -125,7 +126,7 @@ def test_flac_encoder_encode():
         data[i, 0] = int(32767 * np.sin(2 * np.pi * 440 * i / 48000))
         data[i, 1] = int(32767 * np.sin(2 * np.pi * 880 * i / 48000))
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": frame_size,
@@ -220,7 +221,7 @@ def test_flac_44100_sample_rate():
     frame_size = 588
     data = np.zeros((frame_size, 2), dtype=np.int16)
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 44100,
         "number_of_frames": frame_size,
@@ -258,7 +259,7 @@ def test_flac_mono():
     frame_size = 4096
     data = np.zeros((frame_size, 1), dtype=np.int16)
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": frame_size,
@@ -304,7 +305,7 @@ def test_flac_encoder_config_options():
     frame_size = 4096
     data = np.zeros((frame_size, 2), dtype=np.int16)
 
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": frame_size,
@@ -407,7 +408,7 @@ def test_flac_encode_decode_lossless():
         original_data[i, 1] = int(32767 * np.sin(2 * np.pi * 880 * i / 48000))
 
     # エンコード
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": frame_size,
@@ -523,7 +524,7 @@ def test_flac_streaming_decode():
         original_data[i, 1] = int(32767 * np.sin(2 * np.pi * 880 * i / 48000))
 
     # エンコード
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": frame_size,

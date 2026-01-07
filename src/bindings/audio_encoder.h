@@ -49,14 +49,17 @@ class AudioEncoder {
   uint32_t encode_queue_size() const { return pending_tasks_.load(); }
 
   void on_output(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     output_callback_ = callback;
     has_output_callback_ = !callback.is_none();
   }
   void on_error(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     error_callback_ = callback;
     has_error_callback_ = !callback.is_none();
   }
   void on_dequeue(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     dequeue_callback_ = callback;
     has_dequeue_callback_ = !callback.is_none();
   }
@@ -90,6 +93,7 @@ class AudioEncoder {
   nb::object output_callback_;
   nb::object error_callback_;
   nb::object dequeue_callback_;
+  nb::ft_mutex callback_mutex_;  // Free-Threading 用コールバック保護
   bool has_output_callback_{false};
   bool has_error_callback_{false};
   bool has_dequeue_callback_{false};

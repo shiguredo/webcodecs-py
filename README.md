@@ -24,24 +24,35 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 
 - WebCodecs API の Python バインディング
 - Opus、FLAC、AAC、VP8、VP9、AV1、H.264、H.265 コーデックをサポート
-  - AAC は macOS の AudioToolbox を利用
-  - H.264 と H.265 は macOS の VideoToolbox または NVIDIA Video Codec を利用
-- Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応 (macOS)
-- NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応 (Ubuntu x86_64)
+- macOS arm64 にて ImageDecoder による画像デコードをサポート
+  - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
+- macOS arm64 にて Apple Audio Toolbox と Video Toolbox を利用したハードウェアアクセラレーション対応
+  - AAC エンコード/デコードに対応
+  - H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP9 / AV1 デコードに対応
+    - AV1 デコードは M3 チップ以降で利用できる
+  - CVPixelBufferRef をエンコーダーが直接利用可能
+- Ubuntu x86_64 にて NVIDIA Video Codec SDK を利用したハードウェアアクセラレーション対応
   - NVIDIA Video Codec を利用する場合は NVIDIA ドライバー 570.0 以降が必要
-- NumPy の ndarray を直接利用できる
+  - AAC エンコード/デコードに対応
+  - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP8 / VP9 デコードに対応
+- Ubuntu x86_64 にて Intel VPL を利用したハードウェアアクセラレーション対応
+  - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
+  - VP8 / VP9 デコードに対応
+- libyuv を利用した高速な RAW データ変換
+- PyCapsule 経由で CVPixelBuffer を直接受け取るネイティブバッファー対応 (macOS)
+- Python [Free-Threading](https://docs.python.org/3/howto/free-threading-python.html) 対応
 - クロスプラットフォーム対応
   - macOS arm64
   - Ubuntu x86_64 および arm64
   - Windows x86_64
-    - Windows はソフトウェアエンコード/デコードのみ対応
+    - Windows はソフトウェアコーデックのみ対応
 
 開発状況は [webcodecs-py 対応状況](docs/PYTHON_INTERFACE.md) をご確認ください。
 
 ## 実装しない機能
 
-- ImageDecoder: 画像デコード機能は実装対象外
-  - Pillow や OpenCV を使用してください
 - CanvasImageSource: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
 ## サンプルコード
@@ -199,6 +210,8 @@ encoder.close()
 ## Python
 
 - 3.14
+- 3.14t
+  - Windows のみ非対応
 - 3.13
 - 3.12
 
@@ -210,8 +223,8 @@ encoder.close()
 - Ubuntu 24.04 LTS arm64
 - Ubuntu 22.04 LTS x86_64
 - Ubuntu 22.04 LTS arm64
-- Windows 11 x86_64
 - Windows Server 2025 x86_64
+- Windows 11 x86_64
 
 ## ビルド
 
@@ -229,7 +242,7 @@ make test
 ## サンプル
 
 ```bash
-uv sync --group example
+uv sync
 make develop
 uv run python examples/blend2d_to_mp4.py
 ```

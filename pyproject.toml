@@ -1,26 +1,29 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "nanobind>=2.9"]
+requires = ["scikit-build-core", "nanobind>=2.10.2", "meson>=1.9"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "webcodecs-py"
 authors = [{ name = "Shiguredo Inc.", email = "contact+pypi@shiguredo.jp" }]
 dynamic = ["version"]
-description = "webcodecs-py"
+description = "WebCodecs API for Python"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 classifiers = [
+    "Programming Language :: C++",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Programming Language :: C++",
+    "Programming Language :: Python :: Free Threading :: 2 - Beta",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
 ]
 requires-python = ">=3.12"
+dependencies = []
 
 [project.urls]
 Source = "https://github.com/shiguredo/webcodecs-py"
@@ -37,12 +40,13 @@ test = [
     "pytest-repeat",
     "pytest-timeout",
     "pytest-benchmark",
+    "hypothesis",
     "numpy",
     "blend2d-py",
+    "pillow",
 ]
 lint = ["ruff", "ty"]
-example = ["opencv-python", "blend2d-py", "mp4-py"]
-pypi = ["auditwheel", "patchelf"]
+example = ["uvc-py", "portaudio-py", "raw-player", "blend2d-py", "mp4-py"]
 
 [tool.scikit-build]
 minimum-version = "0.11.3"
@@ -53,13 +57,14 @@ build-dir = "_build/{wheel_tag}"
 verbose = false
 
 [tool.scikit-build.cmake]
-version = ">=4.1"
+version = ">=4.2"
+define = { "CMAKE_CXX_STANDARD" = "20" }
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
-# 環境変数 NVIDIA_CUDA_TOOLKIT=1 が設定されている場合に NVIDIA Video Codec SDK を有効にする
+# 環境変数 USE_NVIDIA_CUDA_TOOLKIT=1 が設定されている場合
 [[tool.scikit-build.overrides]]
-if.env.NVIDIA_CUDA_TOOLKIT = true
-cmake.args = ["-DCMAKE_BUILD_TYPE=Release", "-DNVIDIA_CUDA_TOOLKIT=ON"]
+if.env.USE_NVIDIA_CUDA_TOOLKIT = true
+cmake.define.USE_NVIDIA_CUDA_TOOLKIT = "ON"
 
 [tool.scikit-build.ninja]
 version = ">=1.13"
@@ -80,6 +85,9 @@ python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Property-Based Testing (PBT) は prop_ prefix を使用する
+python_files = ["test_*.py", "prop_*.py"]
+python_functions = ["test_*", "prop_*"]
 # benchmark を有効にした場合は以下をコメントアウトする
 # python_files = ["test_*.py", "bench_*.py"]
 # addopts = "--benchmark-disable"

@@ -26,22 +26,14 @@ VideoCodec VideoDecoder::string_to_codec(const std::string& codec) {
 }
 
 VideoDecoder::VideoDecoder(nb::object output, nb::object error)
-    : output_callback_([output](std::unique_ptr<VideoFrame> frame) {
-        if (output) {
-          nb::gil_scoped_acquire gil;
-          output(std::move(frame));
-        }
-      }),
-      error_callback_([error](const std::string& err) {
-        if (error) {
-          nb::gil_scoped_acquire gil;
-          error(err);
-        }
-      }),
-      dequeue_callback_(nullptr),
+    : output_callback_(output),
+      error_callback_(error),
       state_(CodecState::UNCONFIGURED),
       decoder_context_(nullptr),
-      config_() {  // デフォルトコンストラクタ
+      config_() {
+  // コールバックフラグを設定
+  has_output_callback_ = !output_callback_.is_none();
+  has_error_callback_ = !error_callback_.is_none();
   // コンストラクタではコーデックの初期化は行わない
   // configure() で初期化する
 }
@@ -104,8 +96,7 @@ void VideoDecoder::configure(nb::dict config_dict) {
   // ワーカースレッドの開始
   // VideoToolbox は独自の非同期モデルを持つため、ワーカースレッドを開始しない
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (!(codec == VideoCodec::H264 || codec == VideoCodec::H265)) {
+  if (!uses_apple_video_toolbox()) {
     if (!worker_thread_.joinable()) {
       start_worker();  // ワーカースレッドを開始
     }
@@ -126,20 +117,35 @@ void VideoDecoder::decode(const EncodedVideoChunk& chunk) {
 
   // VideoToolbox は独自の非同期モデルを持つため、ワーカースレッドをバイパス
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
+  if (uses_apple_video_toolbox()) {
     // シーケンス番号を設定して直接デコード
     current_sequence_ = next_sequence_number_++;
     bool success = decode_internal(chunk);
-    if (!success && error_callback_) {
-      nb::gil_scoped_acquire gil;
-      error_callback_("Decode failed");
+    if (!success) {
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
+        nb::gil_scoped_acquire gil;
+        error_cb("Decode failed");
+      }
     }
 
     // デキューコールバックを呼び出す
-    if (dequeue_callback_) {
+    nb::object dequeue_cb;
+    bool has_dequeue;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      dequeue_cb = dequeue_callback_;
+      has_dequeue = has_dequeue_callback_;
+    }
+    if (has_dequeue && !dequeue_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      dequeue_callback_();
+      dequeue_cb();
     }
     return;
   }
@@ -159,10 +165,16 @@ void VideoDecoder::decode(const EncodedVideoChunk& chunk) {
   queue_cv_.notify_one();
 
   // デキューコールバックを呼び出す
-  if (dequeue_callback_) {
-    // ここでは GIL を解放中なので、取得が必要
+  nb::object dequeue_cb;
+  bool has_dequeue;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    dequeue_cb = dequeue_callback_;
+    has_dequeue = has_dequeue_callback_;
+  }
+  if (has_dequeue && !dequeue_cb.is_none()) {
     nb::gil_scoped_acquire gil;
-    dequeue_callback_();
+    dequeue_cb();
   }
 }
 
@@ -172,7 +184,7 @@ void VideoDecoder::flush() {
   }
 
   // NVIDIA Video Codec SDK の場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     // 全てのペンディングタスクが完了するまで待機
     {
@@ -186,10 +198,52 @@ void VideoDecoder::flush() {
   }
 #endif
 
+  // Intel VPL の場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    // 全てのペンディングタスクが完了するまで待機
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      queue_cv_.wait(lock, [this]() {
+        return decode_queue_.empty() && pending_tasks_ == 0;
+      });
+    }
+    flush_intel_vpl();
+
+    // 出力バッファに残っているフレームを全て出力
+    std::vector<std::unique_ptr<VideoFrame>> frames_to_output;
+    {
+      std::lock_guard<std::mutex> lock(output_mutex_);
+      for (auto& pair : output_buffer_) {
+        frames_to_output.push_back(std::move(pair.second));
+      }
+      output_buffer_.clear();
+    }
+
+    // コールバックを呼び出す（GIL を取得）
+    nb::object output_cb;
+    bool has_output;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      output_cb = output_callback_;
+      has_output = has_output_callback_;
+    }
+    if (has_output && !frames_to_output.empty()) {
+      nb::gil_scoped_acquire gil;
+      for (auto& frame : frames_to_output) {
+        if (!output_cb.is_none()) {
+          output_cb(nb::cast(frame.release(), nb::rv_policy::take_ownership));
+        }
+      }
+    }
+
+    return;
+  }
+#endif
+
   // VideoToolbox は直接処理されるため、ワーカーキューの待機をスキップ
 #if defined(__APPLE__)
-  VideoCodec codec = string_to_codec(config_.codec);
-  if (!(codec == VideoCodec::H264 || codec == VideoCodec::H265)) {
+  if (!uses_apple_video_toolbox()) {
 #endif
     // 全てのペンディングタスクが完了するまで待機
     {
@@ -203,17 +257,14 @@ void VideoDecoder::flush() {
 #endif
 
   // VideoToolbox の場合
-  if (string_to_codec(config_.codec) == VideoCodec::H264 ||
-      string_to_codec(config_.codec) == VideoCodec::H265) {
 #if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
     if (vt_session_) {
       // VideoToolbox デコーダーでのフラッシュ処理
-      // VTDecompressionSessionWaitForAsynchronousFrames は
-      // video_decoder_apple_video_toolbox.cpp で定義された関数経由で呼ぶ
       flush_videotoolbox();
     }
-#endif
   }
+#endif
 }
 
 void VideoDecoder::reset() {
@@ -274,9 +325,10 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
     VideoCodec codec = string_to_codec(config.codec);
 
     // NVIDIA Video Codec SDK でサポートされているかチェック
-#if defined(NVIDIA_CUDA_TOOLKIT)
-    if (config.hardware_acceleration_engine ==
-        HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
       // NVDEC でサポートされているコーデック: AV1, AVC, HEVC, VP8, VP9
       if (codec == VideoCodec::AV1 || codec == VideoCodec::H264 ||
           codec == VideoCodec::H265 || codec == VideoCodec::VP8 ||
@@ -286,28 +338,61 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
     }
 #endif
 
+#if defined(__APPLE__)
+    // Apple Video Toolbox でサポートされているかチェック
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX) {
+      // VideoToolbox でサポートされているコーデック: H.264, H.265, VP9, AV1
+      if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
+    // Intel VPL でサポートされているかチェック
+#if defined(__linux__)
+    if (config.hardware_acceleration_engine.has_value() &&
+        config.hardware_acceleration_engine.value() ==
+            HardwareAccelerationEngine::INTEL_VPL) {
+      // Intel VPL でサポートされているコーデック: AVC, HEVC, AV1
+      if (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
+          codec == VideoCodec::AV1) {
+        // ハードウェアがサポートしているか実際に確認する必要がある
+        // 今は true を返すが、実際のハードウェアサポートは初期化時にチェックされる
+        return VideoDecoderSupport(true, config);
+      }
+    }
+#endif
+
     switch (codec) {
       case VideoCodec::AV1:
+        // AV1 は dav1d でソフトウェアデコード
         supported = true;
         break;
       case VideoCodec::H264:
       case VideoCodec::H265:
 #if defined(__APPLE__)
         supported = true;  // macOS で VideoToolbox をサポート
-#elif defined(NVIDIA_CUDA_TOOLKIT)
-        // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-        supported = config.hardware_acceleration_engine ==
-                    HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#elif defined(USE_NVIDIA_CUDA_TOOLKIT) || defined(__linux__)
+        // NVIDIA Video Codec SDK または Intel VPL が有効な場合
+        supported = config.hardware_acceleration_engine.has_value() &&
+                    (config.hardware_acceleration_engine.value() ==
+                         HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC ||
+                     config.hardware_acceleration_engine.value() ==
+                         HardwareAccelerationEngine::INTEL_VPL);
 #else
         supported = false;  // 他のプラットフォームではまだサポートされていない
 #endif
         break;
       case VideoCodec::VP8:
       case VideoCodec::VP9:
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
         // NVIDIA Video Codec SDK が有効な場合は HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC を使用
-        if (config.hardware_acceleration_engine ==
-            HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
+        if (config.hardware_acceleration_engine.has_value() &&
+            config.hardware_acceleration_engine.value() ==
+                HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC) {
           supported = true;
         } else {
 #if defined(__APPLE__) || defined(__linux__)
@@ -335,9 +420,25 @@ VideoDecoderSupport VideoDecoder::is_config_supported(
 
 void VideoDecoder::init_decoder() {
   // NVIDIA Video Codec SDK を使用する場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     init_nvdec_decoder();
+    return;
+  }
+#endif
+
+  // Apple Video Toolbox を使用する場合
+#if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
+    init_videotoolbox_decoder();
+    return;
+  }
+#endif
+
+  // Intel VPL を使用する場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    init_intel_vpl_decoder();
     return;
   }
 #endif
@@ -349,11 +450,8 @@ void VideoDecoder::init_decoder() {
       break;
     case VideoCodec::H264:
     case VideoCodec::H265:
-#if defined(__APPLE__)
-      init_videotoolbox_decoder();
-#else
+      // H.264/H.265 は uses_apple_video_toolbox()/uses_intel_vpl() で処理されるため、ここには到達しない
       throw std::runtime_error("H.264/H.265 not supported on this platform");
-#endif
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
@@ -376,9 +474,26 @@ void VideoDecoder::cleanup_decoder() {
   }
 
   // NVIDIA Video Codec SDK のクリーンアップ
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (nvdec_decoder_) {
     cleanup_nvdec_decoder();
+    return;
+  }
+#endif
+
+  // Apple Video Toolbox のクリーンアップ
+#if defined(__APPLE__)
+  if (vt_session_) {
+    cleanup_videotoolbox_decoder();
+    decoder_context_ = nullptr;
+    return;
+  }
+#endif
+
+  // Intel VPL のクリーンアップ
+#if defined(__linux__)
+  if (vpl_session_) {
+    cleanup_intel_vpl_decoder();
     return;
   }
 #endif
@@ -398,9 +513,7 @@ void VideoDecoder::cleanup_decoder() {
       break;
     case VideoCodec::H264:
     case VideoCodec::H265:
-#if defined(__APPLE__)
-      cleanup_videotoolbox_decoder();
-#endif
+      // VideoToolbox/Intel VPL は上で処理されるため、ここには到達しない
       break;
     case VideoCodec::VP8:
     case VideoCodec::VP9:
@@ -417,9 +530,23 @@ void VideoDecoder::cleanup_decoder() {
 
 bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
   // NVIDIA Video Codec SDK を使用する場合
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   if (uses_nvidia_video_codec()) {
     return decode_nvdec(chunk);
+  }
+#endif
+
+  // Apple Video Toolbox を使用する場合
+#if defined(__APPLE__)
+  if (uses_apple_video_toolbox()) {
+    return decode_videotoolbox(chunk);
+  }
+#endif
+
+  // Intel VPL を使用する場合
+#if defined(__linux__)
+  if (uses_intel_vpl()) {
+    return decode_intel_vpl(chunk);
   }
 #endif
 
@@ -428,26 +555,40 @@ bool VideoDecoder::decode_internal(const EncodedVideoChunk& chunk) {
     case VideoCodec::AV1:
       return decode_dav1d(chunk);
     case VideoCodec::H264:
-    case VideoCodec::H265:
-#if defined(__APPLE__)
-      return decode_videotoolbox(chunk);
-#else
-      if (error_callback_) {
+    case VideoCodec::H265: {
+      // H.264/H.265 は uses_apple_video_toolbox()/uses_intel_vpl() で処理されるため、ここには到達しない
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
         nb::gil_scoped_acquire gil;
-        error_callback_("H.264/H.265 not supported on this platform");
+        error_cb("H.264/H.265 not supported on this platform");
       }
       return false;
-#endif
+    }
     case VideoCodec::VP8:
     case VideoCodec::VP9:
 #if defined(__APPLE__) || defined(__linux__)
       return decode_vpx(chunk);
 #else
-      if (error_callback_) {
+    {
+      nb::object error_cb;
+      bool has_error;
+      {
+        nb::ft_lock_guard guard(callback_mutex_);
+        error_cb = error_callback_;
+        has_error = has_error_callback_;
+      }
+      if (has_error && !error_cb.is_none()) {
         nb::gil_scoped_acquire gil;
-        error_callback_("VP8/VP9 not supported on this platform");
+        error_cb("VP8/VP9 not supported on this platform");
       }
       return false;
+    }
 #endif
     default:
       return false;
@@ -466,9 +607,12 @@ void VideoDecoder::flush_dav1d() {
 #if defined(__APPLE__) || defined(__linux__)
 #include "video_decoder_vpx.cpp"
 #endif
+#if defined(__linux__)
+#include "video_decoder_intel_vpl.cpp"
+#endif
 
 bool VideoDecoder::uses_nvidia_video_codec() const {
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK が有効な場合
   // エンコーダー/デコーダー: H.264, H.265, AV1
   // デコーダーのみ: VP8, VP9
@@ -476,8 +620,46 @@ bool VideoDecoder::uses_nvidia_video_codec() const {
   return (codec == VideoCodec::H264 || codec == VideoCodec::H265 ||
           codec == VideoCodec::AV1 || codec == VideoCodec::VP8 ||
           codec == VideoCodec::VP9) &&
-         config_.hardware_acceleration_engine ==
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
              HardwareAccelerationEngine::NVIDIA_VIDEO_CODEC;
+#else
+  return false;
+#endif
+}
+
+bool VideoDecoder::uses_apple_video_toolbox() const {
+#if defined(__APPLE__)
+  // Apple Video Toolbox が有効な場合
+  // H.264, H.265: デフォルトで VideoToolbox を使用（WebCodecs API 準拠）
+  // VP9, AV1: HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX 指定時のみ
+  VideoCodec codec = string_to_codec(config_.codec);
+  if (codec == VideoCodec::H264 || codec == VideoCodec::H265) {
+    // hardware_acceleration_engine が未指定、または明示的に APPLE_VIDEO_TOOLBOX が指定された場合
+    if (!config_.hardware_acceleration_engine.has_value()) {
+      return true;  // 未指定の場合は自動的に VideoToolbox を使用
+    }
+    return config_.hardware_acceleration_engine.value() ==
+           HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+  }
+  if (codec == VideoCodec::VP9 || codec == VideoCodec::AV1) {
+    return config_.hardware_acceleration_engine.has_value() &&
+           config_.hardware_acceleration_engine.value() ==
+               HardwareAccelerationEngine::APPLE_VIDEO_TOOLBOX;
+  }
+  return false;
+#else
+  return false;
+#endif
+}
+
+bool VideoDecoder::uses_intel_vpl() const {
+#if defined(__linux__)
+  VideoCodec codec = string_to_codec(config_.codec);
+  return (codec == VideoCodec::H264 || codec == VideoCodec::H265) &&
+         config_.hardware_acceleration_engine.has_value() &&
+         config_.hardware_acceleration_engine.value() ==
+             HardwareAccelerationEngine::INTEL_VPL;
 #else
   return false;
 #endif
@@ -549,9 +731,16 @@ void VideoDecoder::process_decode_task(const DecodeTask& task) {
 
   if (!success) {
     // エラー処理
-    if (error_callback_) {
+    nb::object error_cb;
+    bool has_error;
+    {
+      nb::ft_lock_guard guard(callback_mutex_);
+      error_cb = error_callback_;
+      has_error = has_error_callback_;
+    }
+    if (has_error && !error_cb.is_none()) {
       nb::gil_scoped_acquire gil;
-      error_callback_(std::string("Failed to decode chunk"));
+      error_cb(std::string("Failed to decode chunk"));
     }
   }
 
@@ -580,11 +769,19 @@ void VideoDecoder::handle_output(uint64_t sequence,
   }
 
   // コールバックを呼び出す（GIL を取得）
-  if (output_callback_ && !frames_to_output.empty()) {
+  nb::object output_cb;
+  bool has_output;
+  {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_cb = output_callback_;
+    has_output = has_output_callback_;
+  }
+  if (has_output && !frames_to_output.empty()) {
     nb::gil_scoped_acquire gil;
-    for (auto& frame : frames_to_output) {
-      if (frame) {  // null チェック
-        output_callback_(std::move(frame));
+    for (auto& output_frame : frames_to_output) {
+      if (output_frame && !output_cb.is_none()) {
+        output_cb(
+            nb::cast(output_frame.release(), nb::rv_policy::take_ownership));
       }
     }
   }
@@ -653,33 +850,13 @@ void init_video_decoder(nb::module_& m) {
                   "webcodecs.VideoDecoderConfig, /) -> "
                   "webcodecs.VideoDecoderSupport"))
       .def(
-          "on_output",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_output([callback](std::unique_ptr<VideoFrame> frame) {
-              nb::gil_scoped_acquire gil;
-              callback(frame.release());
-            });
-          },
+          "on_output", &VideoDecoder::on_output,
           nb::sig("def on_output(self, callback: typing.Callable[[VideoFrame], "
                   "None], /) -> None"))
-      .def(
-          "on_error",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_error([callback](const std::string& error) {
-              nb::gil_scoped_acquire gil;
-              callback(error);
-            });
-          },
-          nb::sig("def on_error(self, callback: typing.Callable[[str], None], "
-                  "/) -> None"))
-      .def(
-          "on_dequeue",
-          [](VideoDecoder& self, nb::object callback) {
-            self.on_dequeue([callback]() {
-              nb::gil_scoped_acquire gil;
-              callback();
-            });
-          },
-          nb::sig("def on_dequeue(self, callback: typing.Callable[[], None], "
-                  "/) -> None"));
+      .def("on_error", &VideoDecoder::on_error,
+           nb::sig("def on_error(self, callback: typing.Callable[[str], None], "
+                   "/) -> None"))
+      .def("on_dequeue", &VideoDecoder::on_dequeue,
+           nb::sig("def on_dequeue(self, callback: typing.Callable[[], None], "
+                   "/) -> None"));
 }

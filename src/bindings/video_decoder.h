@@ -1,11 +1,8 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/function.h>
-#include <nanobind/stl/unique_ptr.h>
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -19,7 +16,7 @@
 #include "video_frame.h"
 #include "webcodecs_types.h"
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
 #include <cuda.h>
 #include <cuviddec.h>
 #include <nvcuvid.h>
@@ -43,9 +40,6 @@ enum class VideoCodec {
 
 class VideoDecoder {
  public:
-  using OutputCallback = std::function<void(std::unique_ptr<VideoFrame>)>;
-  using ErrorCallback = std::function<void(const std::string&)>;
-
   // デコードタスクを表す構造体
   struct DecodeTask {
     std::optional<EncodedVideoChunk> chunk;
@@ -72,10 +66,20 @@ class VideoDecoder {
       const VideoDecoderConfig& config);
 
   // Callback setters
-  void on_output(OutputCallback callback) { output_callback_ = callback; }
-  void on_error(ErrorCallback callback) { error_callback_ = callback; }
-  void on_dequeue(std::function<void()> callback) {
+  void on_output(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    output_callback_ = callback;
+    has_output_callback_ = !callback.is_none();
+  }
+  void on_error(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
+    error_callback_ = callback;
+    has_error_callback_ = !callback.is_none();
+  }
+  void on_dequeue(nb::object callback) {
+    nb::ft_lock_guard guard(callback_mutex_);
     dequeue_callback_ = callback;
+    has_dequeue_callback_ = !callback.is_none();
   }
 
   // VideoToolbox コールバック用に public にする
@@ -83,9 +87,13 @@ class VideoDecoder {
                      std::unique_ptr<VideoFrame> frame);  // 出力処理
 
  private:
-  OutputCallback output_callback_;
-  ErrorCallback error_callback_;
-  std::function<void()> dequeue_callback_;
+  nb::object output_callback_;
+  nb::object error_callback_;
+  nb::object dequeue_callback_;
+  nb::ft_mutex callback_mutex_;  // Free-Threading 用コールバック保護
+  bool has_output_callback_{false};
+  bool has_error_callback_{false};
+  bool has_dequeue_callback_{false};
   CodecState state_;
   VideoDecoderConfig config_;     // 内部で保持する設定
   CodecParameters codec_params_;  // パースしたコーデックパラメータ
@@ -152,7 +160,10 @@ class VideoDecoder {
   // NVIDIA Video Codec SDK を使用するかどうかを判定
   bool uses_nvidia_video_codec() const;
 
-#if defined(NVIDIA_CUDA_TOOLKIT)
+  // Apple Video Toolbox を使用するかどうかを判定
+  bool uses_apple_video_toolbox() const;
+
+#if defined(USE_NVIDIA_CUDA_TOOLKIT)
   // NVIDIA Video Codec SDK (NVDEC) 関連のメンバー
   void* nvdec_decoder_ = nullptr;
   void* nvdec_cuda_context_ = nullptr;
@@ -174,4 +185,24 @@ class VideoDecoder {
   static int handle_decode_picture(void* user_data, void* pic_params);
   static int handle_display_picture(void* user_data, void* disp_info);
 #endif
+
+#if defined(__linux__)
+  // Intel VPL 関連のメンバー
+  void* vpl_loader_ = nullptr;
+  void* vpl_session_ = nullptr;
+  std::vector<uint8_t> vpl_bitstream_buffer_;
+  std::vector<uint8_t> vpl_surface_buffer_;
+  void* vpl_bitstream_ = nullptr;
+  void* vpl_surface_pool_ = nullptr;
+  bool vpl_initialized_ = false;
+
+  // Intel VPL 関連のメソッド
+  void init_intel_vpl_decoder();
+  bool decode_intel_vpl(const EncodedVideoChunk& chunk);
+  void flush_intel_vpl();
+  void cleanup_intel_vpl_decoder();
+#endif
+
+  // Intel VPL を使用するかどうかを判定
+  bool uses_intel_vpl() const;
 };

@@ -23,9 +23,20 @@ jobs:
               group: Self
               labels: [self-hosted, linux, x64, NVIDIA-Video-Codec-SDK]
             env_vars: |
-              NVIDIA_CUDA_TOOLKIT=true
+              NVIDIA_VIDEO_CODEC=true
             test_target: tests/test_nvidia_video_codec.py
             # NVIDIA Video Codec 用の wheel は ubuntu-24.04_x86_64 のものを使用
+            wheel_platform: ubuntu-24.04_x86_64
+          # Intel VPL (self-hosted runner)
+          - name: intel-vpl
+            runs_on:
+              group: Self
+              labels: [self-hosted, linux, x64, Intel-VPL]
+            env_vars: |
+              INTEL_VPL=true
+              LIBVA_MESSAGING_LEVEL=0
+            test_target: tests/test_intel_vpl.py
+            # Intel VPL 用の wheel は ubuntu-24.04_x86_64 のものを使用
             wheel_platform: ubuntu-24.04_x86_64
           # Apple Video Toolbox (self-hosted runner)
           - name: apple-video-toolbox_arm64
@@ -39,17 +50,21 @@ jobs:
             wheel_platform: macos-15_arm64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-          python-version: ${{ matrix.python_version }}
+
+      # self-hosted runner では uv python pin で Python バージョンを固定する
+      - name: Pin Python version
+        run: uv python pin ${{ matrix.python_version }}
 
       - name: Debug event info
         run: |
@@ -59,14 +74,14 @@ jobs:
 
       - name: Download wheel artifact (workflow_call)
         if: ${{ !github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.wheel_platform }}_python-${{ matrix.python_version }}
           path: wheelhouse/
 
       - name: Download wheel artifact (workflow_dispatch)
         if: ${{ github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
@@ -91,19 +106,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest ${{ matrix.platform.test_target }} --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_macos:
@@ -119,19 +133,18 @@ jobs:
             runs_on: macos-15
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-
-      - run: |
-          uv python pin ${{ matrix.python_version }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Debug event info
         run: |
@@ -141,14 +154,14 @@ jobs:
 
       - name: Download wheel artifact (workflow_call)
         if: ${{ !github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
 
       - name: Download wheel artifact (workflow_dispatch)
         if: ${{ github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
@@ -162,19 +175,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_ubuntu:
@@ -195,31 +207,29 @@ jobs:
             runs_on: ubuntu-22.04-arm
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-
-      - name: Setup Python via uv
-        run: |
-          uv python pin ${{ matrix.python_version }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Download wheel artifact (workflow_call)
         if: ${{ !github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
 
       - name: Download wheel artifact (workflow_dispatch)
         if: ${{ github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
@@ -233,19 +243,18 @@ jobs:
 
       - name: Install wheel
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1
 
   test_windows:
@@ -259,32 +268,32 @@ jobs:
           - name: windows-2025_x86_64
             runs_on: windows-2025
         python_version:
-          - "3.13"
           - "3.14"
+          # Windows の Python 3.14t (free-threaded) は nanobind のビルドで
+          # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
+          # - "3.14t"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-
-      - name: Setup Python via uv
-        shell: bash
-        run: |
-          uv python pin ${{ matrix.python_version }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Download wheel artifact (workflow_call)
         if: ${{ !github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
 
       - name: Download wheel artifact (workflow_dispatch)
         if: ${{ github.event.inputs.run_id }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
@@ -300,18 +309,17 @@ jobs:
       - name: Install wheel
         shell: bash
         run: |
-          uv venv
-          uv pip install pytest pytest-timeout numpy
+          uv sync --only-group test
           uv pip install wheelhouse/*.whl
 
       - name: Run tests
         shell: bash
         run: |
+          uv run pytest tests/ --tb=short -v
+        env:
           # UV_NO_SYNC=1 を指定する理由:
           # uv run はデフォルトで実行前に pyproject.toml/uv.lock と環境を同期する
           # この同期により、uv pip install でインストールした wheel が削除され、
           # 元のソースコードがインストールされてしまう
           # UV_NO_SYNC=1 で同期をスキップし、インストール済みの wheel を使用する
-          uv run pytest tests/ --tb=short -v
-        env:
           UV_NO_SYNC: 1

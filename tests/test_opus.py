@@ -2,6 +2,7 @@ import numpy as np
 
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioDecoder,
     AudioDecoderConfig,
     AudioEncoder,
@@ -153,7 +154,7 @@ def test_opus_frame_durations():
 
     for frame_size in frame_sizes:
         data = np.zeros((frame_size, 2), dtype=np.float32)
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": 48000,
             "number_of_frames": frame_size,
@@ -236,7 +237,7 @@ def test_opus_encoder_decoder_states():
 
     # 20ms 相当のフレームを S16 で作成 (F32 同士の変換は未対応のため)
     data = np.zeros((960, 2), dtype=np.int16)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.S16,
         "sample_rate": 48000,
         "number_of_frames": 960,

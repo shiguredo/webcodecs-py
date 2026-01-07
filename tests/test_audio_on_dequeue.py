@@ -10,6 +10,7 @@ from webcodecs import (
     AudioDecoder,
     AudioDecoderConfig,
     AudioData,
+    AudioDataInit,
     AudioSampleFormat,
 )
 
@@ -41,7 +42,7 @@ def test_audio_encoder_on_dequeue():
 
     # テスト用のオーディオデータを作成 (960 サンプル、2 チャンネル)
     samples = np.zeros((960, 2), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": 48000,
         "number_of_frames": 960,
@@ -88,7 +89,7 @@ def test_audio_decoder_on_dequeue():
     encoder.configure(config)
 
     samples = np.zeros((960, 2), dtype=np.float32)
-    init = {
+    init: AudioDataInit = {
         "format": AudioSampleFormat.F32,
         "sample_rate": 48000,
         "number_of_frames": 960,

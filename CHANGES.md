@@ -11,6 +11,60 @@
 
 ## develop
 
+## 2026.1.0
+
+**リリース日**:: 2026-01-07
+
+- [UPDATE] libuv を `022efdb0b771f7353741dbe360b8bef4e0a874eb` にアップデートする
+  - @voluntas
+- [UPDATE] libdav1d を v1.5.3 にアップデートする
+  - @voluntas
+- [UPDATE] libvpl を v2.16.0 にアップデートする
+  - @voluntas
+- [UPDATE] libopus を v1.6 にアップデートする
+  - @voluntas
+- [UPDATE] macOS で hardware_acceleration_engine 未指定時に H.264/HEVC で Apple Video Toolbox を自動選択するように修正する
+  - WebCodecs API 準拠の自動選択動作を実装
+  - HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を明示的に指定しなくても H.264/HEVC では Video Toolbox が使用される
+  - @voluntas
+- [ADD] VideoFrame に native_buffer サポートを追加する (macOS)
+  - コンストラクタで PyCapsule (CVPixelBufferRef) を直接受け取れるようになる
+  - Apple Video Toolbox エンコーダーが直接利用可能
+  - native_buffer のみの VideoFrame では plane()/planes()/copy_to()/clone() は RuntimeError
+  - @voluntas
+- [ADD] Python 3.14t の Free-Threading ビルドに対応する
+  - VideoEncoder / VideoDecoder / AudioEncoder / AudioDecoder でスレッドセーフなコールバック管理を実装
+  - nanobind の nb::ft_mutex を使用した排他制御
+  - Windows 3.14t は nanobind ビルドの問題により非対応
+  - @voluntas
+- [ADD] Apple Video Toolbox で VP9/AV1 デコーダーをサポートする
+  - VideoDecoderConfig で hardware_acceleration_engine に HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX を指定した場合のみ有効
+  - デフォルトは libvpx (VP9) / dav1d (AV1) によるソフトウェアデコード
+  - @voluntas
+- [ADD] NVIDIA Video Codec SDK (H.264/HEVC) で description (avcC/hvcC) をサポートする
+  - キーフレーム時に decoder_config.description を提供する
+  - デコーダーの configure で description を指定可能
+  - @voluntas
+- [ADD] Intel VPL (H.264/HEVC) をサポートする
+  - VideoEncoder / VideoDecoder で hardware_acceleration_engine に HardwareAccelerationEngine.INTEL_VPL を指定できる
+  - H.264 / HEVC のハードウェアエンコード/デコードに対応
+  - キーフレーム時に decoder_config.description (avcC/hvcC) を提供する
+  - Ubuntu x86_64 のみ対応
+- [ADD] ImageDecoder を追加する (macOS)
+  - WebCodecs ImageDecoder API を実装
+  - macOS の Image I/O フレームワークを使用
+  - JPEG、PNG、GIF、WebP、BMP、TIFF、HEIC/HEIF に対応
+  - @voluntas
+
+### misc
+
+- [CHANGE] GitHub Actions で auditwheel を uvx 経由で実行するように変更する
+  - pyproject.toml から pypi 依存グループを削除
+  - @voluntas
+- [CHANGE] NVIDIA Video Codec SDK のビルドオプション名を変更する
+  - `NVIDIA_CUDA_TOOLKIT` → `USE_NVIDIA_CUDA_TOOLKIT`
+  - @voluntas
+
 ## 2025.2.0
 
 **リリース日**:: 2025-12-08

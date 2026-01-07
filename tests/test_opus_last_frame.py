@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from webcodecs import (
     AudioData,
+    AudioDataInit,
     AudioEncoder,
     AudioEncoderConfig,
     AudioSampleFormat,
@@ -57,7 +58,7 @@ def test_opus_encoder_last_frame_handling():
         # マイクロ秒でタイムスタンプを計算
         timestamp = (idx * frame_size * 1000000) // sample_rate
         num_frames, num_channels = frame.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,
@@ -128,7 +129,7 @@ def test_opus_encoder_exact_frames():
         # マイクロ秒でタイムスタンプを計算
         timestamp = (idx * frame_size * 1000000) // sample_rate
         num_frames, num_channels = frame.shape
-        init = {
+        init: AudioDataInit = {
             "format": AudioSampleFormat.F32,
             "sample_rate": sample_rate,
             "number_of_frames": num_frames,

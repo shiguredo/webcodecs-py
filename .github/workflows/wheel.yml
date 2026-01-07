@@ -21,9 +21,10 @@ jobs:
           - name: macos-15_arm64
             runs_on: macos-15
         python_version:
-          - "3.12"
-          - "3.13"
           - "3.14"
+          - "3.14t"
+          - "3.13"
+          - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -38,15 +39,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
       - name: Install build dependencies
         run: |
           brew install nasm yasm
-      - name: Install meson
-        run: uv tool install meson
 
       - run: uv build --wheel --out-dir wheelhouse
       - name: Upload Artifact
@@ -74,6 +73,7 @@ jobs:
             arch: arm64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -90,7 +90,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
 
@@ -106,16 +106,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential nasm yasm
-      - name: Install meson
-        run: uv tool install meson
 
       # x86_64 の場合は NVIDIA Video Codec SDK を有効にしてビルド
       # CUDA ライブラリは dlopen で動的にロードするため、ビルド時には不要
+      # Intel VPL は Linux では常に有効（ヘッダーは third_party/vpl/ にあり、libvpl は dlopen で動的ロード）
       - name: Build wheel (x86_64 with NVIDIA Video Codec SDK)
         if: matrix.platform.arch == 'x86_64'
         run: uv build --wheel
         env:
-          NVIDIA_CUDA_TOOLKIT: true
+          USE_NVIDIA_CUDA_TOOLKIT: true
 
       # arm64 の場合は通常ビルド
       - name: Build wheel (arm64)
@@ -125,8 +124,7 @@ jobs:
       - name: Repair wheel with auditwheel
         shell: bash
         run: |
-          uv sync --group pypi
-          uv run auditwheel repair dist/*.whl --strip --only-plat
+          uvx auditwheel repair dist/*.whl --strip --only-plat
       - name: Upload Repaired Wheels
         uses: actions/upload-artifact@v5
         with:
@@ -142,6 +140,9 @@ jobs:
             runs_on: windows-2025
         python_version:
           - "3.14"
+          # Windows の Python 3.14t (free-threaded) は nanobind のビルドで
+          # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
+          # - "3.14t"
           - "3.13"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
@@ -150,7 +151,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
         with:
-          enable-cache: true
+          enable-cache: false
           python-version: ${{ matrix.python_version }}
 
       # 依存ライブラリのビルドキャッシュ (nanobind と src/ 以外)
@@ -158,12 +159,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _deps
-          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('deps.json', 'CMakeLists.txt', 'pyproject.toml', 'uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-deps-${{ matrix.platform.name }}-
-
-      - name: Install meson
-        run: uv tool install meson
 
       - name: Build wheel
         run: uv build --wheel --out-dir wheelhouse
@@ -197,8 +195,14 @@ jobs:
           - name: windows-2025_x86_64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
           - "3.12"
+        exclude:
+          # Windows の Python 3.14t は非対応
+          - platform:
+              name: windows-2025_x86_64
+            python_version: "3.14t"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: pypi

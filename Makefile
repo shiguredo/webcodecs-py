@@ -6,7 +6,7 @@ wheel:
 develop: wheel
 	uv pip install -e . --force-reinstall
 	@echo "Copying .pyi stub file..."
-	@cp _build/cp*/_webcodecs_py.pyi src/webcodecs/ 2>/dev/null || true
+	@cp _build/cp*/webcodecs_ext.pyi src/webcodecs/ 2>/dev/null || true
 
 test: develop
 	uv run pytest tests/ --timeout=10

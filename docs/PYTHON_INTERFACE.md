@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-07
+- 最終更新: 2025-12-26
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -149,10 +149,11 @@ encoder.configure(config)  # dict として渡す
 
 Init 系:
 
-- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 - `AudioDataInit` - AudioData コンストラクタ用
-- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
 - `EncodedAudioChunkInit` - EncodedAudioChunk コンストラクタ用
+- `EncodedVideoChunkInit` - EncodedVideoChunk コンストラクタ用
+- `ImageDecoderInit` - ImageDecoder コンストラクタ用
+- `VideoFrameBufferInit` - VideoFrame コンストラクタ用
 
 Config 系:
 
@@ -171,13 +172,14 @@ Config 系:
 Options 系:
 
 - `AudioDataCopyToOptions` - AudioData.copy_to() のオプション
-- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
+- `ImageDecodeOptions` - ImageDecoder.decode() のオプション
 - `VideoEncoderEncodeOptions` - VideoEncoder.encode() のオプション
 - `VideoEncoderEncodeOptionsForAv1` - AV1 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForAvc` - AVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForHevc` - HEVC 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp8` - VP8 固有のエンコードオプション
 - `VideoEncoderEncodeOptionsForVp9` - VP9 固有のエンコードオプション
+- `VideoFrameCopyToOptions` - VideoFrame.copy_to() のオプション
 
 Support 系 (is_config_supported() の戻り値):
 
@@ -190,6 +192,10 @@ Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
 - `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
+
+Result 系 (メソッドの戻り値):
+
+- `ImageDecodeResult` - ImageDecoder.decode() の戻り値
 
 ### 6. Promise の代替
 
@@ -282,7 +288,7 @@ destination = np.zeros(chunk.byte_length, dtype=np.uint8)
 chunk.copy_to(destination)
 ```
 
-**ゼロコピーアクセス**: コピーが不要な場合は `planes()` メソッド（独自拡張）を使用してください。
+**直接アクセス**: 内部バッファに直接アクセスする場合は `planes()` メソッド（独自拡張）を使用してください。
 
 ## 基本的な利用例
 
@@ -414,6 +420,28 @@ decoder.configure(config)
 config: VideoDecoderConfig = {
     "codec": "avc1.42001f",
     "hardware_acceleration_engine": HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+}
+decoder.configure(config)
+```
+
+```python
+# Apple Video Toolbox を使用した VP9 デコード (macOS)
+# デフォルトでは libvpx によるソフトウェアデコードが使用される
+# VideoToolbox による高速なハードウェアデコードを使用する場合は明示的に指定が必要
+config: VideoDecoderConfig = {
+    "codec": "vp09.00.10.08",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+}
+decoder.configure(config)
+```
+
+```python
+# Apple Video Toolbox を使用した AV1 デコード (macOS)
+# デフォルトでは dav1d によるソフトウェアデコードが使用される
+# VideoToolbox による高速なハードウェアデコードを使用する場合は明示的に指定が必要
+config: VideoDecoderConfig = {
+    "codec": "av01.0.08M.08",
+    "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
 }
 decoder.configure(config)
 ```
@@ -724,6 +752,7 @@ print(result["capture_time"])  # 1234567890.0
 | **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
 | **`planes()`** | o | x | o | **独自拡張**: 全プレーン (Y, U, V) をタプルで返す（I420/I422/I444 のみ） |
 | **`plane()`** | o | x | o | **独自拡張**: 指定したプレーンを返す（全フォーマット対応） |
+| **`native_buffer`** | o | x | o | **独自拡張**: ネイティブバッファ（PyCapsule）を保持するプロパティ（macOS のみ） |
 
 **clone() の動作**:
 
@@ -798,13 +827,13 @@ def on_output(chunk, metadata=None):
 
 #### planes() メソッド
 
-**ゼロコピービューを返す独自拡張メソッド**
+**内部バッファに直接アクセスする独自拡張メソッド**
 
 ```python
 def planes() -> tuple[ndarray, ndarray, ndarray]
 ```
 
-- **目的**: 高速なメモリアクセスが必要な場合に、データのコピーを作成せずに直接プレーンへのビューを提供
+- **目的**: 内部バッファに直接アクセスし、入出力に利用できる ndarray を返す
 - **対応フォーマット**: I420, I422, I444
 - **戻り値**: (Y プレーン, U プレーン, V プレーン) のタプル
 - **注意事項**:
@@ -830,26 +859,85 @@ init: VideoFrameBufferInit = {
 
 frame = VideoFrame(data, init)
 
-# ゼロコピービューを取得
+# 内部バッファに直接アクセス
 y_plane, u_plane, v_plane = frame.planes()
 
 # ビューへの書き込みは元のデータを変更
 y_plane[:] = 235  # 元の data も変更される
 ```
 
+#### native_buffer プロパティ
+
+**エンコーダーが直接利用できるプロパティ（macOS 専用）**
+
+```python
+native_buffer: object | None  # 読み書き可能
+```
+
+- **目的**: CVPixelBufferRef を保持し、Video Toolbox エンコーダーが直接利用できる
+- **対応プラットフォーム**: macOS のみ
+- **形式**: PyCapsule（名前: `"CVPixelBufferRef"`）
+
+**コンストラクタでの使用**:
+
+VideoFrame は data (numpy.ndarray) の代わりに PyCapsule を直接受け取ることができます:
+
+```python
+import ctypes
+from webcodecs import VideoFrame, VideoPixelFormat
+
+# CVPixelBufferRef を PyCapsule でラップ（実際のコードでは外部から取得）
+# capsule = create_cv_pixel_buffer_capsule(cv_pixel_buffer_ref)
+
+frame = VideoFrame(
+    capsule,  # data の代わりに PyCapsule を渡す
+    {
+        "format": VideoPixelFormat.NV12,
+        "coded_width": 640,
+        "coded_height": 480,
+        "timestamp": 0,
+    },
+)
+
+# エンコーダーが直接利用する
+encoder.encode(frame)
+```
+
+**制限事項**:
+
+native_buffer のみで作成した VideoFrame では、以下のメソッドは使用できません（RuntimeError が発生）:
+
+- `plane()` - プレーンデータにアクセスできない
+- `planes()` - プレーンデータにアクセスできない
+- `copy_to()` - データをコピーできない
+- `clone()` - データをコピーできない
+
+これらのメソッドが必要な場合は、data (numpy.ndarray) を使用して VideoFrame を作成してください。
+
+**ユースケース**:
+
+- カメラキャプチャから直接取得した CVPixelBufferRef をエンコード
+- GPU レンダリング結果の CVPixelBufferRef をエンコード
+- メモリコピーを最小化したリアルタイム処理
+
 ### VideoFrame のメモリ管理
 
-VideoFrame は以下の 2 つのモードで動作します：
+VideoFrame は以下の 3 つのモードで動作します：
 
 1. **外部メモリ参照モード** (コンストラクタで ndarray を渡した場合)
    - 元の ndarray への参照を保持
-   - planes() メソッドはゼロコピービューを返す
+   - planes() メソッドは内部バッファに直接アクセスできる
    - copy_to() メソッドはデータのコピーを返す
 
 2. **内部メモリ所有モード** (width, height, format で作成した場合)
    - 内部でメモリを確保し所有
    - planes() メソッドは内部メモリへのビューを返す
    - copy_to() メソッドはデータのコピーを返す
+
+3. **native_buffer モード** (コンストラクタで PyCapsule を渡した場合、macOS のみ)
+   - CVPixelBufferRef への参照のみを保持（データは保持しない）
+   - planes() / plane() / copy_to() は使用不可（RuntimeError）
+   - Video Toolbox エンコーダーが直接利用可能
 
 ## その他の型定義
 
@@ -921,10 +1009,6 @@ from webcodecs import VideoFrame, VideoPixelFormat
 from PIL import Image
 img = Image.open("image.png").convert("RGB")
 rgb_data = np.array(img)  # shape: (height, width, 3)
-
-# OpenCV との連携例
-import cv2
-bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 ```
 
 #### AudioSampleFormat
@@ -947,7 +1031,7 @@ bgr_data = cv2.imread("image.png")  # OpenCV は BGR を使用
 - `APPLE_VIDEO_TOOLBOX`
   - macOS の VideoToolbox
   - Encoder: H.264 / H.265
-  - Decoder: H.264 / H.265
+  - Decoder: H.264 / H.265 / VP9 / AV1
 - `NVIDIA_VIDEO_CODEC`
   - NVIDIA Video Codec SDK
   - Encoder: AV1 / H.264 / H.265
@@ -1006,7 +1090,7 @@ config_av1: VideoEncoderConfig = {
 - NVIDIA GPU
 - NVIDIA ドライバーがインストールされていること
 - Ubuntu のみ対応
-- ビルド時に `NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
+- ビルド時に `USE_NVIDIA_CUDA_TOOLKIT=1 uv build --wheel` の指定が必要
 
 #### LatencyMode
 
@@ -1178,7 +1262,9 @@ capabilities = get_video_codec_capabilities()
 #         "platform": "darwin",
 #         "codecs": {
 #             "avc1": {"encoder": True, "decoder": True},
-#             "hvc1": {"encoder": True, "decoder": True}
+#             "hvc1": {"encoder": True, "decoder": True},
+#             "vp09": {"encoder": False, "decoder": True},
+#             "av01": {"encoder": False, "decoder": True}
 #         }
 #     }
 # }
@@ -1224,13 +1310,128 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
+## Image インターフェース
+
+### 辞書型インターフェース (Image)
+
+#### ImageDecoderInit
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `type` | o | o | o | MIME タイプ、**必須** |
+| `data` | o | o | o | bytes 型、**必須** |
+| `color_space_conversion` | o | o | - | "default" または "none" |
+| `desired_width` | o | o | - | リサイズ幅 |
+| `desired_height` | o | o | - | リサイズ高さ |
+| `prefer_animation` | o | o | - | アニメーション優先 |
+| `transfer` | x | o | - | **未実装** |
+
+#### ImageDecodeOptions
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `frame_index` | o | o | o | デフォルト 0 |
+| `complete_frames_only` | o | o | - | デフォルト true |
+
+#### ImageDecodeResult
+
+| プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------|---------|-------------|--------|------|
+| `image` | o | o | o | VideoFrame |
+| `complete` | o | o | o | デコード完了フラグ |
+
+### ImageDecoder
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `constructor(init)` | o | o | o | ImageDecoderInit を使用 |
+| `type` | o | o | o | MIME タイプ |
+| `complete` | o | o | o | データ読み込み完了 |
+| `completed` | - | o | - | Promise（Python では `is_complete` プロパティ） |
+| `tracks` | o | o | o | ImageTrackList |
+| `decode(options)` | o | o | o | 同期的に実行、ImageDecodeResult を返す |
+| `reset()` | o | o | o | |
+| `close()` | o | o | o | |
+| `is_type_supported()` | o | o | o | 静的メソッド |
+| **`is_closed`** | o | x | o | **独自拡張**: プロパティ |
+| **`is_complete`** | o | x | o | **独自拡張**: `complete` の別名 |
+
+**サポートフォーマット (macOS のみ)**:
+
+| フォーマット | MIME タイプ | 対応状況 |
+|------------|------------|---------|
+| JPEG | image/jpeg | o |
+| PNG | image/png | o |
+| GIF | image/gif | o（アニメーション対応） |
+| WebP | image/webp | o |
+| BMP | image/bmp | o |
+| TIFF | image/tiff | o |
+| HEIC/HEIF | image/heic, image/heif | o |
+
+**注**: ImageDecoder は macOS の Image I/O フレームワークを使用しています。他のプラットフォームでは利用できません。
+
+### ImageTrackList
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `[index]` | o | o | o | `__getitem__` |
+| `ready` | - | o | - | Promise（Python では `is_ready` プロパティ） |
+| `length` | o | o | o | |
+| `selected_index` | o | o | o | |
+| `selected_track` | o | o | o | |
+| **`is_ready`** | o | x | o | **独自拡張**: `ready` の同期版 |
+
+### ImageTrack
+
+| メソッド/プロパティ | Python | WebCodecs API | テスト | 備考 |
+|-----------------|---------|-------------|--------|------|
+| `animated` | o | o | o | |
+| `frame_count` | o | o | o | |
+| `repetition_count` | o | o | o | |
+| `selected` | o | o | o | 読み書き可能 |
+
+### ImageDecoder の使用例
+
+```python
+from webcodecs import ImageDecoder, ImageDecoderInit
+
+# JPEG ファイルを読み込み
+with open("image.jpg", "rb") as f:
+    jpeg_data = f.read()
+
+# ImageDecoder を作成
+decoder = ImageDecoder({
+    "type": "image/jpeg",
+    "data": jpeg_data,
+})
+
+# 画像情報を確認
+print(f"Type: {decoder.type}")
+print(f"Complete: {decoder.complete}")
+print(f"Tracks: {decoder.tracks.length}")
+
+track = decoder.tracks[0]
+print(f"Animated: {track.animated}")
+print(f"Frame count: {track.frame_count}")
+
+# デコード
+result = decoder.decode()
+frame = result["image"]
+
+print(f"Size: {frame.coded_width}x{frame.coded_height}")
+print(f"Format: {frame.format}")  # RGBA
+
+# クリーンアップ
+frame.close()
+decoder.close()
+```
+
 ## 未実装の機能
 
 ### 実装しない機能
 
 以下の機能は webcodecs-py では実装しません:
 
-- **ImageDecoder**: 画像デコード機能は実装対象外（PIL/Pillow や OpenCV を使用してください）
 - **CanvasImageSource**: VideoFrame の CanvasImageSource コンストラクタはブラウザ固有機能のため実装対象外
 
 ### 未実装の辞書型
@@ -1240,7 +1441,6 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
 | `SvcOutputMetadata` | SVC サポート未実装 |
-| `VideoFrameMetadata` | `metadata()` は dict を返すが TypedDict は未定義 |
 
 **注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
 
@@ -1258,14 +1458,16 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 |----------|-----------|----------|---------------|----------------|
 | VP8 | o | o | libvpx | macOS / Ubuntu |
 | VP9 | o | o | libvpx | macOS / Ubuntu |
+| VP9 | - | o | VideoToolbox* | macOS |
 | AV1 | o | o | libaom / dav1d | All |
+| AV1 | - | o | VideoToolbox* | macOS |
 | AV1 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.264 | o | o | VideoToolbox* | macOS |
 | H.264 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 | H.265 | o | o | VideoToolbox* | macOS |
 | H.265 | o | o | NVENC / NVDEC | Ubuntu x86_64 |
 
-*ハードウェアアクセラレーション使用
+*ハードウェアアクセラレーション使用（VP9/AV1 の VideoToolbox デコードは `HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX` を明示的に指定した場合のみ有効）
 
 **VP9 プロファイル対応状況**:
 
@@ -1316,6 +1518,78 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
 - `close()` メソッドによる明示的なリソース解放をサポート
 - ワーカースレッドでの shared_ptr 使用によるメモリ安全性の確保
 
+## Free Threading 対応
+
+Python 3.13t / 3.14t の Free Threading ビルド（GIL 無効化）に対応しています。
+
+### 対応状況
+
+| クラス | 対応状況 | 備考 |
+|--------|----------|------|
+| VideoEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioEncoder | o | コールバックの並列変更・呼び出しに対応 |
+| AudioDecoder | o | コールバックの並列変更・呼び出しに対応 |
+| VideoFrame | - | コールバック機構なし（対応不要）、native_buffer 含む |
+| AudioData | - | コールバック機構なし（対応不要） |
+| EncodedVideoChunk | - | イミュータブル（対応不要） |
+| EncodedAudioChunk | - | イミュータブル（対応不要） |
+
+### サポートプラットフォーム
+
+| プラットフォーム | Python 3.13t | Python 3.14t |
+|------------------|--------------|--------------|
+| macOS | o | o |
+| Ubuntu | o | o |
+| Windows | o | x（nanobind ビルドの問題） |
+
+### 実装詳細
+
+Free Threading 環境でのスレッドセーフ性を確保するため、以下の同期メカニズムを使用しています:
+
+- **`nb::ft_mutex`**: Python オブジェクト（コールバック）の保護
+- **`std::mutex`**: C++ 内部状態（キュー、バッファ）の保護
+- **`std::atomic<>`**: スレッドセーフなフラグ管理
+
+コールバックの変更と呼び出しは排他制御されており、複数スレッドから同時にアクセスしても安全です:
+
+```python
+import threading
+from webcodecs import VideoEncoder, VideoEncoderConfig
+
+def on_output(chunk, metadata=None):
+    pass
+
+def on_error(err):
+    pass
+
+encoder = VideoEncoder(on_output, on_error)
+encoder.configure({
+    "codec": "av01.0.04M.08",
+    "width": 320,
+    "height": 240,
+})
+
+# 複数スレッドから同時にコールバックを変更しても安全
+def modify_callback(thread_id):
+    for i in range(100):
+        def new_output(chunk, metadata=None, tid=thread_id, idx=i):
+            pass
+        encoder.on_output(new_output)
+
+threads = [threading.Thread(target=modify_callback, args=(i,)) for i in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+encoder.close()
+```
+
+### GIL ビルドとの互換性
+
+Free Threading 対応コードは GIL ビルド（通常の Python）でも動作します。`nb::ft_mutex` は GIL ビルドではノーオペレーションとなるため、パフォーマンスへの影響はありません。
+
 ## メモリ管理とパフォーマンス
 
 ### メモリ管理の実装方式
@@ -1350,8 +1624,9 @@ print(encoder.encode_queue_size)  # 処理待ちタスク数
    - planes() でビューを取得した場合、VideoFrame/AudioData の生存期間に注意
    - ハードウェアエンコーダーを使用する場合は copy_to() を推奨
 1. **スレッドセーフティ**
-   - エンコーダー/デコーダーはシングルスレッドでの使用を想定
-   - 複数スレッドから同時アクセスする場合は外部で同期が必要
+   - エンコーダー/デコーダーは Free Threading 環境（Python 3.13t / 3.14t）でスレッドセーフ
+   - コールバックの変更・呼び出しは内部で排他制御される
+   - 詳細は「Free Threading 対応」セクションを参照
 1. **プラットフォーム依存**
    - VideoToolbox (H.264/H.265) は macOS のみ
    - AudioToolbox (AAC) は macOS のみ
