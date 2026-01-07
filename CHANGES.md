@@ -11,10 +11,14 @@
 
 ## develop
 
-## 2025.3.0
+## 2026.1.0
 
-**リリース日**:: 2025-12-30
+**リリース日**:: 2026-01-07
 
+- [UPDATE] libuv を `022efdb0b771f7353741dbe360b8bef4e0a874eb` にアップデートする
+  - @voluntas
+- [UPDATE] libdav1d を v1.5.3 にアップデートする
+  - @voluntas
 - [UPDATE] libvpl を v2.16.0 にアップデートする
   - @voluntas
 - [UPDATE] libopus を v1.6 にアップデートする
