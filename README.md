@@ -40,6 +40,7 @@ webcodecs-py は [WebCodecs API](https://www.w3.org/TR/webcodecs/) API を Pytho
 - Ubuntu x86_64 にて Intel VPL を利用したハードウェアアクセラレーション対応
   - AV1 / H.264 / H.265 のハードウェアエンコード/デコードに対応
   - VP8 / VP9 デコードに対応
+- libyuv を利用した高速な RAW データ変換
 - クロスプラットフォーム対応
   - macOS arm64
   - Ubuntu x86_64 および arm64
