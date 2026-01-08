@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-26
+- 最終更新: 2026-01-08
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -24,7 +24,7 @@ webcodecs-py は WebCodecs API にできるだけ準拠しつつ、以下の方�
 | Video クラス | VideoFrame / EncodedVideoChunk / VideoEncoder / VideoDecoder | 全メソッド実装済み | |
 | Audio クラス | AudioData / EncodedAudioChunk / AudioEncoder / AudioDecoder | 全メソッド実装済み | |
 | 補助型と列挙型 | PlaneLayout / DOMRect / VideoColorSpace / CodecState など | 必要項目を実装済み | 列挙値の未実装分はテーブルで明記 |
-| 独自拡張 | HardwareAccelerationEngine / VideoFrame 拡張 / AudioData 拡張 / get_video_codec_capabilities() | planes() とハードウェアアクセラレーション | 仕様逸脱理由を各節で説明 |
+| 独自拡張 | HardwareAccelerationEngine / VideoFrame 拡張 / AudioData 拡張 / get_video_codec_capabilities() / H.264/H.265 ヘッダーパーサー | planes() とハードウェアアクセラレーション、ヘッダーパーサー | 仕様逸脱理由を各節で説明 |
 
 ## WebCodecs API との主な差異
 
@@ -1309,6 +1309,213 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - macOS では libvpx による VP8/VP9 が利用可能
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
+
+### H.264/H.265 ヘッダーパーサー
+
+**独自拡張関数 - WebCodecs API にはない**
+
+H.264 (AVC) および H.265 (HEVC) のビットストリームヘッダーをパースし、SPS/PPS/VPS および NAL ユニット情報を抽出します。
+
+#### パース関数
+
+**Annex B フォーマット用**:
+
+```python
+def parse_avc_annexb(data: bytes) -> AVCAnnexBInfo: ...
+def parse_hevc_annexb(data: bytes) -> HEVCAnnexBInfo: ...
+```
+
+スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニットをパースします。
+
+**Description (avcC/hvcC) フォーマット用**:
+
+```python
+def parse_avc_description(data: bytes) -> AVCDescriptionInfo: ...
+def parse_hevc_description(data: bytes) -> HEVCDescriptionInfo: ...
+```
+
+エンコーダーから出力される description（avcC/hvcC box）をパースします。
+
+**使用例**:
+
+```python
+from webcodecs import parse_avc_annexb, parse_avc_description
+
+# Annex B フォーマットの H.264 ストリーム
+avc_stream = b"\x00\x00\x00\x01\x67..."  # SPS + PPS + ...
+info = parse_avc_annexb(avc_stream)
+
+if info.sps is not None:
+    print(f"Profile: {info.sps.profile_idc}")
+    print(f"Level: {info.sps.level_idc}")
+    print(f"Resolution: {info.sps.width}x{info.sps.height}")
+
+# NAL ユニット情報
+for nal in info.nal_units:
+    print(f"NAL Type: {nal.nal_unit_type}, Key frame: {nal.is_key_frame}")
+
+# エンコーダーから取得した description をパース
+def on_output(chunk, metadata=None):
+    if metadata and "decoder_config" in metadata:
+        description = metadata["decoder_config"].get("description")
+        if description:
+            desc_info = parse_avc_description(description)
+            print(f"Length size: {desc_info.length_size}")
+```
+
+#### 個別パース関数
+
+```python
+def parse_avc_sps(data: bytes) -> AVCSpsInfo: ...
+def parse_avc_pps(data: bytes) -> AVCPpsInfo: ...
+def parse_hevc_vps(data: bytes) -> HEVCVpsInfo: ...
+def parse_hevc_sps(data: bytes) -> HEVCSpsInfo: ...
+def parse_hevc_pps(data: bytes) -> HEVCPpsInfo: ...
+```
+
+個別の NAL ユニットをパースします。入力データには NAL ヘッダーを含めてください。
+
+#### 戻り値の型
+
+**AVCSpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `profile_idc` | int | プロファイル ID (66=Baseline, 77=Main, 100=High など) |
+| `level_idc` | int | レベル ID (30=3.0, 31=3.1, 40=4.0 など) |
+| `constraint_set_flags` | int | 制約フラグ |
+| `width` | int | 解像度（幅） |
+| `height` | int | 解像度（高さ） |
+| `bit_depth_luma` | int | 輝度ビット深度 (通常 8) |
+| `bit_depth_chroma` | int | 色差ビット深度 (通常 8) |
+| `chroma_format_idc` | int | クロマフォーマット (1=4:2:0, 2=4:2:2, 3=4:4:4) |
+| `sps_id` | int | SPS ID |
+| `framerate` | float \| None | フレームレート（VUI から取得、存在する場合） |
+
+**AVCPpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `pps_id` | int | PPS ID |
+| `sps_id` | int | 参照する SPS ID |
+| `entropy_coding_mode_flag` | bool | CABAC 使用フラグ |
+
+**AVCNalUnitHeader**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `nal_unit_type` | int | NAL ユニットタイプ (1=非IDRスライス, 5=IDRスライス, 7=SPS, 8=PPS など) |
+| `nal_ref_idc` | int | 参照指標 (0-3) |
+| `is_idr` | bool | IDR フレームか |
+| `is_key_frame` | bool | キーフレームか |
+
+**AVCAnnexBInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps` | AVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | AVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[AVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+
+**AVCDescriptionInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps` | AVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | AVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[AVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+| `length_size` | int | NAL ユニット長のバイト数 (通常 4) |
+
+**HEVCVpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps_id` | int | VPS ID |
+| `max_layers_minus1` | int | 最大レイヤー数 - 1 |
+| `max_sub_layers_minus1` | int | 最大サブレイヤー数 - 1 |
+
+**HEVCSpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps_id` | int | SPS ID |
+| `vps_id` | int | 参照する VPS ID |
+| `width` | int | 解像度（幅） |
+| `height` | int | 解像度（高さ） |
+| `bit_depth_luma` | int | 輝度ビット深度 |
+| `bit_depth_chroma` | int | 色差ビット深度 |
+| `chroma_format_idc` | int | クロマフォーマット |
+| `general_profile_idc` | int | 一般プロファイル ID |
+| `general_level_idc` | int | 一般レベル ID |
+| `general_tier_flag` | int | 一般ティアフラグ |
+| `framerate` | float \| None | フレームレート（VUI から取得、存在する場合） |
+
+**HEVCPpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `pps_id` | int | PPS ID |
+| `sps_id` | int | 参照する SPS ID |
+
+**HEVCNalUnitHeader**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `nal_unit_type` | int | NAL ユニットタイプ (32=VPS, 33=SPS, 34=PPS, 19-21=IDR など) |
+| `nuh_layer_id` | int | レイヤー ID |
+| `nuh_temporal_id_plus1` | int | テンポラル ID + 1 |
+| `is_irap` | bool | IRAP (Intra Random Access Point) フレームか |
+| `is_key_frame` | bool | キーフレームか |
+
+**HEVCAnnexBInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps` | HEVCVpsInfo \| None | VPS 情報（存在する場合） |
+| `sps` | HEVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | HEVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[HEVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+
+**HEVCDescriptionInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps` | HEVCVpsInfo \| None | VPS 情報（存在する場合） |
+| `sps` | HEVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | HEVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[HEVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+| `length_size` | int | NAL ユニット長のバイト数 (通常 4) |
+
+#### NAL ユニットタイプ enum
+
+`AVCNalUnitType` と `HEVCNalUnitType` は IntEnum 相当として定義されており、整数値との比較が可能です。
+
+```python
+from webcodecs import AVCNalUnitType, HEVCNalUnitType
+
+# AVC NAL ユニットタイプ
+print(AVCNalUnitType.SPS)       # 7
+print(AVCNalUnitType.PPS)       # 8
+print(AVCNalUnitType.IDR_SLICE) # 5
+
+# HEVC NAL ユニットタイプ
+print(HEVCNalUnitType.VPS)      # 32
+print(HEVCNalUnitType.SPS)      # 33
+print(HEVCNalUnitType.PPS)      # 34
+```
+
+#### エラー処理
+
+不正なデータの場合は `ValueError` を送出します:
+
+```python
+from webcodecs import parse_avc_annexb
+
+try:
+    info = parse_avc_annexb(b"")  # 空データ
+except ValueError as e:
+    print(f"Error: {e}")
+```
 
 ## Image インターフェース
 

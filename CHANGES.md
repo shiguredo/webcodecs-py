@@ -11,6 +11,15 @@
 
 ## develop
 
+- [ADD] H.264/H.265 ヘッダーパーサーを追加する
+  - `parse_avc_annexb` / `parse_avc_description` で H.264 の SPS/PPS 情報を抽出
+  - `parse_hevc_annexb` / `parse_hevc_description` で H.265 の VPS/SPS/PPS 情報を抽出
+  - 個別パーサー: `parse_avc_sps`, `parse_avc_pps`, `parse_hevc_vps`, `parse_hevc_sps`, `parse_hevc_pps`
+  - `AVCNalUnitType` / `HEVCNalUnitType` enum を追加 (IntEnum 相当)
+  - 戻り値の型: `AVCSpsInfo`, `AVCPpsInfo`, `AVCNalUnitHeader`, `AVCAnnexBInfo`, `AVCDescriptionInfo`
+  - 戻り値の型: `HEVCVpsInfo`, `HEVCSpsInfo`, `HEVCPpsInfo`, `HEVCNalUnitHeader`, `HEVCAnnexBInfo`, `HEVCDescriptionInfo`
+  - @voluntas
+
 ## 2026.1.0
 
 **リリース日**:: 2026-01-07

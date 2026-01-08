@@ -7,6 +7,7 @@ import pytest
 
 from webcodecs import (
     CodecState,
+    EncodedVideoChunkType,
     HardwareAccelerationEngine,
     LatencyMode,
     VideoDecoder,
