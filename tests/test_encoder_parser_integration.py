@@ -263,28 +263,77 @@ def test_description_parse(codec, width, height, engine, pixel_format):
 
 
 # =============================================================================
-# Annex B チャンクパーステスト (Apple Video Toolbox のみ)
+# Annex B チャンクパーステスト
 # =============================================================================
 
 
 @pytest.mark.parametrize(
-    ("codec", "codec_config"),
+    ("codec", "engine", "codec_config", "pixel_format"),
     [
-        pytest.param("avc1.42E01E", {"avc": {"format": "annexb"}}, id="h264"),
-        pytest.param("hvc1.1.6.L93.B0", {"hevc": {"format": "annexb"}}, id="h265"),
+        # Apple Video Toolbox (明示的に annexb 指定が必要)
+        pytest.param(
+            "avc1.42E01E",
+            HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+            {"avc": {"format": "annexb"}},
+            VideoPixelFormat.I420,
+            marks=skip_apple,
+            id="apple-h264",
+        ),
+        pytest.param(
+            "hvc1.1.6.L93.B0",
+            HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+            {"hevc": {"format": "annexb"}},
+            VideoPixelFormat.I420,
+            marks=skip_apple,
+            id="apple-h265",
+        ),
+        # NVIDIA Video Codec (デフォルトで Annex B)
+        pytest.param(
+            "avc1.42001f",
+            HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+            None,
+            VideoPixelFormat.NV12,
+            marks=skip_nvidia,
+            id="nvidia-h264",
+        ),
+        pytest.param(
+            "hvc1.1.6.L93.B0",
+            HardwareAccelerationEngine.NVIDIA_VIDEO_CODEC,
+            None,
+            VideoPixelFormat.NV12,
+            marks=skip_nvidia,
+            id="nvidia-h265",
+        ),
+        # Intel VPL (デフォルトで Annex B)
+        pytest.param(
+            "avc1.42001e",
+            HardwareAccelerationEngine.INTEL_VPL,
+            None,
+            VideoPixelFormat.I420,
+            marks=skip_intel,
+            id="intel-h264",
+        ),
+        pytest.param(
+            "hvc1.1.6.L93.B0",
+            HardwareAccelerationEngine.INTEL_VPL,
+            None,
+            VideoPixelFormat.I420,
+            marks=skip_intel,
+            id="intel-h265",
+        ),
     ],
 )
-@skip_apple
-def test_annexb_chunk_parse(codec, codec_config):
-    """Annex B チャンクのパーステスト (Apple Video Toolbox)"""
+def test_annexb_chunk_parse(codec, engine, codec_config, pixel_format):
+    """Annex B チャンクのパーステスト"""
     is_hevc = codec.startswith("hvc") or codec.startswith("hev")
 
     chunk_data, _ = encode_key_frame(
         codec,
         640,
         480,
-        HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+        engine,
         codec_config,
+        pixel_format,
     )
 
     assert len(chunk_data) >= 4
