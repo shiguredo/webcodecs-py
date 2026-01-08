@@ -7,6 +7,7 @@ import pytest
 
 from webcodecs import (
     CodecState,
+    EncodedVideoChunkType,
     HardwareAccelerationEngine,
     LatencyMode,
     VideoDecoder,
@@ -16,6 +17,10 @@ from webcodecs import (
     VideoFrame,
     VideoFrameBufferInit,
     VideoPixelFormat,
+    parse_avc_annexb,
+    parse_avc_description,
+    parse_hevc_annexb,
+    parse_hevc_description,
 )
 
 # Apple Video Toolbox 環境でのみテストを実行
@@ -1885,3 +1890,246 @@ def test_av1_decode_videotoolbox():
         frame.close()
     encoder.close()
     decoder.close()
+
+
+# =============================================================================
+# H.264/H.265 ヘッダーパーサー統合テスト
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    ("codec", "width", "height", "bitrate"),
+    [
+        pytest.param("avc1.42E01E", 640, 480, 1_000_000, id="avc"),
+        pytest.param("hvc1.1.6.L93.B0", 1280, 720, 2_000_000, id="hevc"),
+    ],
+)
+def test_description_parse(codec, width, height, bitrate):
+    """エンコーダーの description (avcC/hvcC) をヘッダーパーサーでパースするテスト."""
+    encoded_chunks = []
+    metadatas = []
+
+    def on_output(chunk, metadata=None):
+        encoded_chunks.append(chunk)
+        metadatas.append(metadata)
+
+    def on_error(error):
+        pytest.fail(f"エンコーダーエラー: {error}")
+
+    encoder = VideoEncoder(on_output, on_error)
+
+    config: VideoEncoderConfig = {
+        "codec": codec,
+        "width": width,
+        "height": height,
+        "bitrate": bitrate,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+    }
+    encoder.configure(config)
+
+    # 1 フレームをエンコード
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+    frame = VideoFrame(data, init)
+    encoder.encode(frame, {"key_frame": True})
+    frame.close()
+
+    encoder.flush()
+    encoder.close()
+
+    assert len(encoded_chunks) > 0
+
+    # キーフレームの metadata から description を取得
+    key_frame_metadata = None
+    for i, chunk in enumerate(encoded_chunks):
+        if chunk.type == EncodedVideoChunkType.KEY:
+            key_frame_metadata = metadatas[i]
+            break
+
+    assert key_frame_metadata is not None
+    assert "decoder_config" in key_frame_metadata
+    decoder_config = key_frame_metadata["decoder_config"]
+    assert "description" in decoder_config
+    description = decoder_config["description"]
+
+    # configurationVersion = 1
+    assert len(description) > 0
+    assert description[0] == 1
+
+    # ヘッダーパーサーでパース
+    if codec.startswith("hvc") or codec.startswith("hev"):
+        info = parse_hevc_description(description)
+        # HEVC は VPS も抽出される
+        assert info.vps is not None
+    else:
+        info = parse_avc_description(description)
+
+    # SPS/PPS が抽出される
+    assert info.sps is not None
+    assert info.pps is not None
+
+    # 解像度の確認
+    assert info.sps.width == width
+    assert info.sps.height == height
+    assert info.sps.bit_depth_luma == 8
+    assert info.sps.bit_depth_chroma == 8
+
+
+@pytest.mark.parametrize(
+    ("codec", "codec_config"),
+    [
+        pytest.param("avc1.42E01E", {"avc": {"format": "annexb"}}, id="avc"),
+        pytest.param("hvc1.1.6.L93.B0", {"hevc": {"format": "annexb"}}, id="hevc"),
+    ],
+)
+def test_chunk_annexb_parse(codec, codec_config):
+    """エンコーダーの Annex B チャンクデータをヘッダーパーサーでパースするテスト."""
+    encoded_chunks = []
+
+    def on_output(chunk, metadata=None):
+        encoded_chunks.append(chunk)
+
+    def on_error(error):
+        pytest.fail(f"エンコーダーエラー: {error}")
+
+    encoder = VideoEncoder(on_output, on_error)
+
+    width, height = 640, 480
+    config: VideoEncoderConfig = {
+        "codec": codec,
+        "width": width,
+        "height": height,
+        "bitrate": 1_000_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+        **codec_config,
+    }
+    encoder.configure(config)
+
+    # 1 フレームをエンコード
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+    frame = VideoFrame(data, init)
+    encoder.encode(frame, {"key_frame": True})
+    frame.close()
+
+    encoder.flush()
+    encoder.close()
+
+    assert len(encoded_chunks) > 0
+
+    # キーフレームのチャンクデータを取得
+    key_frame_chunk = None
+    for chunk in encoded_chunks:
+        if chunk.type == EncodedVideoChunkType.KEY:
+            key_frame_chunk = chunk
+            break
+
+    assert key_frame_chunk is not None
+    chunk_data = np.zeros(key_frame_chunk.byte_length, dtype=np.uint8)
+    key_frame_chunk.copy_to(chunk_data)
+
+    # Annex B 形式: スタートコード (0x00 0x00 0x00 0x01) で始まる
+    assert len(chunk_data) >= 4
+    assert (
+        chunk_data[0] == 0x00
+        and chunk_data[1] == 0x00
+        and chunk_data[2] == 0x00
+        and chunk_data[3] == 0x01
+    ) or (chunk_data[0] == 0x00 and chunk_data[1] == 0x00 and chunk_data[2] == 0x01)
+
+    # ヘッダーパーサーでパース (Annex B)
+    if codec.startswith("hvc") or codec.startswith("hev"):
+        info = parse_hevc_annexb(bytes(chunk_data))
+    else:
+        info = parse_avc_annexb(bytes(chunk_data))
+
+    # NAL ユニットが抽出される
+    assert len(info.nal_units) > 0
+
+
+@pytest.mark.parametrize(
+    ("codec", "codec_config"),
+    [
+        pytest.param("avc1.42E01E", {"avc": {"format": "avc"}}, id="avc"),
+        pytest.param("hvc1.1.6.L93.B0", {"hevc": {"format": "hevc"}}, id="hevc"),
+    ],
+)
+def test_chunk_length_prefixed_format(codec, codec_config):
+    """エンコーダーの長さプレフィックス形式チャンクデータのフォーマット確認テスト."""
+    encoded_chunks = []
+
+    def on_output(chunk, metadata=None):
+        encoded_chunks.append(chunk)
+
+    def on_error(error):
+        pytest.fail(f"エンコーダーエラー: {error}")
+
+    encoder = VideoEncoder(on_output, on_error)
+
+    width, height = 640, 480
+    config: VideoEncoderConfig = {
+        "codec": codec,
+        "width": width,
+        "height": height,
+        "bitrate": 1_000_000,
+        "framerate": 30,
+        "latency_mode": LatencyMode.REALTIME,
+        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
+        **codec_config,
+    }
+    encoder.configure(config)
+
+    # 1 フレームをエンコード
+    data_size = width * height * 3 // 2
+    data = np.zeros(data_size, dtype=np.uint8)
+    init: VideoFrameBufferInit = {
+        "format": VideoPixelFormat.I420,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": 0,
+    }
+    frame = VideoFrame(data, init)
+    encoder.encode(frame, {"key_frame": True})
+    frame.close()
+
+    encoder.flush()
+    encoder.close()
+
+    assert len(encoded_chunks) > 0
+
+    # キーフレームのチャンクデータを取得
+    key_frame_chunk = None
+    for chunk in encoded_chunks:
+        if chunk.type == EncodedVideoChunkType.KEY:
+            key_frame_chunk = chunk
+            break
+
+    assert key_frame_chunk is not None
+    chunk_data = np.zeros(key_frame_chunk.byte_length, dtype=np.uint8)
+    key_frame_chunk.copy_to(chunk_data)
+
+    # 長さプレフィックス形式: スタートコードで始まらない
+    assert len(chunk_data) >= 4
+    is_start_code = (
+        chunk_data[0] == 0x00
+        and chunk_data[1] == 0x00
+        and chunk_data[2] == 0x00
+        and chunk_data[3] == 0x01
+    )
+    assert not is_start_code

@@ -443,6 +443,8 @@ set(WEBCODECS_SOURCES
     src/bindings/webcodecs_ext.cpp
     src/bindings/webcodecs_types.cpp
     src/bindings/codec_parser.cpp
+    src/bindings/avc_parser.cpp
+    src/bindings/hevc_parser.cpp
     src/bindings/video_frame.cpp
     src/bindings/audio_data.cpp
     src/bindings/video_decoder.cpp

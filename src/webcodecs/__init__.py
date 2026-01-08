@@ -42,6 +42,29 @@ from .webcodecs_ext import (
     HardwareAccelerationEngine,
     # stubgen はプライベート関数をスキップするため type: ignore が必要
     _get_video_codec_capabilities_impl,  # type: ignore[attr-defined]
+    # Header parser (独自拡張)
+    AVCNalUnitType,
+    HEVCNalUnitType,
+    AVCSpsInfo,
+    AVCPpsInfo,
+    AVCNalUnitHeader,
+    AVCAnnexBInfo,
+    AVCDescriptionInfo,
+    HEVCVpsInfo,
+    HEVCSpsInfo,
+    HEVCPpsInfo,
+    HEVCNalUnitHeader,
+    HEVCAnnexBInfo,
+    HEVCDescriptionInfo,
+    parse_avc_annexb,
+    parse_avc_description,
+    parse_hevc_annexb,
+    parse_hevc_description,
+    parse_avc_sps,
+    parse_avc_pps,
+    parse_hevc_vps,
+    parse_hevc_sps,
+    parse_hevc_pps,
 )
 
 
@@ -520,6 +543,29 @@ __all__ = [
     "HardwareAccelerationEngine",
     # Functions
     "get_video_codec_capabilities",
+    # Header parser (独自拡張)
+    "AVCNalUnitType",
+    "HEVCNalUnitType",
+    "AVCSpsInfo",
+    "AVCPpsInfo",
+    "AVCNalUnitHeader",
+    "AVCAnnexBInfo",
+    "AVCDescriptionInfo",
+    "HEVCVpsInfo",
+    "HEVCSpsInfo",
+    "HEVCPpsInfo",
+    "HEVCNalUnitHeader",
+    "HEVCAnnexBInfo",
+    "HEVCDescriptionInfo",
+    "parse_avc_annexb",
+    "parse_avc_description",
+    "parse_hevc_annexb",
+    "parse_hevc_description",
+    "parse_avc_sps",
+    "parse_avc_pps",
+    "parse_hevc_vps",
+    "parse_hevc_sps",
+    "parse_hevc_pps",
 ]
 
 # WebCodecs 互換: encode(frame, options?: dict)

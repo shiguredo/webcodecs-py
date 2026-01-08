@@ -14,6 +14,8 @@ void init_video_encoder(nb::module_& m);
 void init_audio_encoder(nb::module_& m);
 void init_video_codec_capabilities(nb::module_& m);
 void init_image_decoder(nb::module_& m);
+void init_avc_parser(nb::module_& m);
+void init_hevc_parser(nb::module_& m);
 
 NB_MODULE(webcodecs_ext, m) {
   m.doc() = "Python bindings for media codecs with WebCodecs-like API";
@@ -30,4 +32,6 @@ NB_MODULE(webcodecs_ext, m) {
   init_audio_encoder(m);
   init_video_codec_capabilities(m);
   init_image_decoder(m);
+  init_avc_parser(m);
+  init_hevc_parser(m);
 }
