@@ -24,7 +24,7 @@ jobs:
               labels: [self-hosted, linux, x64, NVIDIA-Video-Codec-SDK]
             env_vars: |
               NVIDIA_VIDEO_CODEC=true
-            test_target: tests/test_nvidia_video_codec.py
+            test_target: tests/test_nvidia_video_codec.py tests/test_hwa.py
             # NVIDIA Video Codec 用の wheel は ubuntu-24.04_x86_64 のものを使用
             wheel_platform: ubuntu-24.04_x86_64
           # Intel VPL (self-hosted runner)
@@ -35,7 +35,7 @@ jobs:
             env_vars: |
               INTEL_VPL=true
               LIBVA_MESSAGING_LEVEL=0
-            test_target: tests/test_intel_vpl.py
+            test_target: tests/test_intel_vpl.py tests/test_hwa.py
             # Intel VPL 用の wheel は ubuntu-24.04_x86_64 のものを使用
             wheel_platform: ubuntu-24.04_x86_64
           # Apple Video Toolbox (self-hosted runner)
@@ -45,7 +45,7 @@ jobs:
               labels: [self-hosted, macOS, ARM64]
             env_vars: |
               APPLE_VIDEO_TOOLBOX=true
-            test_target: "tests/test_apple_video_toolbox.py tests/test_apple_audio_toolbox.py"
+            test_target: "tests/test_apple_video_toolbox.py tests/test_apple_audio_toolbox.py tests/test_hwa.py"
             # Apple Video Toolbox 用の wheel は macos_arm64 のものを使用
             wheel_platform: macos-15_arm64
         python_version:

@@ -1,16 +1,17 @@
-"""H.264 (AVC) ヘッダーパーサーのテスト
-
-PBT でカバーできない具体的な値の検証テスト
-"""
+"""H.264 (AVC) ヘッダーパーサーのテスト"""
 
 import pytest
 
 from webcodecs import (
+    AVCNalUnitType,
     parse_avc_annexb,
     parse_avc_sps,
-    AVCNalUnitType,
 )
 
+
+# =============================================================================
+# テストデータ
+# =============================================================================
 
 # H.264 Baseline Profile Level 3.0 の SPS (320x240)
 AVC_SPS_BASELINE = bytes(
@@ -51,6 +52,11 @@ AVC_ANNEXB_STREAM = (
 )
 
 
+# =============================================================================
+# 単体テスト
+# =============================================================================
+
+
 def test_parse_avc_sps_extracts_correct_values():
     """AVC SPS から正しい値が抽出されることを確認"""
     sps = parse_avc_sps(AVC_SPS_BASELINE)
@@ -78,20 +84,12 @@ def test_empty_data_raises_error():
 
 def test_avc_nal_unit_type_enum_comparison():
     """AVCNalUnitType が IntEnum 相当の動作をすることを確認"""
-    # enum と int の比較
     assert AVCNalUnitType.SPS == 7
     assert AVCNalUnitType.PPS == 8
     assert AVCNalUnitType.IDR_SLICE == 5
     assert AVCNalUnitType.NON_IDR_SLICE == 1
 
-    # パース結果との比較
     info = parse_avc_annexb(AVC_ANNEXB_STREAM)
     assert len(info.nal_units) == 2
-
-    # SPS NAL
     assert info.nal_units[0].nal_unit_type == AVCNalUnitType.SPS
-    assert info.nal_units[0].nal_unit_type == 7
-
-    # PPS NAL
     assert info.nal_units[1].nal_unit_type == AVCNalUnitType.PPS
-    assert info.nal_units[1].nal_unit_type == 8

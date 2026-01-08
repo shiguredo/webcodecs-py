@@ -1,16 +1,17 @@
-"""H.265 (HEVC) ヘッダーパーサーのテスト
-
-PBT でカバーできない具体的な値の検証テスト
-"""
+"""H.265 (HEVC) ヘッダーパーサーのテスト"""
 
 import pytest
 
 from webcodecs import (
+    HEVCNalUnitType,
     parse_hevc_annexb,
     parse_hevc_sps,
-    HEVCNalUnitType,
 )
 
+
+# =============================================================================
+# テストデータ
+# =============================================================================
 
 # H.265 VPS
 HEVC_VPS = bytes(
@@ -103,6 +104,11 @@ HEVC_ANNEXB_STREAM = (
 )
 
 
+# =============================================================================
+# 単体テスト
+# =============================================================================
+
+
 def test_parse_hevc_sps_extracts_correct_values():
     """HEVC SPS から正しい値が抽出されることを確認"""
     sps = parse_hevc_sps(HEVC_SPS)
@@ -128,25 +134,14 @@ def test_empty_data_raises_error():
 
 def test_hevc_nal_unit_type_enum_comparison():
     """HEVCNalUnitType が IntEnum 相当の動作をすることを確認"""
-    # enum と int の比較
     assert HEVCNalUnitType.VPS == 32
     assert HEVCNalUnitType.SPS == 33
     assert HEVCNalUnitType.PPS == 34
     assert HEVCNalUnitType.IDR_W_RADL == 19
     assert HEVCNalUnitType.IDR_N_LP == 20
 
-    # パース結果との比較
     info = parse_hevc_annexb(HEVC_ANNEXB_STREAM)
     assert len(info.nal_units) == 3
-
-    # VPS NAL
     assert info.nal_units[0].nal_unit_type == HEVCNalUnitType.VPS
-    assert info.nal_units[0].nal_unit_type == 32
-
-    # SPS NAL
     assert info.nal_units[1].nal_unit_type == HEVCNalUnitType.SPS
-    assert info.nal_units[1].nal_unit_type == 33
-
-    # PPS NAL
     assert info.nal_units[2].nal_unit_type == HEVCNalUnitType.PPS
-    assert info.nal_units[2].nal_unit_type == 34
