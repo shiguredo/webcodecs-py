@@ -174,10 +174,12 @@ class VideoEncoder {
   uint64_t next_output_sequence_{0};  // 次に出力すべきシーケンス番号
   std::mutex output_mutex_;           // 出力バッファの同期
 
-  void handle_encoded_frame(const uint8_t* data,
-                            size_t size,
-                            int64_t timestamp,
-                            bool keyframe);
+  void handle_encoded_frame(
+      const uint8_t* data,
+      size_t size,
+      int64_t timestamp,
+      bool keyframe,
+      std::optional<SvcOutputMetadata> svc_metadata = std::nullopt);
 
   void init_aom_encoder();
   void cleanup_aom_encoder();
@@ -212,6 +214,11 @@ class VideoEncoder {
   vpx_codec_enc_cfg_t vpx_config_;
   const vpx_codec_iface_t* vpx_iface_ = nullptr;
   std::mutex vpx_mutex_;
+
+  // VP9 SVC (Scalable Video Coding) 関連
+  bool svc_enabled_ = false;
+  uint32_t svc_temporal_layers_ = 1;
+  std::atomic<uint64_t> svc_frame_index_{0};
 #endif
 
   // 並列処理のためのメソッド

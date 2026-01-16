@@ -192,6 +192,7 @@ Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
 - `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
+- `SvcOutputMetadata` - EncodedVideoChunkMetadata の svc (scalabilityMode 指定時のみ)
 
 Result 系 (メソッドの戻り値):
 
@@ -516,6 +517,51 @@ config_vp9_10bit: VideoEncoderConfig = {
 encoder.configure(config_vp9)
 ```
 
+### VideoEncoder の例 (VP9 SVC - macOS / Ubuntu)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk, metadata=None):
+    if metadata and "svc" in metadata:
+        tid = metadata["svc"]["temporal_layer_id"]
+        print(f"エンコード完了: {chunk.byte_length} bytes, temporal_layer_id={tid}")
+    else:
+        print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# VP9 L1T2 (2 temporal layers)
+# temporal layer パターン: 0, 1, 0, 1, ...
+config_l1t2: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+    "scalability_mode": "L1T2",
+}
+
+# VP9 L1T3 (3 temporal layers)
+# temporal layer パターン: 0, 2, 1, 2, 0, 2, 1, 2, ...
+config_l1t3: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+    "scalability_mode": "L1T3",
+}
+
+encoder.configure(config_l1t2)
+```
+
 ## 実装済みインターフェース
 
 ### 辞書型インターフェース (Config)
@@ -651,7 +697,7 @@ print(result["capture_time"])  # 1234567890.0
 | `framerate` | o | o | o | |
 | `hardware_acceleration` | x | o | - | **未実装** |
 | `alpha` | o | o | o | AlphaOption enum |
-| `scalability_mode` | x | o | - | **未実装** |
+| `scalability_mode` | o | o | o | VP9 L1T2/L1T3 のみ対応 |
 | `bitrate_mode` | o | o | o | VideoEncoderBitrateMode enum |
 | `latency_mode` | o | o | o | LatencyMode enum |
 | `content_hint` | x | o | - | **未実装** |
@@ -1647,9 +1693,8 @@ decoder.close()
 |--------|------|
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
-| `SvcOutputMetadata` | SVC サポート未実装 |
 
-**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
+**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。`scalability_mode` が指定されている場合、全フレームで `svc` フィールド (`temporal_layer_id` を含む) が提供される。
 
 ### 未実装の列挙型
 
@@ -1684,6 +1729,14 @@ decoder.close()
 | 1 | 8-bit | 4:2:2, 4:4:4 | o |
 | 2 | 10/12-bit | 4:2:0 | o |
 | 3 | 10/12-bit | 4:2:2, 4:4:4 | o |
+
+**VP9 scalabilityMode 対応状況**:
+
+| モード | 説明 | 対応状況 |
+|--------|------|---------|
+| L1T2 | 1 spatial layer, 2 temporal layers | o |
+| L1T3 | 1 spatial layer, 3 temporal layers | o |
+| L2T* | 2+ spatial layers | x |
 
 ### Audio コーデック
 

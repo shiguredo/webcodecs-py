@@ -66,6 +66,9 @@ void VideoEncoder::configure(nb::dict config_dict) {
         nb::cast<HardwareAcceleration>(config_dict["hardware_acceleration"]);
   if (config_dict.contains("alpha"))
     config.alpha = nb::cast<AlphaOption>(config_dict["alpha"]);
+  if (config_dict.contains("scalability_mode"))
+    config.scalability_mode =
+        nb::cast<std::string>(config_dict["scalability_mode"]);
   if (config_dict.contains("hardware_acceleration_engine"))
     config.hardware_acceleration_engine = nb::cast<HardwareAccelerationEngine>(
         config_dict["hardware_acceleration_engine"]);
@@ -340,10 +343,12 @@ void VideoEncoder::encode(const VideoFrame& frame,
   }
 }
 
-void VideoEncoder::handle_encoded_frame(const uint8_t* data,
-                                        size_t size,
-                                        int64_t timestamp,
-                                        bool keyframe) {
+void VideoEncoder::handle_encoded_frame(
+    const uint8_t* data,
+    size_t size,
+    int64_t timestamp,
+    bool keyframe,
+    std::optional<SvcOutputMetadata> svc_metadata) {
   nb::object output_cb;
   bool has_output;
   {
@@ -361,8 +366,16 @@ void VideoEncoder::handle_encoded_frame(const uint8_t* data,
         keyframe ? EncodedVideoChunkType::KEY : EncodedVideoChunkType::DELTA,
         timestamp, 0);
 
+    // SVC メタデータがある場合は EncodedVideoChunkMetadata を作成
+    std::optional<EncodedVideoChunkMetadata> metadata = std::nullopt;
+    if (svc_metadata.has_value()) {
+      EncodedVideoChunkMetadata meta;
+      meta.svc = svc_metadata;
+      metadata = meta;
+    }
+
     // 順序制御された出力処理
-    handle_output(current_sequence_, chunk);
+    handle_output(current_sequence_, chunk, metadata);
   }
 
   // デキューコールバックを呼び出す
@@ -773,23 +786,33 @@ void VideoEncoder::handle_output(
 
       // metadata を dict に変換 (存在しない場合は空の dict)
       nb::dict metadata_dict;
-      if (entry.metadata.has_value() &&
-          entry.metadata->decoder_config.has_value()) {
-        const auto& config = entry.metadata->decoder_config.value();
-        nb::dict decoder_config_dict;
-        decoder_config_dict["codec"] = config.codec;
-        if (config.coded_width.has_value()) {
-          decoder_config_dict["coded_width"] = config.coded_width.value();
+      if (entry.metadata.has_value()) {
+        // decoder_config を追加
+        if (entry.metadata->decoder_config.has_value()) {
+          const auto& config = entry.metadata->decoder_config.value();
+          nb::dict decoder_config_dict;
+          decoder_config_dict["codec"] = config.codec;
+          if (config.coded_width.has_value()) {
+            decoder_config_dict["coded_width"] = config.coded_width.value();
+          }
+          if (config.coded_height.has_value()) {
+            decoder_config_dict["coded_height"] = config.coded_height.value();
+          }
+          if (config.description.has_value()) {
+            const auto& desc = config.description.value();
+            decoder_config_dict["description"] = nb::bytes(
+                reinterpret_cast<const char*>(desc.data()), desc.size());
+          }
+          metadata_dict["decoder_config"] = decoder_config_dict;
         }
-        if (config.coded_height.has_value()) {
-          decoder_config_dict["coded_height"] = config.coded_height.value();
+
+        // svc メタデータを追加
+        if (entry.metadata->svc.has_value()) {
+          nb::dict svc_dict;
+          svc_dict["temporal_layer_id"] =
+              entry.metadata->svc->temporal_layer_id;
+          metadata_dict["svc"] = svc_dict;
         }
-        if (config.description.has_value()) {
-          const auto& desc = config.description.value();
-          decoder_config_dict["description"] = nb::bytes(
-              reinterpret_cast<const char*>(desc.data()), desc.size());
-        }
-        metadata_dict["decoder_config"] = decoder_config_dict;
       }
 
       // callback を呼び出す
