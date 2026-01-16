@@ -1,5 +1,6 @@
 #include "video_encoder.h"
 #include <cstring>
+#include <regex>
 #include <stdexcept>
 #include "encoded_video_chunk.h"
 #include "video_frame.h"
@@ -219,6 +220,40 @@ bool VideoEncoder::uses_intel_vpl() const {
 #else
   return false;
 #endif
+}
+
+// scalabilityMode 文字列のパース結果
+// VP9/AV1 の SVC 設定で共通利用
+struct ScalabilityModeConfig {
+  uint32_t spatial_layers;
+  uint32_t temporal_layers;
+  bool is_valid;
+
+  ScalabilityModeConfig()
+      : spatial_layers(1), temporal_layers(1), is_valid(false) {}
+};
+
+// scalabilityMode 文字列をパース
+// "L1T2" -> spatial_layers=1, temporal_layers=2
+// "L1T3" -> spatial_layers=1, temporal_layers=3
+static ScalabilityModeConfig parse_scalability_mode(const std::string& mode) {
+  ScalabilityModeConfig config;
+
+  if (mode.empty()) {
+    return config;
+  }
+
+  // 正規表現: L[1-4]T[1-3]
+  std::regex pattern("^L([1-4])T([1-3])$");
+  std::smatch match;
+
+  if (std::regex_match(mode, match, pattern)) {
+    config.spatial_layers = static_cast<uint32_t>(std::stoul(match[1].str()));
+    config.temporal_layers = static_cast<uint32_t>(std::stoul(match[2].str()));
+    config.is_valid = true;
+  }
+
+  return config;
 }
 
 // 分割されたファイルをインクルード

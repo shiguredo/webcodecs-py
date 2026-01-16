@@ -128,8 +128,20 @@ void VideoEncoder::init_aom_encoder() {
   aom_config_.kf_min_dist = 0;
   aom_config_.kf_max_dist = 999999;  // 事実上無制限（30fps で約 9 時間）
 
+  // SVC 使用時は REALTIME モードが必須
+  // libaom の SVC は REALTIME モードでのみサポートされている
+  bool svc_requested = config_.scalability_mode.has_value() &&
+                       !config_.scalability_mode.value().empty();
+  auto svc_config_check =
+      svc_requested ? parse_scalability_mode(config_.scalability_mode.value())
+                    : ScalabilityModeConfig();
+  bool force_realtime =
+      svc_requested && svc_config_check.is_valid &&
+      svc_config_check.spatial_layers == 1 &&
+      svc_config_check.temporal_layers > 1;
+
   // Realtime vs quality
-  if (config_.latency_mode == LatencyMode::REALTIME) {
+  if (config_.latency_mode == LatencyMode::REALTIME || force_realtime) {
     aom_config_.g_usage = AOM_USAGE_REALTIME;
     aom_config_.g_lag_in_frames = 0;
   } else {
@@ -230,6 +242,72 @@ void VideoEncoder::init_aom_encoder() {
 
   // 参照フレーム数の制限
   aom_codec_control(aom_encoder_, AV1E_SET_MAX_REFERENCE_FRAMES, 3);
+
+  // SVC (Scalable Video Coding) の設定
+  svc_enabled_ = false;
+  svc_temporal_layers_ = 1;
+  svc_frame_index_.store(0);
+
+  if (config_.scalability_mode.has_value() &&
+      !config_.scalability_mode.value().empty()) {
+    auto svc_config = parse_scalability_mode(config_.scalability_mode.value());
+
+    if (!svc_config.is_valid) {
+      throw std::runtime_error("Invalid scalability_mode: " +
+                               config_.scalability_mode.value());
+    }
+
+    // Spatial SVC は未対応
+    if (svc_config.spatial_layers > 1) {
+      throw std::runtime_error(
+          "Spatial SVC (L2T*, L3T*, L4T*) is not supported for AV1. "
+          "Only temporal SVC (L1T2, L1T3) is supported.");
+    }
+
+    uint32_t ts_layers = svc_config.temporal_layers;
+    if (ts_layers > 1) {
+      svc_enabled_ = true;
+      svc_temporal_layers_ = ts_layers;
+
+      // SVC パラメータの設定
+      aom_svc_params_t svc_params;
+      memset(&svc_params, 0, sizeof(svc_params));
+
+      svc_params.number_spatial_layers = 1;
+      svc_params.number_temporal_layers = static_cast<int>(ts_layers);
+
+      // 各層の量子化パラメータ (spatial_layers * temporal_layers 分)
+      for (unsigned int i = 0; i < ts_layers; ++i) {
+        svc_params.max_quantizers[i] =
+            static_cast<int>(aom_config_.rc_max_quantizer);
+        svc_params.min_quantizers[i] =
+            static_cast<int>(aom_config_.rc_min_quantizer);
+      }
+
+      // ビットレート配分（VP9 と同様）
+      uint32_t total_bitrate = aom_config_.rc_target_bitrate;
+      if (ts_layers == 2) {
+        // L1T2: Layer 0 = 60%, Layer 1 = 100%
+        svc_params.layer_target_bitrate[0] =
+            static_cast<int>(total_bitrate * 60 / 100);
+        svc_params.layer_target_bitrate[1] = static_cast<int>(total_bitrate);
+      } else if (ts_layers == 3) {
+        // L1T3: Layer 0 = 25%, Layer 1 = 50%, Layer 2 = 100%
+        svc_params.layer_target_bitrate[0] =
+            static_cast<int>(total_bitrate * 25 / 100);
+        svc_params.layer_target_bitrate[1] =
+            static_cast<int>(total_bitrate * 50 / 100);
+        svc_params.layer_target_bitrate[2] = static_cast<int>(total_bitrate);
+      }
+
+      // スケーリングファクター（空間層は 1 なので 1:1）
+      // scaling_factor_den は 0 以外の値が必要
+      svc_params.scaling_factor_num[0] = 1;
+      svc_params.scaling_factor_den[0] = 1;
+
+      aom_codec_control(aom_encoder_, AV1E_SET_SVC_PARAMS, &svc_params);
+    }
+  }
 }
 
 void VideoEncoder::cleanup_aom_encoder() {
@@ -255,6 +333,32 @@ void VideoEncoder::encode_frame_aom(const VideoFrame& frame,
     // AV1E_SET_QUANTIZER_ONE_PASS は 1 パスモードでのフレーム単位 QP 設定
     aom_codec_control(aom_encoder_, AV1E_SET_QUANTIZER_ONE_PASS,
                       static_cast<int>(quantizer.value()));
+  }
+
+  // SVC temporal layer ID の計算
+  std::optional<SvcOutputMetadata> svc_metadata;
+  if (svc_enabled_) {
+    uint64_t frame_idx = svc_frame_index_.fetch_add(1);
+
+    // temporal layer ID の計算
+    // L1T2: 周期 2 (0, 1, 0, 1, ...)
+    // L1T3: 周期 4 (0, 2, 1, 2, 0, 2, 1, 2, ...)
+    uint32_t temporal_layer_id = 0;
+    if (svc_temporal_layers_ == 2) {
+      temporal_layer_id = frame_idx % 2;
+    } else if (svc_temporal_layers_ == 3) {
+      // 周期 4 のパターン: 0, 2, 1, 2
+      static const uint32_t pattern_l1t3[] = {0, 2, 1, 2};
+      temporal_layer_id = pattern_l1t3[frame_idx % 4];
+    }
+
+    // AV1E_SET_SVC_LAYER_ID で層 ID を設定
+    aom_svc_layer_id_t layer_id;
+    layer_id.spatial_layer_id = 0;
+    layer_id.temporal_layer_id = static_cast<int>(temporal_layer_id);
+    aom_codec_control(aom_encoder_, AV1E_SET_SVC_LAYER_ID, &layer_id);
+
+    svc_metadata = SvcOutputMetadata(temporal_layer_id);
   }
 
   // Wrap I420 memory from VideoFrame directly
@@ -292,8 +396,15 @@ void VideoEncoder::encode_frame_aom(const VideoFrame& frame,
   while ((pkt = aom_codec_get_cx_data(aom_encoder_, &iter)) != nullptr) {
     if (pkt->kind == AOM_CODEC_CX_FRAME_PKT) {
       bool is_keyframe = (pkt->data.frame.flags & AOM_FRAME_IS_KEY) != 0;
-      handle_encoded_frame(static_cast<const uint8_t*>(pkt->data.frame.buf),
-                           pkt->data.frame.sz, frame.timestamp(), is_keyframe);
+      if (svc_enabled_) {
+        handle_encoded_frame(static_cast<const uint8_t*>(pkt->data.frame.buf),
+                             pkt->data.frame.sz, frame.timestamp(), is_keyframe,
+                             svc_metadata);
+      } else {
+        handle_encoded_frame(static_cast<const uint8_t*>(pkt->data.frame.buf),
+                             pkt->data.frame.sz, frame.timestamp(),
+                             is_keyframe);
+      }
     }
   }
   // aom_img_wrap では img_data_owner=0 のため解放不要だが、
