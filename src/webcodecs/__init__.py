@@ -427,13 +427,24 @@ class EncodedVideoChunkMetadataDecoderConfig(TypedDict, total=False):
     description: bytes
 
 
+class SvcOutputMetadata(TypedDict, total=False):
+    """SVC (Scalable Video Coding) エンコード時の出力メタデータ
+
+    WebCodecs API 準拠。
+    """
+
+    temporal_layer_id: int
+
+
 class EncodedVideoChunkMetadata(TypedDict, total=False):
     """VideoEncoder の output callback で提供される metadata
 
     キーフレーム時のみ decoder_config が含まれる。
+    SVC エンコード時は svc が含まれる。
     """
 
     decoder_config: EncodedVideoChunkMetadataDecoderConfig
+    svc: SvcOutputMetadata
 
 
 def get_video_codec_capabilities() -> dict[HardwareAccelerationEngine, dict]:
