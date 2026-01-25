@@ -1,9 +1,11 @@
-"""ソフトウェアエンコーダー (AV1, VP8, VP9) のスケーリング機能テスト.
+"""エンコーダーのスケーリング機能テスト.
 
 WebCodecs API 仕様: 「The encoder MUST scale any VideoFrame whose
 visible width differs from the configured width value」
 
-libyuv を使用してスケーリングを実装。
+- ソフトウェアエンコーダー (AV1, VP8, VP9): libyuv を使用
+- ハードウェアエンコーダー (NVENC, Intel VPL): libyuv を使用
+- Apple Video Toolbox: VTPixelTransferSession を使用 (test_apple_video_toolbox.py)
 """
 
 import platform

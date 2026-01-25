@@ -15,6 +15,7 @@
   - WebCodecs API 仕様に準拠: encode で渡されるフレームの解像度と configure で指定した解像度が異なる場合に自動的にスケーリング
   - Apple Video Toolbox: VTPixelTransferSession を使用 (Metal ベースの HW アクセラレーション)
   - ソフトウェアエンコーダー (AV1/VP8/VP9): libyuv の I420Scale を使用
+  - NVENC / Intel VPL: libyuv の I420Scale を使用
   - @voluntas
 - [ADD] VP9 で scalabilityMode (L1T2/L1T3) をサポートする
   - VideoEncoderConfig で `scalability_mode` を指定可能

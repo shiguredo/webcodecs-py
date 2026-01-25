@@ -11,6 +11,9 @@
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
+#include <vector>
+
+#include <libyuv.h>
 
 #include "../dyn/cuda.h"
 #include "../dyn/nvenc.h"
@@ -389,6 +392,71 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
   }
   const VideoFrame& src = nv12 ? *nv12 : frame;
 
+  // スケーリングが必要かどうかを判定
+  bool needs_scaling =
+      (src.width() != config_.width || src.height() != config_.height);
+
+  // スケーリング用のバッファ (I420 経由でスケーリング)
+  std::vector<uint8_t> scaled_i420_buffer;
+  std::vector<uint8_t> scaled_nv12_buffer;
+  const uint8_t* final_y = src.plane_ptr(0);
+  const uint8_t* final_uv = src.plane_ptr(1);
+  uint32_t final_width = src.width();
+  uint32_t final_height = src.height();
+
+  if (needs_scaling) {
+    // NV12 -> I420 に変換してからスケーリング
+    size_t src_i420_size =
+        src.width() * src.height() + (src.width() / 2) * (src.height() / 2) * 2;
+    std::vector<uint8_t> src_i420_buffer(src_i420_size);
+
+    uint8_t* src_i420_y = src_i420_buffer.data();
+    uint8_t* src_i420_u = src_i420_y + src.width() * src.height();
+    uint8_t* src_i420_v = src_i420_u + (src.width() / 2) * (src.height() / 2);
+
+    libyuv::NV12ToI420(src.plane_ptr(0), src.width(), src.plane_ptr(1),
+                       src.width(), src_i420_y, src.width(), src_i420_u,
+                       src.width() / 2, src_i420_v, src.width() / 2,
+                       src.width(), src.height());
+
+    // I420 でスケーリング
+    uint32_t dst_width = config_.width;
+    uint32_t dst_height = config_.height;
+    size_t dst_i420_size =
+        dst_width * dst_height + (dst_width / 2) * (dst_height / 2) * 2;
+    scaled_i420_buffer.resize(dst_i420_size);
+
+    uint8_t* dst_i420_y = scaled_i420_buffer.data();
+    uint8_t* dst_i420_u = dst_i420_y + dst_width * dst_height;
+    uint8_t* dst_i420_v = dst_i420_u + (dst_width / 2) * (dst_height / 2);
+
+    int result = libyuv::I420Scale(
+        src_i420_y, src.width(), src_i420_u, src.width() / 2, src_i420_v,
+        src.width() / 2, src.width(), src.height(), dst_i420_y, dst_width,
+        dst_i420_u, dst_width / 2, dst_i420_v, dst_width / 2, dst_width,
+        dst_height, libyuv::kFilterBox);
+
+    if (result != 0) {
+      throw std::runtime_error("libyuv::I420Scale failed");
+    }
+
+    // I420 -> NV12 に変換
+    size_t nv12_size = dst_width * dst_height * 3 / 2;
+    scaled_nv12_buffer.resize(nv12_size);
+
+    uint8_t* nv12_y = scaled_nv12_buffer.data();
+    uint8_t* nv12_uv = nv12_y + dst_width * dst_height;
+
+    libyuv::I420ToNV12(dst_i420_y, dst_width, dst_i420_u, dst_width / 2,
+                       dst_i420_v, dst_width / 2, nv12_y, dst_width, nv12_uv,
+                       dst_width, dst_width, dst_height);
+
+    final_y = nv12_y;
+    final_uv = nv12_uv;
+    final_width = dst_width;
+    final_height = dst_height;
+  }
+
   // 入力バッファをロック
   NV_ENC_LOCK_INPUT_BUFFER lock_input_buffer = {};
   lock_input_buffer.version = NV_ENC_LOCK_INPUT_BUFFER_VER;
@@ -403,22 +471,19 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
   // フレームデータをコピー
   uint8_t* dst_y = static_cast<uint8_t*>(lock_input_buffer.bufferDataPtr);
   uint32_t dst_pitch = lock_input_buffer.pitch;
-  uint32_t width = src.width();
-  uint32_t height = src.height();
-
-  const uint8_t* src_y = src.plane_ptr(0);
-  const uint8_t* src_uv = src.plane_ptr(1);
 
   // Y プレーンをコピー
-  for (uint32_t row = 0; row < height; ++row) {
-    std::memcpy(dst_y + row * dst_pitch, src_y + row * width, width);
+  for (uint32_t row = 0; row < final_height; ++row) {
+    std::memcpy(dst_y + row * dst_pitch, final_y + row * final_width,
+                final_width);
   }
 
   // UV プレーンをコピー
-  uint8_t* dst_uv = dst_y + dst_pitch * height;
-  uint32_t chroma_height = (height + 1) / 2;
+  uint8_t* dst_uv = dst_y + dst_pitch * final_height;
+  uint32_t chroma_height = (final_height + 1) / 2;
   for (uint32_t row = 0; row < chroma_height; ++row) {
-    std::memcpy(dst_uv + row * dst_pitch, src_uv + row * width, width);
+    std::memcpy(dst_uv + row * dst_pitch, final_uv + row * final_width,
+                final_width);
   }
 
   // 入力バッファをアンロック
@@ -434,8 +499,8 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
   pic_params.inputBuffer = nvenc_input_buffer_;
   pic_params.outputBitstream = nvenc_output_buffer_;
   pic_params.bufferFmt = NV_ENC_BUFFER_FORMAT_NV12;
-  pic_params.inputWidth = width;
-  pic_params.inputHeight = height;
+  pic_params.inputWidth = final_width;
+  pic_params.inputHeight = final_height;
   pic_params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
   pic_params.inputTimeStamp = frame.timestamp();
 
