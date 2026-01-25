@@ -239,6 +239,11 @@ class VideoEncoder {
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)
   void* vt_session_ = nullptr;
 
+#if defined(__APPLE__)
+  // VTPixelTransferSession: スケーリング用
+  void* vt_pixel_transfer_session_ = nullptr;
+#endif
+
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;
 

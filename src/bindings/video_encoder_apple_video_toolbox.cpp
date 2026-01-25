@@ -398,6 +398,24 @@ void VideoEncoder::init_videotoolbox_encoder() {
   }
 
   vt_session_ = session;
+
+  // VTPixelTransferSession の作成 (スケーリング用)
+  VTPixelTransferSessionRef pixel_transfer_session = nullptr;
+  CVReturn pt_err = VTPixelTransferSessionCreate(kCFAllocatorDefault,
+                                                 &pixel_transfer_session);
+  if (pt_err != kCVReturnSuccess) {
+    VTCompressionSessionInvalidate(session);
+    CFRelease(session);
+    vt_session_ = nullptr;
+    throw std::runtime_error("Failed to create VTPixelTransferSession");
+  }
+
+  // スケーリングモードを設定 (Normal = アスペクト比無視でリサイズ)
+  VTSessionSetProperty(pixel_transfer_session,
+                       kVTPixelTransferPropertyKey_ScalingMode,
+                       kVTScalingMode_Normal);
+
+  vt_pixel_transfer_session_ = pixel_transfer_session;
 }
 
 void VideoEncoder::encode_frame_videotoolbox(
@@ -408,6 +426,10 @@ void VideoEncoder::encode_frame_videotoolbox(
     throw std::runtime_error("VideoToolbox encoder is not initialized");
   }
   auto session = (VTCompressionSessionRef)vt_session_;
+
+  // スケーリングが必要かどうかを判定
+  bool needs_scaling =
+      (frame.width() != config_.width || frame.height() != config_.height);
 
   CVPixelBufferRef pb = nullptr;
   bool pb_from_native = false;
@@ -422,13 +444,8 @@ void VideoEncoder::encode_frame_videotoolbox(
     }
   }
 
-  // native_buffer がない場合は従来通りプールから作成してコピー
+  // native_buffer がない場合は CVPixelBuffer を作成してコピー
   if (!pb_from_native) {
-    CVPixelBufferPoolRef pool = VTCompressionSessionGetPixelBufferPool(session);
-    if (!pool) {
-      throw std::runtime_error("Failed to get CVPixelBufferPool");
-    }
-
     // Make sure we have NV12 source
     std::unique_ptr<VideoFrame> nv12;
     if (frame.format() != VideoPixelFormat::NV12) {
@@ -436,10 +453,25 @@ void VideoEncoder::encode_frame_videotoolbox(
     }
     const VideoFrame& src = nv12 ? *nv12 : frame;
 
-    CVReturn r =
-        CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pb);
+    // 入力フレームサイズの CVPixelBuffer を作成
+    OSType pixel_format = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
+    CFDictionaryRef empty_dict = CFDictionaryCreate(
+        kCFAllocatorDefault, nullptr, nullptr, 0,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    const void* pb_keys[] = {kCVPixelBufferIOSurfacePropertiesKey};
+    const void* pb_vals[] = {empty_dict};
+    CFDictionaryRef pb_attrs = CFDictionaryCreate(
+        kCFAllocatorDefault, pb_keys, pb_vals, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    CVReturn r = CVPixelBufferCreate(kCFAllocatorDefault, src.width(),
+                                     src.height(), pixel_format, pb_attrs, &pb);
+
+    CFRelease(pb_attrs);
+    CFRelease(empty_dict);
+
     if (r != kCVReturnSuccess || !pb) {
-      throw std::runtime_error("Failed to create CVPixelBuffer");
+      throw std::runtime_error("Failed to create CVPixelBuffer for input");
     }
 
     // Copy planes into CVPixelBuffer
@@ -476,6 +508,48 @@ void VideoEncoder::encode_frame_videotoolbox(
     CVPixelBufferUnlockBaseAddress(pb, 0);
   }
 
+  // スケーリングが必要な場合
+  CVPixelBufferRef encode_pb = pb;
+  if (needs_scaling) {
+    if (!vt_pixel_transfer_session_) {
+      CFRelease(pb);
+      throw std::runtime_error(
+          "VTPixelTransferSession is not initialized for scaling");
+    }
+
+    // 出力用 CVPixelBuffer をプールから取得
+    CVPixelBufferPoolRef pool = VTCompressionSessionGetPixelBufferPool(session);
+    if (!pool) {
+      CFRelease(pb);
+      throw std::runtime_error("Failed to get CVPixelBufferPool for scaling");
+    }
+
+    CVPixelBufferRef scaled_pb = nullptr;
+    CVReturn r = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool,
+                                                    &scaled_pb);
+    if (r != kCVReturnSuccess || !scaled_pb) {
+      CFRelease(pb);
+      throw std::runtime_error(
+          "Failed to create scaled CVPixelBuffer from pool");
+    }
+
+    // VTPixelTransferSessionTransferImage でスケーリング
+    auto transfer_session =
+        (VTPixelTransferSessionRef)vt_pixel_transfer_session_;
+    OSStatus transfer_err =
+        VTPixelTransferSessionTransferImage(transfer_session, pb, scaled_pb);
+
+    // 入力バッファは不要になったので解放
+    CFRelease(pb);
+
+    if (transfer_err != noErr) {
+      CFRelease(scaled_pb);
+      throw std::runtime_error("VTPixelTransferSessionTransferImage failed");
+    }
+
+    encode_pb = scaled_pb;
+  }
+
   // VideoToolbox はフレームごとの quantizer 指定をサポートしていないため、
   // avc.quantizer オプションは無視される
   (void)quantizer;
@@ -507,11 +581,11 @@ void VideoEncoder::encode_frame_videotoolbox(
 
   // バインディング層で既に GIL を解放しているため、ここでは解放しない
   OSStatus err = VTCompressionSessionEncodeFrame(
-      session, pb, pts, kCMTimeInvalid, frame_opts, ref, nullptr);
+      session, encode_pb, pts, kCMTimeInvalid, frame_opts, ref, nullptr);
 
   if (frame_opts)
     CFRelease(frame_opts);
-  CFRelease(pb);
+  CFRelease(encode_pb);
   if (err != noErr) {
     delete ref;
     throw std::runtime_error("VTCompressionSessionEncodeFrame failed");
@@ -534,6 +608,13 @@ void VideoEncoder::flush_videotoolbox_encoder() {
 }
 
 void VideoEncoder::cleanup_videotoolbox_encoder() {
+  if (vt_pixel_transfer_session_) {
+    VTPixelTransferSessionInvalidate(
+        (VTPixelTransferSessionRef)vt_pixel_transfer_session_);
+    CFRelease((VTPixelTransferSessionRef)vt_pixel_transfer_session_);
+    vt_pixel_transfer_session_ = nullptr;
+  }
+
   if (vt_session_) {
     VTCompressionSessionRef s = (VTCompressionSessionRef)vt_session_;
     VTCompressionSessionInvalidate(s);
