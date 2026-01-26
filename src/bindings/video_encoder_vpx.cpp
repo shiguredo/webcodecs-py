@@ -1,44 +1,11 @@
-// VP8/VP9 エンコーダー実装 (macOS / Linux)
+// VP8/VP9 エンコーダー実装 (macOS / Ubuntu)
 // video_encoder.cpp から #include されるため、インクルードガードは不要
+// ScalabilityModeConfig と parse_scalability_mode は video_encoder.cpp で定義
 
 #include <cstring>
-#include <regex>
 #include <thread>
 
 #include <libyuv.h>
-
-// scalabilityMode 文字列のパース結果
-struct ScalabilityModeConfig {
-  uint32_t spatial_layers;
-  uint32_t temporal_layers;
-  bool is_valid;
-
-  ScalabilityModeConfig()
-      : spatial_layers(1), temporal_layers(1), is_valid(false) {}
-};
-
-// scalabilityMode 文字列をパース
-// "L1T2" -> spatial_layers=1, temporal_layers=2
-// "L1T3" -> spatial_layers=1, temporal_layers=3
-static ScalabilityModeConfig parse_scalability_mode(const std::string& mode) {
-  ScalabilityModeConfig config;
-
-  if (mode.empty()) {
-    return config;
-  }
-
-  // 正規表現: L[1-4]T[1-3]
-  std::regex pattern("^L([1-4])T([1-3])$");
-  std::smatch match;
-
-  if (std::regex_match(mode, match, pattern)) {
-    config.spatial_layers = static_cast<uint32_t>(std::stoul(match[1].str()));
-    config.temporal_layers = static_cast<uint32_t>(std::stoul(match[2].str()));
-    config.is_valid = true;
-  }
-
-  return config;
-}
 
 // WebRTC の NumberOfThreads ロジックに準拠
 static int calculate_vpx_number_of_threads(int width,

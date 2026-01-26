@@ -562,6 +562,50 @@ config_l1t3: VideoEncoderConfig = {
 encoder.configure(config_l1t2)
 ```
 
+### VideoEncoder の例 (AV1 SVC)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk, metadata=None):
+    if metadata and "svc" in metadata:
+        tid = metadata["svc"]["temporal_layer_id"]
+        print(f"エンコード完了: {chunk.byte_length} bytes, temporal_layer_id={tid}")
+    else:
+        print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# AV1 L1T2 (2 temporal layers)
+# temporal layer パターン: 0, 1, 0, 1, ...
+# 注: SVC 使用時は自動的に REALTIME モードが適用される
+config_l1t2: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "scalability_mode": "L1T2",
+}
+
+# AV1 L1T3 (3 temporal layers)
+# temporal layer パターン: 0, 2, 1, 2, 0, 2, 1, 2, ...
+config_l1t3: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "scalability_mode": "L1T3",
+}
+
+encoder.configure(config_l1t2)
+```
+
 ## 実装済みインターフェース
 
 ### 辞書型インターフェース (Config)
@@ -1788,6 +1832,16 @@ decoder.close()
 | L1T2 | 1 spatial layer, 2 temporal layers | o |
 | L1T3 | 1 spatial layer, 3 temporal layers | o |
 | L2T* | 2+ spatial layers | x |
+
+**AV1 scalabilityMode 対応状況**:
+
+| モード | 説明 | 対応状況 |
+|--------|------|---------|
+| L1T2 | 1 spatial layer, 2 temporal layers | o |
+| L1T3 | 1 spatial layer, 3 temporal layers | o |
+| L2T* | 2+ spatial layers | x |
+
+**注**: AV1 で scalabilityMode を使用する場合、libaom の制約により自動的に REALTIME モードが適用されます。
 
 ### Audio コーデック
 

@@ -202,6 +202,12 @@ class VideoEncoder {
   CFStringRef get_hevc_profile_level();
 #endif
 
+  // SVC (Scalable Video Coding) 関連
+  // AV1 と VP9 の両方で使用するため、全プラットフォームで定義
+  bool svc_enabled_ = false;
+  uint32_t svc_temporal_layers_ = 1;
+  std::atomic<uint64_t> svc_frame_index_{0};
+
 #if defined(__APPLE__) || defined(__linux__)
   // libvpx エンコーダー
   void init_vpx_encoder();
@@ -214,11 +220,6 @@ class VideoEncoder {
   vpx_codec_enc_cfg_t vpx_config_;
   const vpx_codec_iface_t* vpx_iface_ = nullptr;
   std::mutex vpx_mutex_;
-
-  // VP9 SVC (Scalable Video Coding) 関連
-  bool svc_enabled_ = false;
-  uint32_t svc_temporal_layers_ = 1;
-  std::atomic<uint64_t> svc_frame_index_{0};
 #endif
 
   // 並列処理のためのメソッド
