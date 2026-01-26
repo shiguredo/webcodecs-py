@@ -138,10 +138,9 @@ void VideoEncoder::init_aom_encoder() {
   auto svc_config_check =
       svc_requested ? parse_scalability_mode(config_.scalability_mode.value())
                     : ScalabilityModeConfig();
-  bool force_realtime =
-      svc_requested && svc_config_check.is_valid &&
-      svc_config_check.spatial_layers == 1 &&
-      svc_config_check.temporal_layers > 1;
+  bool force_realtime = svc_requested && svc_config_check.is_valid &&
+                        svc_config_check.spatial_layers == 1 &&
+                        svc_config_check.temporal_layers > 1;
 
   // Realtime vs quality
   if (config_.latency_mode == LatencyMode::REALTIME || force_realtime) {
