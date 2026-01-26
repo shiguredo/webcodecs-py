@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2026-01-08
+- 最終更新: 2026-01-26
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -910,6 +910,57 @@ def on_output(chunk, metadata=None):
             # description: bytes (H.264 では avcC、H.265 では hvcC)
             description = decoder_config.get("description")
 ```
+
+**自動スケーリング**: WebCodecs API 仕様に準拠し、`encode()` で渡される VideoFrame の解像度と `configure()` で指定した解像度が異なる場合、自動的にスケーリングが行われます。
+
+```python
+from webcodecs import VideoEncoder, VideoEncoderConfig, VideoFrame, VideoPixelFormat
+import numpy as np
+
+def on_output(chunk, metadata=None):
+    pass
+
+def on_error(error):
+    pass
+
+encoder = VideoEncoder(on_output, on_error)
+
+# configure で 640x360 を指定
+config: VideoEncoderConfig = {
+    "codec": "av01.0.04M.08",
+    "width": 640,
+    "height": 360,
+    "bitrate": 1_000_000,
+}
+encoder.configure(config)
+
+# 1280x720 のフレームを渡すと、自動的に 640x360 にスケーリングされる
+data = np.zeros(1280 * 720 * 3 // 2, dtype=np.uint8)
+frame = VideoFrame(data, {
+    "format": VideoPixelFormat.I420,
+    "coded_width": 1280,
+    "coded_height": 720,
+    "timestamp": 0,
+})
+encoder.encode(frame)  # 640x360 にスケーリングしてエンコード
+frame.close()
+encoder.close()
+```
+
+**スケーリング実装の詳細**:
+
+| エンコーダー | スケーリング方式 | 備考 |
+|------------|----------------|------|
+| Apple Video Toolbox (H.264/HEVC) | VTPixelTransferSession | Metal ベースの HW アクセラレーション |
+| ソフトウェアエンコーダー (AV1/VP8/VP9) | libyuv I420Scale | kFilterBox 補間 |
+| NVIDIA Video Codec SDK (NVENC) | libyuv I420Scale | NV12→I420→スケーリング→NV12 |
+| Intel VPL | libyuv I420Scale | NV12→I420→スケーリング→NV12 |
+
+**注意事項**:
+
+- スケーリングはダウンスケール、アップスケールの両方に対応
+- アスペクト比は `configure()` で指定した解像度に合わせられる（引き伸ばし）
+- 同じ解像度のフレームはスケーリング処理をスキップ
 
 ## 独自インターフェース
 
