@@ -5,7 +5,7 @@
 #include <cstring>
 #include <thread>
 
-#include <libyuv.h>
+#include "video_scaler.h"
 
 // WebRTC の NumberOfThreads ロジックに準拠
 static int calculate_vpx_number_of_threads(int width,
@@ -284,53 +284,16 @@ void VideoEncoder::encode_frame_vpx(const VideoFrame& frame,
     vpx_codec_control(vpx_encoder_, VP9E_SET_SVC_LAYER_ID, &layer_id);
   }
 
-  // スケーリングが必要かどうかを判定
-  bool needs_scaling =
-      (frame.width() != config_.width || frame.height() != config_.height);
+  // スケーリングと I420 変換
+  auto scaled =
+      video_scaler::scale_to_i420(frame, config_.width, config_.height);
 
-  // スケーリング用のバッファ
-  std::vector<uint8_t> scaled_buffer;
-  const uint8_t* src_y = frame.plane_ptr(0);
-  const uint8_t* src_u = frame.plane_ptr(1);
-  const uint8_t* src_v = frame.plane_ptr(2);
-  int src_stride_y = static_cast<int>(frame.width());
-  int src_stride_u = static_cast<int>(frame.width() / 2);
-  int src_stride_v = static_cast<int>(frame.width() / 2);
-
-  // スケーリングが必要な場合は libyuv で変換
-  if (needs_scaling) {
-    uint32_t dst_width = config_.width;
-    uint32_t dst_height = config_.height;
-    size_t y_size = dst_width * dst_height;
-    size_t uv_size = (dst_width / 2) * (dst_height / 2);
-    scaled_buffer.resize(y_size + uv_size * 2);
-
-    uint8_t* dst_y = scaled_buffer.data();
-    uint8_t* dst_u = dst_y + y_size;
-    uint8_t* dst_v = dst_u + uv_size;
-    int dst_stride_y = static_cast<int>(dst_width);
-    int dst_stride_u = static_cast<int>(dst_width / 2);
-    int dst_stride_v = static_cast<int>(dst_width / 2);
-
-    int result = libyuv::I420Scale(
-        src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v,
-        static_cast<int>(frame.width()), static_cast<int>(frame.height()),
-        dst_y, dst_stride_y, dst_u, dst_stride_u, dst_v, dst_stride_v,
-        static_cast<int>(dst_width), static_cast<int>(dst_height),
-        libyuv::kFilterBox);
-
-    if (result != 0) {
-      throw std::runtime_error("libyuv::I420Scale failed");
-    }
-
-    // スケーリング後のポインタとストライドを更新
-    src_y = dst_y;
-    src_u = dst_u;
-    src_v = dst_v;
-    src_stride_y = dst_stride_y;
-    src_stride_u = dst_stride_u;
-    src_stride_v = dst_stride_v;
-  }
+  const uint8_t* src_y = scaled.y;
+  const uint8_t* src_u = scaled.u;
+  const uint8_t* src_v = scaled.v;
+  int src_stride_y = scaled.stride_y;
+  int src_stride_u = scaled.stride_u;
+  int src_stride_v = scaled.stride_v;
 
   // I420 イメージをラップ
   vpx_image_t img;

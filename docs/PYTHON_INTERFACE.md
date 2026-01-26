@@ -949,18 +949,20 @@ encoder.close()
 
 **スケーリング実装の詳細**:
 
-| エンコーダー | スケーリング方式 | 備考 |
-|------------|----------------|------|
-| Apple Video Toolbox (H.264/HEVC) | VTPixelTransferSession | Metal ベースの HW アクセラレーション |
-| ソフトウェアエンコーダー (AV1/VP8/VP9) | libyuv I420Scale | kFilterBox 補間 |
-| NVIDIA Video Codec SDK (NVENC) | libyuv I420Scale | NV12→I420→スケーリング→NV12 |
-| Intel VPL | libyuv I420Scale | NV12→I420→スケーリング→NV12 |
+| エンコーダー | スケーリング方式 | 対応フォーマット |
+|------------|----------------|----------------|
+| Apple Video Toolbox (H.264/HEVC) | VTPixelTransferSession (HWA) | I420, NV12, BGRA |
+| ソフトウェアエンコーダー (AV1/VP8/VP9) | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
+| NVIDIA Video Codec SDK (NVENC) | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
+| Intel VPL | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
 
 **注意事項**:
 
 - スケーリングはダウンスケール、アップスケールの両方に対応
 - アスペクト比は `configure()` で指定した解像度に合わせられる（引き伸ばし）
 - 同じ解像度のフレームはスケーリング処理をスキップ
+- 入力フォーマットに応じた libyuv スケーラーが使用される (I420Scale, I422Scale, I444Scale, NV12Scale, ARGBScale)
+- RGB/BGR フォーマットは I420/NV12 に変換後スケーリング (libyuv に RGBScale がないため)
 
 ## 独自インターフェース
 
