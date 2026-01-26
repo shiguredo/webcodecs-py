@@ -16,6 +16,12 @@
   - 出力コールバックの metadata に `svc.temporal_layer_id` が含まれる
   - Spatial SVC (L2T* など) は未対応
   - @voluntas
+- [ADD] AV1 で scalabilityMode (L1T2/L1T3) をサポートする
+  - VideoEncoderConfig で `scalability_mode` を指定可能
+  - 出力コールバックの metadata に `svc.temporal_layer_id` が含まれる
+  - libaom の制約により SVC 使用時は自動的に REALTIME モードが適用される
+  - Spatial SVC (L2T* など) は未対応
+  - @voluntas
 - [ADD] H.264/H.265 ヘッダーパーサーを追加する
   - `parse_avc_annexb` / `parse_avc_description` で H.264 の SPS/PPS 情報を抽出
   - `parse_hevc_annexb` / `parse_hevc_description` で H.265 の VPS/SPS/PPS 情報を抽出
