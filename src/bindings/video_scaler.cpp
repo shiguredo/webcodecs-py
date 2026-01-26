@@ -277,27 +277,19 @@ I420ScaleResult scale_to_i420(const VideoFrame& frame,
   }
 
   // 2. I420 に変換
-  result.buffer.resize(y_size + uv_size * 2);
-  uint8_t* dst_y = result.buffer.data();
-  uint8_t* dst_u = dst_y + y_size;
-  uint8_t* dst_v = dst_u + uv_size;
-
   if (current_format == VideoPixelFormat::I420) {
-    if (needs_scaling) {
-      // スケーリング済みの場合はバッファをコピー
-      result.buffer = std::move(scaled_buffer);
-      result.y = result.buffer.data();
-      result.u = result.buffer.data() + y_size;
-      result.v = result.buffer.data() + y_size + uv_size;
-    } else {
-      // スケーリング不要の場合は元フレームのポインタを返す
-      result.buffer.clear();
-      result.y = frame.plane_ptr(0);
-      result.u = frame.plane_ptr(1);
-      result.v = frame.plane_ptr(2);
-    }
+    // スケーリング済みの I420 バッファをそのまま使用
+    result.buffer = std::move(scaled_buffer);
+    result.y = result.buffer.data();
+    result.u = result.buffer.data() + y_size;
+    result.v = result.buffer.data() + y_size + uv_size;
   } else {
     // I420 以外のフォーマットは変換が必要
+    result.buffer.resize(y_size + uv_size * 2);
+    uint8_t* dst_y = result.buffer.data();
+    uint8_t* dst_u = dst_y + y_size;
+    uint8_t* dst_v = dst_u + uv_size;
+
     const uint8_t* src_data =
         needs_scaling ? scaled_buffer.data() : frame.plane_ptr(0);
 
@@ -575,16 +567,10 @@ NV12ScaleResult scale_to_nv12(const VideoFrame& frame,
 
   // 2. NV12 に変換
   if (current_format == VideoPixelFormat::NV12) {
-    if (needs_scaling) {
-      // スケーリング済みの場合はバッファをそのまま使用
-      result.buffer = std::move(scaled_buffer);
-      result.y = result.buffer.data();
-      result.uv = result.buffer.data() + current_width * current_height;
-    } else {
-      // スケーリング不要の場合は元フレームのポインタを返す
-      result.y = frame.plane_ptr(0);
-      result.uv = frame.plane_ptr(1);
-    }
+    // スケーリング済みの NV12 バッファをそのまま使用
+    result.buffer = std::move(scaled_buffer);
+    result.y = result.buffer.data();
+    result.uv = result.buffer.data() + current_width * current_height;
   } else {
     // NV12 以外のフォーマットは変換が必要
     result.buffer.resize(nv12_size);
