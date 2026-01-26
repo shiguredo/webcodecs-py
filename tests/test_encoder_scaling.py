@@ -81,7 +81,9 @@ PIXEL_FORMATS = [
 @pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
 def test_av1_encode_with_scaling(pixel_format: VideoPixelFormat):
     """AV1 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
+    # configure: 320x240 (出力解像度)
     output_width, output_height = 320, 240
+    # encode: 640x480 のフレーム (入力解像度)
     input_width, input_height = 640, 480
 
     encoded_chunks = []
@@ -104,15 +106,18 @@ def test_av1_encode_with_scaling(pixel_format: VideoPixelFormat):
     }
     encoder.configure(config)
 
+    # 入力解像度のフレームを作成
     frame = _make_test_frame(input_width, input_height, 0, pixel_format)
     encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
+    # エンコードが成功していることを確認
     assert len(encoded_chunks) >= 1
     assert encoded_chunks[0].byte_length > 0
     assert encoded_chunks[0].type == EncodedVideoChunkType.KEY
 
+    # デコードして出力解像度を確認
     decoded_frames = []
 
     def on_decode_output(frame):
@@ -130,6 +135,7 @@ def test_av1_encode_with_scaling(pixel_format: VideoPixelFormat):
         decoder.decode(chunk)
     decoder.flush()
 
+    # デコードされたフレームが出力解像度になっていることを確認
     assert len(decoded_frames) >= 1
     for frame in decoded_frames:
         assert frame.coded_width == output_width
@@ -227,7 +233,9 @@ def test_av1_encode_scaling_multiple_frames(pixel_format: VideoPixelFormat):
 @pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
 def test_vp8_encode_with_scaling(pixel_format: VideoPixelFormat):
     """VP8 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
+    # configure: 320x240 (出力解像度)
     output_width, output_height = 320, 240
+    # encode: 640x480 のフレーム (入力解像度)
     input_width, input_height = 640, 480
 
     encoded_chunks = []
@@ -250,15 +258,18 @@ def test_vp8_encode_with_scaling(pixel_format: VideoPixelFormat):
     }
     encoder.configure(config)
 
+    # 入力解像度のフレームを作成
     frame = _make_test_frame(input_width, input_height, 0, pixel_format)
     encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
+    # エンコードが成功していることを確認
     assert len(encoded_chunks) >= 1
     assert encoded_chunks[0].byte_length > 0
     assert encoded_chunks[0].type == EncodedVideoChunkType.KEY
 
+    # デコードして出力解像度を確認
     decoded_frames = []
 
     def on_decode_output(frame):
@@ -276,6 +287,7 @@ def test_vp8_encode_with_scaling(pixel_format: VideoPixelFormat):
         decoder.decode(chunk)
     decoder.flush()
 
+    # デコードされたフレームが出力解像度になっていることを確認
     assert len(decoded_frames) >= 1
     for frame in decoded_frames:
         assert frame.coded_width == output_width
@@ -338,7 +350,9 @@ def test_vp8_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
 @pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
 def test_vp9_encode_with_scaling(pixel_format: VideoPixelFormat):
     """VP9 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
+    # configure: 320x240 (出力解像度)
     output_width, output_height = 320, 240
+    # encode: 640x480 のフレーム (入力解像度)
     input_width, input_height = 640, 480
 
     encoded_chunks = []
@@ -361,15 +375,18 @@ def test_vp9_encode_with_scaling(pixel_format: VideoPixelFormat):
     }
     encoder.configure(config)
 
+    # 入力解像度のフレームを作成
     frame = _make_test_frame(input_width, input_height, 0, pixel_format)
     encoder.encode(frame, {"key_frame": True})
     encoder.flush()
     frame.close()
 
+    # エンコードが成功していることを確認
     assert len(encoded_chunks) >= 1
     assert encoded_chunks[0].byte_length > 0
     assert encoded_chunks[0].type == EncodedVideoChunkType.KEY
 
+    # デコードして出力解像度を確認
     decoded_frames = []
 
     def on_decode_output(frame):
@@ -387,6 +404,7 @@ def test_vp9_encode_with_scaling(pixel_format: VideoPixelFormat):
         decoder.decode(chunk)
     decoder.flush()
 
+    # デコードされたフレームが出力解像度になっていることを確認
     assert len(decoded_frames) >= 1
     for frame in decoded_frames:
         assert frame.coded_width == output_width
