@@ -60,25 +60,12 @@ def _make_test_frame(
     return frame
 
 
-# テスト対象のピクセルフォーマット
-PIXEL_FORMATS = [
-    VideoPixelFormat.I420,
-    VideoPixelFormat.I422,
-    VideoPixelFormat.I444,
-    VideoPixelFormat.NV12,
-    VideoPixelFormat.RGBA,
-    VideoPixelFormat.BGRA,
-    VideoPixelFormat.RGB,
-    VideoPixelFormat.BGR,
-]
-
-
 # =============================================================================
 # AV1 スケーリングテスト
 # =============================================================================
 
 
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_av1_encode_with_scaling(pixel_format: VideoPixelFormat):
     """AV1 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
     # configure: 320x240 (出力解像度)
@@ -146,7 +133,7 @@ def test_av1_encode_with_scaling(pixel_format: VideoPixelFormat):
     decoder.close()
 
 
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_av1_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     """AV1 configure と同じ解像度のフレームはスケーリングなしでエンコード (各ピクセルフォーマット)."""
     width, height = 320, 240
@@ -184,7 +171,7 @@ def test_av1_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     encoder.close()
 
 
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_av1_encode_scaling_multiple_frames(pixel_format: VideoPixelFormat):
     """AV1 複数フレームでのスケーリングテスト (各ピクセルフォーマット)."""
     # configure: 320x240 (出力解像度)
@@ -236,7 +223,7 @@ def test_av1_encode_scaling_multiple_frames(pixel_format: VideoPixelFormat):
     platform.system() not in ("Darwin", "Linux"),
     reason="VP8 は macOS / Linux のみサポート",
 )
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_vp8_encode_with_scaling(pixel_format: VideoPixelFormat):
     """VP8 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
     # configure: 320x240 (出力解像度)
@@ -308,7 +295,7 @@ def test_vp8_encode_with_scaling(pixel_format: VideoPixelFormat):
     platform.system() not in ("Darwin", "Linux"),
     reason="VP8 は macOS / Linux のみサポート",
 )
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_vp8_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     """VP8 configure と同じ解像度のフレームはスケーリングなしでエンコード (各ピクセルフォーマット)."""
     width, height = 320, 240
@@ -355,7 +342,7 @@ def test_vp8_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     platform.system() not in ("Darwin", "Linux"),
     reason="VP9 は macOS / Linux のみサポート",
 )
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_vp9_encode_with_scaling(pixel_format: VideoPixelFormat):
     """VP9 エンコーダのスケーリング機能テスト (各ピクセルフォーマット)."""
     # configure: 320x240 (出力解像度)
@@ -427,7 +414,7 @@ def test_vp9_encode_with_scaling(pixel_format: VideoPixelFormat):
     platform.system() not in ("Darwin", "Linux"),
     reason="VP9 は macOS / Linux のみサポート",
 )
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_vp9_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     """VP9 configure と同じ解像度のフレームはスケーリングなしでエンコード (各ピクセルフォーマット)."""
     width, height = 320, 240
@@ -469,7 +456,7 @@ def test_vp9_encode_scaling_same_resolution(pixel_format: VideoPixelFormat):
     platform.system() not in ("Darwin", "Linux"),
     reason="VP9 は macOS / Linux のみサポート",
 )
-@pytest.mark.parametrize("pixel_format", PIXEL_FORMATS)
+@pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_vp9_encode_scaling_multiple_frames(pixel_format: VideoPixelFormat):
     """VP9 複数フレームでのスケーリングテスト (各ピクセルフォーマット)."""
     # configure: 320x240 (出力解像度)
