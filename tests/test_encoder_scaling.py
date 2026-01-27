@@ -70,29 +70,28 @@ def _make_test_frame(
 # スケーリングテスト (全コーデック共通)
 # =============================================================================
 
+CODECS = [
+    pytest.param("av01.0.04M.08", id="AV1"),
+    pytest.param(
+        "vp8",
+        marks=pytest.mark.skipif(
+            platform.system() not in ("Darwin", "Linux"),
+            reason="VP8 は macOS / Linux のみサポート",
+        ),
+        id="VP8",
+    ),
+    pytest.param(
+        "vp09.00.10.08",
+        marks=pytest.mark.skipif(
+            platform.system() not in ("Darwin", "Linux"),
+            reason="VP9 は macOS / Linux のみサポート",
+        ),
+        id="VP9",
+    ),
+]
 
-@pytest.mark.parametrize(
-    "codec",
-    [
-        pytest.param("av01.0.04M.08", id="AV1"),
-        pytest.param(
-            "vp8",
-            marks=pytest.mark.skipif(
-                platform.system() not in ("Darwin", "Linux"),
-                reason="VP8 は macOS / Linux のみサポート",
-            ),
-            id="VP8",
-        ),
-        pytest.param(
-            "vp09.00.10.08",
-            marks=pytest.mark.skipif(
-                platform.system() not in ("Darwin", "Linux"),
-                reason="VP9 は macOS / Linux のみサポート",
-            ),
-            id="VP9",
-        ),
-    ],
-)
+
+@pytest.mark.parametrize("codec", CODECS)
 @pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_encode_with_scaling(codec: str, pixel_format: VideoPixelFormat):
     """エンコーダのスケーリング機能テスト (各コーデック・各ピクセルフォーマット)."""
@@ -161,28 +160,7 @@ def test_encode_with_scaling(codec: str, pixel_format: VideoPixelFormat):
     decoder.close()
 
 
-@pytest.mark.parametrize(
-    "codec",
-    [
-        pytest.param("av01.0.04M.08", id="AV1"),
-        pytest.param(
-            "vp8",
-            marks=pytest.mark.skipif(
-                platform.system() not in ("Darwin", "Linux"),
-                reason="VP8 は macOS / Linux のみサポート",
-            ),
-            id="VP8",
-        ),
-        pytest.param(
-            "vp09.00.10.08",
-            marks=pytest.mark.skipif(
-                platform.system() not in ("Darwin", "Linux"),
-                reason="VP9 は macOS / Linux のみサポート",
-            ),
-            id="VP9",
-        ),
-    ],
-)
+@pytest.mark.parametrize("codec", CODECS)
 @pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_encode_scaling_same_resolution(codec: str, pixel_format: VideoPixelFormat):
     """configure と同じ解像度のフレームはスケーリングなしでエンコード (各コーデック・各ピクセルフォーマット)."""
@@ -221,20 +199,7 @@ def test_encode_scaling_same_resolution(codec: str, pixel_format: VideoPixelForm
     encoder.close()
 
 
-@pytest.mark.parametrize(
-    "codec",
-    [
-        pytest.param("av01.0.04M.08", id="AV1"),
-        pytest.param(
-            "vp09.00.10.08",
-            marks=pytest.mark.skipif(
-                platform.system() not in ("Darwin", "Linux"),
-                reason="VP9 は macOS / Linux のみサポート",
-            ),
-            id="VP9",
-        ),
-    ],
-)
+@pytest.mark.parametrize("codec", CODECS)
 @pytest.mark.parametrize("pixel_format", VideoPixelFormat)
 def test_encode_scaling_multiple_frames(codec: str, pixel_format: VideoPixelFormat):
     """複数フレームでのスケーリングテスト (各コーデック・各ピクセルフォーマット)."""
