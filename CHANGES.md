@@ -11,6 +11,8 @@
 
 ## develop
 
+- [UPDATE] libopus を v1.6.1 にアップデートする
+  - @voluntas
 - [ADD] VideoEncoder にスケーリング機能を追加する
   - WebCodecs API 仕様に準拠: encode で渡されるフレームの解像度と configure で指定した解像度が異なる場合に自動的にスケーリング
   - 対応ピクセルフォーマット: I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR
