@@ -11,6 +11,10 @@
 
 ## develop
 
+## 2026.2.0
+
+**リリース日**:: 2026-01-27
+
 - [UPDATE] libopus を v1.6.1 にアップデートする
   - @voluntas
 - [ADD] VideoEncoder にスケーリング機能を追加する
