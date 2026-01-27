@@ -542,11 +542,10 @@ void VideoEncoder::encode_frame_videotoolbox(
         int height = static_cast<int>(src_frame->height());
         int row_bytes = width * 4;
 
-        libyuv::CopyPlane(
-            src_frame->plane_ptr(0), row_bytes,
-            (uint8_t*)CVPixelBufferGetBaseAddress(pb),
-            static_cast<int>(CVPixelBufferGetBytesPerRow(pb)), row_bytes,
-            height);
+        libyuv::CopyPlane(src_frame->plane_ptr(0), row_bytes,
+                          (uint8_t*)CVPixelBufferGetBaseAddress(pb),
+                          static_cast<int>(CVPixelBufferGetBytesPerRow(pb)),
+                          row_bytes, height);
         break;
       }
 
