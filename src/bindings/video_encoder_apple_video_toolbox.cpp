@@ -4,12 +4,13 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreVideo/CoreVideo.h>
 #include <VideoToolbox/VideoToolbox.h>
+#include <libyuv.h>
 #include <nanobind/nanobind.h>
 #include <memory>
 #include <vector>
 
 #include "encoded_video_chunk.h"
-#include "video_frame.h"  // VideoFrame の完全な定義が必要
+#include "video_frame.h"
 
 namespace nb = nanobind;
 
@@ -513,72 +514,63 @@ void VideoEncoder::encode_frame_videotoolbox(
         int chroma_height = (height + 1) / 2;
 
         // Y plane
-        uint8_t* dst_y = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0);
-        size_t dst_stride_y = CVPixelBufferGetBytesPerRowOfPlane(pb, 0);
-        const uint8_t* src_y = src_frame->plane_ptr(0);
-        for (int i = 0; i < height; ++i) {
-          memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 0)), width,
+            height);
 
         // U plane
-        uint8_t* dst_u = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1);
-        size_t dst_stride_u = CVPixelBufferGetBytesPerRowOfPlane(pb, 1);
-        const uint8_t* src_u = src_frame->plane_ptr(1);
-        for (int i = 0; i < chroma_height; ++i) {
-          memcpy(dst_u + i * dst_stride_u, src_u + i * chroma_width,
-                 chroma_width);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(1), chroma_width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 1)),
+            chroma_width, chroma_height);
 
         // V plane
-        uint8_t* dst_v = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 2);
-        size_t dst_stride_v = CVPixelBufferGetBytesPerRowOfPlane(pb, 2);
-        const uint8_t* src_v = src_frame->plane_ptr(2);
-        for (int i = 0; i < chroma_height; ++i) {
-          memcpy(dst_v + i * dst_stride_v, src_v + i * chroma_width,
-                 chroma_width);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(2), chroma_width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 2),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 2)),
+            chroma_width, chroma_height);
         break;
       }
 
       case VideoPixelFormat::BGRA: {
         // BGRA: 単一プレーン
-        uint8_t* dst = (uint8_t*)CVPixelBufferGetBaseAddress(pb);
-        size_t dst_stride = CVPixelBufferGetBytesPerRow(pb);
-        const uint8_t* src = src_frame->plane_ptr(0);
         int width = static_cast<int>(src_frame->width());
         int height = static_cast<int>(src_frame->height());
-        size_t row_bytes = width * 4;
+        int row_bytes = width * 4;
 
-        for (int i = 0; i < height; ++i) {
-          memcpy(dst + i * dst_stride, src + i * row_bytes, row_bytes);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), row_bytes,
+            (uint8_t*)CVPixelBufferGetBaseAddress(pb),
+            static_cast<int>(CVPixelBufferGetBytesPerRow(pb)), row_bytes,
+            height);
         break;
       }
 
       case VideoPixelFormat::NV12:
       default: {
         // NV12: 2 プレーン (Y, UV)
-        uint8_t* dst_y = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0);
-        size_t dst_stride_y = CVPixelBufferGetBytesPerRowOfPlane(pb, 0);
-        uint8_t* dst_uv = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1);
-        size_t dst_stride_uv = CVPixelBufferGetBytesPerRowOfPlane(pb, 1);
-
-        const uint8_t* src_y = src_frame->plane_ptr(0);
-        const uint8_t* src_uv = src_frame->plane_ptr(1);
         int width = static_cast<int>(src_frame->width());
         int height = static_cast<int>(src_frame->height());
         int chroma_height = (height + 1) / 2;
+        int chroma_row_bytes = ((width + 1) / 2) * 2;
 
         // Y plane
-        for (int i = 0; i < height; ++i) {
-          memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 0)), width,
+            height);
+
         // UV plane (interleaved)
-        int chroma_row_bytes = ((width + 1) / 2) * 2;
-        for (int i = 0; i < chroma_height; ++i) {
-          memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
-                 chroma_row_bytes);
-        }
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(1), chroma_row_bytes,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 1)),
+            chroma_row_bytes, chroma_height);
         break;
       }
     }
