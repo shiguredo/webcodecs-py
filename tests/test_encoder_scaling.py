@@ -6,6 +6,12 @@ visible width differs from the configured width value」
 - ソフトウェアエンコーダー (AV1, VP8, VP9): libyuv を使用
 - ハードウェアエンコーダー (NVENC, Intel VPL): libyuv を使用
 - Apple Video Toolbox: VTPixelTransferSession を使用 (test_apple_video_toolbox.py)
+
+テストデータについて:
+    このテストでは全てのピクセルフォーマット (I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR)
+    に対してスケーリング機能をテストする。テストフレームのデータは全てゼロ (黒) だが、
+    各フォーマットに応じた正しいサイズで生成される。VideoFrame はサイズと format 指定に
+    基づいてデータを解釈するため、スケーリング機能のテストとしてはサイズが正しければ十分。
 """
 
 import platform
