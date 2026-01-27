@@ -4,12 +4,13 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreVideo/CoreVideo.h>
 #include <VideoToolbox/VideoToolbox.h>
+#include <libyuv.h>
 #include <nanobind/nanobind.h>
 #include <memory>
 #include <vector>
 
 #include "encoded_video_chunk.h"
-#include "video_frame.h"  // VideoFrame の完全な定義が必要
+#include "video_frame.h"
 
 namespace nb = nanobind;
 
@@ -446,15 +447,41 @@ void VideoEncoder::encode_frame_videotoolbox(
 
   // native_buffer がない場合は CVPixelBuffer を作成してコピー
   if (!pb_from_native) {
-    // Make sure we have NV12 source
-    std::unique_ptr<VideoFrame> nv12;
-    if (frame.format() != VideoPixelFormat::NV12) {
-      nv12 = frame.convert_format(VideoPixelFormat::NV12);
+    // スケーリング時は VTPixelTransferSession でフォーマット変換とスケーリングを同時に行う
+    // VTPixelTransferSession がサポートするフォーマット: I420, NV12, BGRA
+    // スケーリングなしの場合は NV12 に変換が必要
+    bool use_native_format =
+        needs_scaling && (frame.format() == VideoPixelFormat::I420 ||
+                          frame.format() == VideoPixelFormat::NV12 ||
+                          frame.format() == VideoPixelFormat::BGRA);
+
+    // 入力フレームを変換するかどうかを決定
+    std::unique_ptr<VideoFrame> converted;
+    const VideoFrame* src_frame = &frame;
+
+    if (!use_native_format && frame.format() != VideoPixelFormat::NV12) {
+      // VTPixelTransferSession がサポートしないフォーマット、またはスケーリングなしの場合
+      // NV12 に変換
+      converted = frame.convert_format(VideoPixelFormat::NV12);
+      src_frame = converted.get();
     }
-    const VideoFrame& src = nv12 ? *nv12 : frame;
+
+    // CVPixelBuffer のピクセルフォーマットを決定
+    OSType pixel_format;
+    switch (src_frame->format()) {
+      case VideoPixelFormat::I420:
+        pixel_format = kCVPixelFormatType_420YpCbCr8Planar;
+        break;
+      case VideoPixelFormat::BGRA:
+        pixel_format = kCVPixelFormatType_32BGRA;
+        break;
+      case VideoPixelFormat::NV12:
+      default:
+        pixel_format = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
+        break;
+    }
 
     // 入力フレームサイズの CVPixelBuffer を作成
-    OSType pixel_format = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
     CFDictionaryRef empty_dict = CFDictionaryCreate(
         kCFAllocatorDefault, nullptr, nullptr, 0,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
@@ -464,8 +491,9 @@ void VideoEncoder::encode_frame_videotoolbox(
         kCFAllocatorDefault, pb_keys, pb_vals, 1,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-    CVReturn r = CVPixelBufferCreate(kCFAllocatorDefault, src.width(),
-                                     src.height(), pixel_format, pb_attrs, &pb);
+    CVReturn r =
+        CVPixelBufferCreate(kCFAllocatorDefault, src_frame->width(),
+                            src_frame->height(), pixel_format, pb_attrs, &pb);
 
     CFRelease(pb_attrs);
     CFRelease(empty_dict);
@@ -474,37 +502,79 @@ void VideoEncoder::encode_frame_videotoolbox(
       throw std::runtime_error("Failed to create CVPixelBuffer for input");
     }
 
-    // Copy planes into CVPixelBuffer
+    // フォーマットに応じてデータをコピー
     CVPixelBufferLockBaseAddress(pb, 0);
-    uint8_t* dst_y = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0);
-    size_t dst_stride_y = CVPixelBufferGetBytesPerRowOfPlane(pb, 0);
-    uint8_t* dst_uv = (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1);
-    size_t dst_stride_uv = CVPixelBufferGetBytesPerRowOfPlane(pb, 1);
 
-    const uint8_t* src_y = src.plane_ptr(0);
-    const uint8_t* src_uv = src.plane_ptr(1);
-    int width = static_cast<int>(src.width());
-    int height = static_cast<int>(src.height());
-    int chroma_height = (height + 1) / 2;
-    // Y plane
-    if (dst_stride_y == static_cast<size_t>(width)) {
-      memcpy(dst_y, src_y, static_cast<size_t>(width * height));
-    } else {
-      for (int i = 0; i < height; ++i) {
-        memcpy(dst_y + i * dst_stride_y, src_y + i * width, width);
+    switch (src_frame->format()) {
+      case VideoPixelFormat::I420: {
+        // I420: 3 プレーン (Y, U, V)
+        int width = static_cast<int>(src_frame->width());
+        int height = static_cast<int>(src_frame->height());
+        int chroma_width = (width + 1) / 2;
+        int chroma_height = (height + 1) / 2;
+
+        // Y plane
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 0)), width,
+            height);
+
+        // U plane
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(1), chroma_width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 1)),
+            chroma_width, chroma_height);
+
+        // V plane
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(2), chroma_width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 2),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 2)),
+            chroma_width, chroma_height);
+        break;
+      }
+
+      case VideoPixelFormat::BGRA: {
+        // BGRA: 単一プレーン
+        int width = static_cast<int>(src_frame->width());
+        int height = static_cast<int>(src_frame->height());
+        int row_bytes = width * 4;
+
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), row_bytes,
+            (uint8_t*)CVPixelBufferGetBaseAddress(pb),
+            static_cast<int>(CVPixelBufferGetBytesPerRow(pb)), row_bytes,
+            height);
+        break;
+      }
+
+      case VideoPixelFormat::NV12:
+      default: {
+        // NV12: 2 プレーン (Y, UV)
+        int width = static_cast<int>(src_frame->width());
+        int height = static_cast<int>(src_frame->height());
+        int chroma_height = (height + 1) / 2;
+        int chroma_row_bytes = ((width + 1) / 2) * 2;
+
+        // Y plane
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(0), width,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 0),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 0)), width,
+            height);
+
+        // UV plane (interleaved)
+        libyuv::CopyPlane(
+            src_frame->plane_ptr(1), chroma_row_bytes,
+            (uint8_t*)CVPixelBufferGetBaseAddressOfPlane(pb, 1),
+            static_cast<int>(CVPixelBufferGetBytesPerRowOfPlane(pb, 1)),
+            chroma_row_bytes, chroma_height);
+        break;
       }
     }
-    // UV plane (interleaved)
-    int chroma_row_bytes = ((width + 1) / 2) * 2;
-    if (dst_stride_uv == static_cast<size_t>(chroma_row_bytes)) {
-      memcpy(dst_uv, src_uv,
-             static_cast<size_t>(chroma_row_bytes * chroma_height));
-    } else {
-      for (int i = 0; i < chroma_height; ++i) {
-        memcpy(dst_uv + i * dst_stride_uv, src_uv + i * chroma_row_bytes,
-               chroma_row_bytes);
-      }
-    }
+
     CVPixelBufferUnlockBaseAddress(pb, 0);
   }
 
@@ -533,7 +603,8 @@ void VideoEncoder::encode_frame_videotoolbox(
           "Failed to create scaled CVPixelBuffer from pool");
     }
 
-    // VTPixelTransferSessionTransferImage でスケーリング
+    // VTPixelTransferSessionTransferImage でスケーリングとフォーマット変換を実行
+    // 入力は I420/NV12/BGRA のいずれか、出力は NV12
     auto transfer_session =
         (VTPixelTransferSessionRef)vt_pixel_transfer_session_;
     OSStatus transfer_err =

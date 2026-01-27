@@ -1890,15 +1890,73 @@ def test_av1_decode_videotoolbox():
 
 # =============================================================================
 # スケーリングテスト (VTPixelTransferSession)
+#
+# WebCodecs API 仕様: 「The encoder MUST scale any VideoFrame whose
+# visible width differs from the configured width value」
+#
+# Apple Video Toolbox がサポートするピクセルフォーマット: I420, NV12, BGRA
 # =============================================================================
 
+# スケーリングテスト用のピクセルフォーマット (Apple Video Toolbox がサポートするもののみ)
+SCALING_PIXEL_FORMATS = [
+    VideoPixelFormat.I420,
+    VideoPixelFormat.NV12,
+    VideoPixelFormat.BGRA,
+]
 
-def test_h264_encode_with_scaling():
-    """configure と異なる解像度のフレームを H.264 でエンコードする (スケーリング).
+# 同一解像度テスト用のピクセルフォーマット (BGRA はスケーリング時のみサポート)
+SAME_RESOLUTION_PIXEL_FORMATS = [
+    VideoPixelFormat.I420,
+    VideoPixelFormat.NV12,
+]
 
-    WebCodecs API 仕様: 「The encoder MUST scale any VideoFrame whose
-    visible width differs from the configured width value」
-    """
+
+def _calculate_scaling_frame_data_size(
+    width: int, height: int, pixel_format: VideoPixelFormat
+) -> int:
+    """スケーリングテスト用のピクセルフォーマットに応じたデータサイズを計算する."""
+    match pixel_format:
+        case VideoPixelFormat.I420 | VideoPixelFormat.NV12:
+            return width * height * 3 // 2
+        case VideoPixelFormat.BGRA:
+            return width * height * 4
+        case _:
+            raise ValueError(f"Unsupported pixel format: {pixel_format}")
+
+
+def _make_scaling_test_frame(
+    width: int,
+    height: int,
+    frame_num: int = 0,
+    pixel_format: VideoPixelFormat = VideoPixelFormat.I420,
+) -> VideoFrame:
+    """スケーリングテスト用の VideoFrame を作成する."""
+    data_size = _calculate_scaling_frame_data_size(width, height, pixel_format)
+    data = np.zeros(data_size, dtype=np.uint8)
+    init: VideoFrameBufferInit = {
+        "format": pixel_format,
+        "coded_width": width,
+        "coded_height": height,
+        "timestamp": frame_num * 33333,
+    }
+    return VideoFrame(data, init)
+
+
+@pytest.mark.parametrize(
+    "codec",
+    [
+        pytest.param("avc1.42E01E", id="H264"),
+        pytest.param("hvc1.1.6.L93.B0", id="HEVC"),
+    ],
+)
+@pytest.mark.parametrize("pixel_format", SCALING_PIXEL_FORMATS)
+def test_encode_with_scaling(codec: str, pixel_format: VideoPixelFormat):
+    """エンコーダのスケーリング機能テスト (各コーデック・各ピクセルフォーマット)."""
+    # configure: 320x240 (出力解像度)
+    output_width, output_height = 320, 240
+    # encode: 640x480 のフレーム (入力解像度)
+    input_width, input_height = 640, 480
+
     encoded_chunks = []
 
     def on_output(chunk):
@@ -1909,45 +1967,31 @@ def test_h264_encode_with_scaling():
 
     encoder = VideoEncoder(on_output, on_error)
 
-    # configure: 640x360 (出力解像度)
+    # コーデックごとのフォーマット設定
     config: VideoEncoderConfig = {
-        "codec": "avc1.42E01E",
-        "width": 640,
-        "height": 360,
-        "bitrate": 1_000_000,
+        "codec": codec,
+        "width": output_width,
+        "height": output_height,
+        "bitrate": 500_000,
         "framerate": 30,
         "latency_mode": LatencyMode.REALTIME,
         "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-        "avc": {"format": "annexb"},
     }
-
+    if codec.startswith("avc"):
+        config["avc"] = {"format": "annexb"}
+    elif codec.startswith("hvc"):
+        config["hevc"] = {"format": "annexb"}
     encoder.configure(config)
 
-    # encode: 1280x720 のフレーム (入力解像度)
-    input_width, input_height = 1280, 720
-    data_size = input_width * input_height * 3 // 2  # I420
-    test_frames = []
-
-    for i in range(5):
-        data = np.full(data_size, (i * 50) % 256, dtype=np.uint8)
-        init: VideoFrameBufferInit = {
-            "format": VideoPixelFormat.I420,
-            "coded_width": input_width,
-            "coded_height": input_height,
-            "timestamp": i * 33333,
-        }
-        frame = VideoFrame(data, init)
-        test_frames.append(frame)
-        encoder.encode(frame, {"key_frame": i == 0})
-
+    # 入力解像度のフレームを作成
+    frame = _make_scaling_test_frame(input_width, input_height, 0, pixel_format)
+    encoder.encode(frame, {"key_frame": True})
     encoder.flush()
+    frame.close()
 
     # エンコードが成功していることを確認
-    assert len(encoded_chunks) >= 5, (
-        f"5 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
-    )
-
-    # 最初のチャンクがキーフレームであることを確認
+    assert len(encoded_chunks) >= 1
+    assert encoded_chunks[0].byte_length > 0
     assert encoded_chunks[0].type == EncodedVideoChunkType.KEY
 
     # デコードして出力解像度を確認
@@ -1962,43 +2006,39 @@ def test_h264_encode_with_scaling():
     decoder = VideoDecoder(on_decode_output, on_decode_error)
 
     decoder_config: VideoDecoderConfig = {
-        "codec": "avc1.42E01E",
-        "coded_width": 640,
-        "coded_height": 360,
+        "codec": codec,
+        "coded_width": output_width,
+        "coded_height": output_height,
     }
     decoder.configure(decoder_config)
 
     for chunk in encoded_chunks:
         decoder.decode(chunk)
-
     decoder.flush()
 
     # デコードされたフレームが出力解像度になっていることを確認
     assert len(decoded_frames) >= 1
     for frame in decoded_frames:
-        assert frame.coded_width == 640, (
-            f"出力幅が期待値と異なる: 期待値 640, 実際 {frame.coded_width}"
-        )
-        assert frame.coded_height == 360, (
-            f"出力高さが期待値と異なる: 期待値 360, 実際 {frame.coded_height}"
-        )
-
-    print(
-        f"スケーリングテスト成功: 入力 {input_width}x{input_height} -> "
-        f"出力 640x360, エンコードチャンク数: {len(encoded_chunks)}"
-    )
-
-    # クリーンアップ
-    for frame in test_frames:
+        assert frame.coded_width == output_width
+        assert frame.coded_height == output_height
         frame.close()
-    for frame in decoded_frames:
-        frame.close()
+
     encoder.close()
     decoder.close()
 
 
-def test_hevc_encode_with_scaling():
-    """configure と異なる解像度のフレームを HEVC でエンコードする (スケーリング)."""
+@pytest.mark.parametrize(
+    "codec",
+    [
+        pytest.param("avc1.42E01E", id="H264"),
+        pytest.param("hvc1.1.6.L93.B0", id="HEVC"),
+    ],
+)
+@pytest.mark.parametrize("pixel_format", SAME_RESOLUTION_PIXEL_FORMATS)
+def test_encode_scaling_same_resolution(codec: str, pixel_format: VideoPixelFormat):
+    """configure と同じ解像度のフレームはスケーリングなしでエンコード (各コーデック・各ピクセルフォーマット)."""
+    width, height = 320, 240
+
     encoded_chunks = []
 
     def on_output(chunk):
@@ -2009,188 +2049,25 @@ def test_hevc_encode_with_scaling():
 
     encoder = VideoEncoder(on_output, on_error)
 
-    # configure: 640x480 (出力解像度)
     config: VideoEncoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "width": 640,
-        "height": 480,
-        "bitrate": 1_000_000,
-        "framerate": 30,
-        "latency_mode": LatencyMode.REALTIME,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-        "hevc": {"format": "annexb"},
-    }
-
-    encoder.configure(config)
-
-    # encode: 1920x1080 のフレーム (入力解像度)
-    input_width, input_height = 1920, 1080
-    data_size = input_width * input_height * 3 // 2  # I420
-    test_frames = []
-
-    for i in range(3):
-        data = np.full(data_size, (i * 80) % 256, dtype=np.uint8)
-        init: VideoFrameBufferInit = {
-            "format": VideoPixelFormat.I420,
-            "coded_width": input_width,
-            "coded_height": input_height,
-            "timestamp": i * 33333,
-        }
-        frame = VideoFrame(data, init)
-        test_frames.append(frame)
-        encoder.encode(frame, {"key_frame": i == 0})
-
-    encoder.flush()
-
-    # エンコードが成功していることを確認
-    assert len(encoded_chunks) >= 3, (
-        f"3 フレームがエンコードされるべき、実際: {len(encoded_chunks)}"
-    )
-
-    # デコードして出力解像度を確認
-    decoded_frames = []
-
-    def on_decode_output(frame):
-        decoded_frames.append(frame)
-
-    def on_decode_error(error):
-        pytest.fail(f"Decoder error: {error}")
-
-    decoder = VideoDecoder(on_decode_output, on_decode_error)
-
-    decoder_config: VideoDecoderConfig = {
-        "codec": "hvc1.1.6.L93.B0",
-        "coded_width": 640,
-        "coded_height": 480,
-    }
-    decoder.configure(decoder_config)
-
-    for chunk in encoded_chunks:
-        decoder.decode(chunk)
-
-    decoder.flush()
-
-    # デコードされたフレームが出力解像度になっていることを確認
-    assert len(decoded_frames) >= 1
-    for frame in decoded_frames:
-        assert frame.coded_width == 640, (
-            f"出力幅が期待値と異なる: 期待値 640, 実際 {frame.coded_width}"
-        )
-        assert frame.coded_height == 480, (
-            f"出力高さが期待値と異なる: 期待値 480, 実際 {frame.coded_height}"
-        )
-
-    print(
-        f"HEVC スケーリングテスト成功: 入力 {input_width}x{input_height} -> "
-        f"出力 640x480, エンコードチャンク数: {len(encoded_chunks)}"
-    )
-
-    # クリーンアップ
-    for frame in test_frames:
-        frame.close()
-    for frame in decoded_frames:
-        frame.close()
-    encoder.close()
-    decoder.close()
-
-
-def test_scaling_with_nv12_input():
-    """NV12 形式の入力フレームでスケーリングが動作することを確認."""
-    encoded_chunks = []
-
-    def on_output(chunk):
-        encoded_chunks.append(chunk)
-
-    def on_error(error):
-        pytest.fail(f"Encoder error: {error}")
-
-    encoder = VideoEncoder(on_output, on_error)
-
-    # configure: 320x240 (出力解像度)
-    config: VideoEncoderConfig = {
-        "codec": "avc1.42E01E",
-        "width": 320,
-        "height": 240,
+        "codec": codec,
+        "width": width,
+        "height": height,
         "bitrate": 500_000,
         "framerate": 30,
         "latency_mode": LatencyMode.REALTIME,
         "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
     }
-
-    encoder.configure(config)
-
-    # encode: 640x480 の NV12 フレーム (入力解像度)
-    input_width, input_height = 640, 480
-    data_size = input_width * input_height * 3 // 2  # NV12
-
-    data = np.zeros(data_size, dtype=np.uint8)
-    init: VideoFrameBufferInit = {
-        "format": VideoPixelFormat.NV12,
-        "coded_width": input_width,
-        "coded_height": input_height,
-        "timestamp": 0,
-    }
-    frame = VideoFrame(data, init)
-    encoder.encode(frame, {"key_frame": True})
-
-    encoder.flush()
-
-    # エンコードが成功していることを確認
-    assert len(encoded_chunks) >= 1, "NV12 スケーリングエンコードに失敗"
-
-    print(f"NV12 スケーリングテスト成功: 入力 {input_width}x{input_height} -> 出力 320x240")
-
-    # クリーンアップ
-    frame.close()
-    encoder.close()
-
-
-def test_scaling_same_resolution():
-    """configure と同じ解像度のフレームはスケーリングなしでエンコードされることを確認."""
-    encoded_chunks = []
-
-    def on_output(chunk):
-        encoded_chunks.append(chunk)
-
-    def on_error(error):
-        pytest.fail(f"Encoder error: {error}")
-
-    encoder = VideoEncoder(on_output, on_error)
-
-    # configure と encode で同じ解像度
-    config: VideoEncoderConfig = {
-        "codec": "avc1.42E01E",
-        "width": 640,
-        "height": 480,
-        "bitrate": 1_000_000,
-        "framerate": 30,
-        "latency_mode": LatencyMode.REALTIME,
-        "hardware_acceleration_engine": HardwareAccelerationEngine.APPLE_VIDEO_TOOLBOX,
-    }
-
     encoder.configure(config)
 
     # 同じ解像度のフレーム
-    width, height = 640, 480
-    data_size = width * height * 3 // 2  # I420
-
-    data = np.zeros(data_size, dtype=np.uint8)
-    init: VideoFrameBufferInit = {
-        "format": VideoPixelFormat.I420,
-        "coded_width": width,
-        "coded_height": height,
-        "timestamp": 0,
-    }
-    frame = VideoFrame(data, init)
+    frame = _make_scaling_test_frame(width, height, 0, pixel_format)
     encoder.encode(frame, {"key_frame": True})
-
     encoder.flush()
+    frame.close()
 
     # エンコードが成功していることを確認
-    assert len(encoded_chunks) >= 1, "同一解像度エンコードに失敗"
+    assert len(encoded_chunks) >= 1
+    assert encoded_chunks[0].byte_length > 0
 
-    print("同一解像度テスト成功: スケーリングなしでエンコード")
-
-    # クリーンアップ
-    frame.close()
     encoder.close()

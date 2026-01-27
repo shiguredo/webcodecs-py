@@ -260,6 +260,7 @@ static ScalabilityModeConfig parse_scalability_mode(const std::string& mode) {
 #include "video_encoder_aom.cpp"
 #include "video_encoder_apple_video_toolbox.cpp"
 #include "video_encoder_nvidia.cpp"
+#include "video_scaler.cpp"
 #if defined(__APPLE__) || defined(__linux__)
 #include "video_encoder_vpx.cpp"
 #endif
