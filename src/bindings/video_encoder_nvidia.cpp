@@ -11,11 +11,13 @@
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
+#include <vector>
 
 #include "../dyn/cuda.h"
 #include "../dyn/nvenc.h"
 #include "encoded_video_chunk.h"
 #include "video_frame.h"
+#include "video_scaler.h"
 
 namespace nb = nanobind;
 
@@ -382,12 +384,14 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
     throw std::runtime_error("NVENC encoder is not initialized");
   }
 
-  // NV12 フォーマットに変換
-  std::unique_ptr<VideoFrame> nv12;
-  if (frame.format() != VideoPixelFormat::NV12) {
-    nv12 = frame.convert_format(VideoPixelFormat::NV12);
-  }
-  const VideoFrame& src = nv12 ? *nv12 : frame;
+  // スケーリングと NV12 変換
+  auto scaled =
+      video_scaler::scale_to_nv12(frame, config_.width, config_.height);
+
+  const uint8_t* final_y = scaled.y;
+  const uint8_t* final_uv = scaled.uv;
+  uint32_t final_width = scaled.width;
+  uint32_t final_height = scaled.height;
 
   // 入力バッファをロック
   NV_ENC_LOCK_INPUT_BUFFER lock_input_buffer = {};
@@ -403,22 +407,19 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
   // フレームデータをコピー
   uint8_t* dst_y = static_cast<uint8_t*>(lock_input_buffer.bufferDataPtr);
   uint32_t dst_pitch = lock_input_buffer.pitch;
-  uint32_t width = src.width();
-  uint32_t height = src.height();
-
-  const uint8_t* src_y = src.plane_ptr(0);
-  const uint8_t* src_uv = src.plane_ptr(1);
 
   // Y プレーンをコピー
-  for (uint32_t row = 0; row < height; ++row) {
-    std::memcpy(dst_y + row * dst_pitch, src_y + row * width, width);
+  for (uint32_t row = 0; row < final_height; ++row) {
+    std::memcpy(dst_y + row * dst_pitch, final_y + row * final_width,
+                final_width);
   }
 
   // UV プレーンをコピー
-  uint8_t* dst_uv = dst_y + dst_pitch * height;
-  uint32_t chroma_height = (height + 1) / 2;
+  uint8_t* dst_uv = dst_y + dst_pitch * final_height;
+  uint32_t chroma_height = (final_height + 1) / 2;
   for (uint32_t row = 0; row < chroma_height; ++row) {
-    std::memcpy(dst_uv + row * dst_pitch, src_uv + row * width, width);
+    std::memcpy(dst_uv + row * dst_pitch, final_uv + row * final_width,
+                final_width);
   }
 
   // 入力バッファをアンロック
@@ -434,8 +435,8 @@ void VideoEncoder::encode_frame_nvenc(const VideoFrame& frame,
   pic_params.inputBuffer = nvenc_input_buffer_;
   pic_params.outputBitstream = nvenc_output_buffer_;
   pic_params.bufferFmt = NV_ENC_BUFFER_FORMAT_NV12;
-  pic_params.inputWidth = width;
-  pic_params.inputHeight = height;
+  pic_params.inputWidth = final_width;
+  pic_params.inputHeight = final_height;
   pic_params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
   pic_params.inputTimeStamp = frame.timestamp();
 

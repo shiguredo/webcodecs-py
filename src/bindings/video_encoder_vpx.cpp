@@ -1,8 +1,11 @@
-// VP8/VP9 エンコーダー実装 (macOS のみ)
+// VP8/VP9 エンコーダー実装 (macOS / Ubuntu)
 // video_encoder.cpp から #include されるため、インクルードガードは不要
+// ScalabilityModeConfig と parse_scalability_mode は video_encoder.cpp で定義
 
 #include <cstring>
 #include <thread>
+
+#include "video_scaler.h"
 
 // WebRTC の NumberOfThreads ロジックに準拠
 static int calculate_vpx_number_of_threads(int width,
@@ -119,6 +122,69 @@ void VideoEncoder::init_vpx_encoder() {
     vpx_config_.g_lag_in_frames = 25;
   }
 
+  // VP9 SVC (Scalable Video Coding) の設定
+  svc_enabled_ = false;
+  svc_temporal_layers_ = 1;
+  svc_frame_index_.store(0);
+
+  if (is_vp9_codec() && config_.scalability_mode.has_value()) {
+    ScalabilityModeConfig svc_config =
+        parse_scalability_mode(config_.scalability_mode.value());
+
+    if (!svc_config.is_valid) {
+      throw std::runtime_error("Unsupported scalability mode: " +
+                               config_.scalability_mode.value());
+    }
+
+    // spatial layers > 1 は未サポート
+    if (svc_config.spatial_layers > 1) {
+      throw std::runtime_error(
+          "Spatial SVC is not supported. Only temporal SVC (L1T*) is "
+          "supported.");
+    }
+
+    uint32_t ts_layers = svc_config.temporal_layers;
+    vpx_config_.ts_number_layers = ts_layers;
+
+    if (ts_layers == 2) {
+      // L1T2: 0-1-0-1... パターン
+      vpx_config_.ts_periodicity = 2;
+      vpx_config_.ts_layer_id[0] = 0;
+      vpx_config_.ts_layer_id[1] = 1;
+
+      // ビットレート配分: Layer 0 = 60%, Layer 1 = 100%
+      uint32_t base_bitrate = vpx_config_.rc_target_bitrate;
+      vpx_config_.ts_target_bitrate[0] = base_bitrate * 60 / 100;
+      vpx_config_.ts_target_bitrate[1] = base_bitrate;
+
+      // フレームレートデシメータ: Layer 0 = 2 (半分), Layer 1 = 1 (全部)
+      vpx_config_.ts_rate_decimator[0] = 2;
+      vpx_config_.ts_rate_decimator[1] = 1;
+
+    } else if (ts_layers == 3) {
+      // L1T3: 0-2-1-2... パターン
+      vpx_config_.ts_periodicity = 4;
+      vpx_config_.ts_layer_id[0] = 0;
+      vpx_config_.ts_layer_id[1] = 2;
+      vpx_config_.ts_layer_id[2] = 1;
+      vpx_config_.ts_layer_id[3] = 2;
+
+      // ビットレート配分: Layer 0 = 40%, Layer 1 = 60%, Layer 2 = 100%
+      uint32_t base_bitrate = vpx_config_.rc_target_bitrate;
+      vpx_config_.ts_target_bitrate[0] = base_bitrate * 40 / 100;
+      vpx_config_.ts_target_bitrate[1] = base_bitrate * 60 / 100;
+      vpx_config_.ts_target_bitrate[2] = base_bitrate;
+
+      // フレームレートデシメータ
+      vpx_config_.ts_rate_decimator[0] = 4;
+      vpx_config_.ts_rate_decimator[1] = 2;
+      vpx_config_.ts_rate_decimator[2] = 1;
+    }
+
+    svc_enabled_ = true;
+    svc_temporal_layers_ = ts_layers;
+  }
+
   vpx_encoder_ = new vpx_codec_ctx_t();
   res = vpx_codec_enc_init(vpx_encoder_, vpx_iface_, &vpx_config_, 0);
   if (res != VPX_CODEC_OK) {
@@ -159,6 +225,11 @@ void VideoEncoder::init_vpx_encoder() {
     // VP9 固有の設定
     vpx_codec_control(vpx_encoder_, VP9E_SET_ROW_MT, 1);
     vpx_codec_control(vpx_encoder_, VP9E_SET_AQ_MODE, 3);
+
+    // VP9 SVC を有効化
+    if (svc_enabled_) {
+      vpx_codec_control(vpx_encoder_, VP9E_SET_SVC, 1);
+    }
   }
 
   // ノイズ感度
@@ -196,18 +267,46 @@ void VideoEncoder::encode_frame_vpx(const VideoFrame& frame,
                       static_cast<unsigned int>(quantizer.value()));
   }
 
+  // SVC が有効な場合、temporal layer ID を計算して設定
+  uint32_t current_temporal_layer_id = 0;
+  if (svc_enabled_) {
+    uint64_t frame_idx = svc_frame_index_.fetch_add(1);
+
+    // フレームインデックスから temporal layer ID を計算
+    uint32_t period_idx =
+        static_cast<uint32_t>(frame_idx % vpx_config_.ts_periodicity);
+    current_temporal_layer_id = vpx_config_.ts_layer_id[period_idx];
+
+    // VP9E_SET_SVC_LAYER_ID で現在のフレームのレイヤを設定
+    vpx_svc_layer_id_t layer_id;
+    layer_id.spatial_layer_id = 0;
+    layer_id.temporal_layer_id = static_cast<int>(current_temporal_layer_id);
+    vpx_codec_control(vpx_encoder_, VP9E_SET_SVC_LAYER_ID, &layer_id);
+  }
+
+  // スケーリングと I420 変換
+  auto scaled =
+      video_scaler::scale_to_i420(frame, config_.width, config_.height);
+
+  const uint8_t* src_y = scaled.y;
+  const uint8_t* src_u = scaled.u;
+  const uint8_t* src_v = scaled.v;
+  int src_stride_y = scaled.stride_y;
+  int src_stride_u = scaled.stride_u;
+  int src_stride_v = scaled.stride_v;
+
   // I420 イメージをラップ
   vpx_image_t img;
-  unsigned char* base = const_cast<unsigned char*>(frame.plane_ptr(0));
+  unsigned char* base = const_cast<unsigned char*>(src_y);
   if (!vpx_img_wrap(&img, VPX_IMG_FMT_I420, config_.width, config_.height, 1,
                     base)) {
     throw std::runtime_error("Failed to wrap VPX image");
   }
-  img.stride[0] = static_cast<int>(config_.width);
-  img.stride[1] = static_cast<int>(config_.width / 2);
-  img.stride[2] = static_cast<int>(config_.width / 2);
-  img.planes[1] = const_cast<unsigned char*>(frame.plane_ptr(1));
-  img.planes[2] = const_cast<unsigned char*>(frame.plane_ptr(2));
+  img.stride[0] = src_stride_y;
+  img.stride[1] = src_stride_u;
+  img.stride[2] = src_stride_v;
+  img.planes[1] = const_cast<unsigned char*>(src_u);
+  img.planes[2] = const_cast<unsigned char*>(src_v);
 
   // pts/duration in timebase units
   const vpx_codec_pts_t pts = frame_count_.fetch_add(1);
@@ -227,8 +326,16 @@ void VideoEncoder::encode_frame_vpx(const VideoFrame& frame,
   while ((pkt = vpx_codec_get_cx_data(vpx_encoder_, &iter)) != nullptr) {
     if (pkt->kind == VPX_CODEC_CX_FRAME_PKT) {
       bool is_keyframe = (pkt->data.frame.flags & VPX_FRAME_IS_KEY) != 0;
+
+      // SVC メタデータを作成
+      std::optional<SvcOutputMetadata> svc_metadata = std::nullopt;
+      if (svc_enabled_) {
+        svc_metadata = SvcOutputMetadata(current_temporal_layer_id);
+      }
+
       handle_encoded_frame(static_cast<const uint8_t*>(pkt->data.frame.buf),
-                           pkt->data.frame.sz, frame.timestamp(), is_keyframe);
+                           pkt->data.frame.sz, frame.timestamp(), is_keyframe,
+                           svc_metadata);
     }
   }
   vpx_img_free(&img);

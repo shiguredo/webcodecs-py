@@ -1,6 +1,6 @@
 {
   "libopus": {
-    "tag": "v1.6",
+    "tag": "v1.6.1",
     "url": "https://github.com/xiph/opus"
   },
   "libflac": {

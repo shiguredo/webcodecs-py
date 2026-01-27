@@ -517,7 +517,10 @@ def main():
 
     enable_audio = args.audio
     if enable_audio and platform.system() != "Darwin":
-        print("警告: 音声エンコード (AAC) は macOS でのみ使用可能です。無効化します。", file=sys.stderr)
+        print(
+            "警告: 音声エンコード (AAC) は macOS でのみ使用可能です。無効化します。",
+            file=sys.stderr,
+        )
         enable_audio = False
 
     video_codec = args.video_codec

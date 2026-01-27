@@ -712,3 +712,7 @@ enum BitrateMode {
   "variable"
 };
 ```
+
+## WebCodecs VideoFrame Metadata Registry
+
+<https://www.w3.org/TR/webcodecs-video-frame-metadata-registry/>

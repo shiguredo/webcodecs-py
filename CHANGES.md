@@ -11,6 +11,39 @@
 
 ## develop
 
+## 2026.2.0
+
+**リリース日**:: 2026-01-27
+
+- [UPDATE] libopus を v1.6.1 にアップデートする
+  - @voluntas
+- [ADD] VideoEncoder にスケーリング機能を追加する
+  - WebCodecs API 仕様に準拠: encode で渡されるフレームの解像度と configure で指定した解像度が異なる場合に自動的にスケーリング
+  - 対応ピクセルフォーマット: I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR
+  - Apple Video Toolbox: VTPixelTransferSession を使用 (I420, NV12, BGRA のみ直接対応、他は NV12 に変換)
+  - ソフトウェアエンコーダー (AV1/VP8/VP9): libyuv を使用してフォーマット変換とスケーリング
+  - NVENC / Intel VPL: libyuv を使用してフォーマット変換とスケーリング
+  - @voluntas
+- [ADD] VP9 で scalabilityMode (L1T2/L1T3) をサポートする
+  - VideoEncoderConfig で `scalability_mode` を指定可能
+  - 出力コールバックの metadata に `svc.temporal_layer_id` が含まれる
+  - Spatial SVC (L2T* など) は未対応
+  - @voluntas
+- [ADD] AV1 で scalabilityMode (L1T2/L1T3) をサポートする
+  - VideoEncoderConfig で `scalability_mode` を指定可能
+  - 出力コールバックの metadata に `svc.temporal_layer_id` が含まれる
+  - libaom の制約により SVC 使用時は自動的に REALTIME モードが適用される
+  - Spatial SVC (L2T* など) は未対応
+  - @voluntas
+- [ADD] H.264/H.265 ヘッダーパーサーを追加する
+  - `parse_avc_annexb` / `parse_avc_description` で H.264 の SPS/PPS 情報を抽出
+  - `parse_hevc_annexb` / `parse_hevc_description` で H.265 の VPS/SPS/PPS 情報を抽出
+  - 個別パーサー: `parse_avc_sps`, `parse_avc_pps`, `parse_hevc_vps`, `parse_hevc_sps`, `parse_hevc_pps`
+  - `AVCNalUnitType` / `HEVCNalUnitType` enum を追加 (IntEnum 相当)
+  - 戻り値の型: `AVCSpsInfo`, `AVCPpsInfo`, `AVCNalUnitHeader`, `AVCAnnexBInfo`, `AVCDescriptionInfo`
+  - 戻り値の型: `HEVCVpsInfo`, `HEVCSpsInfo`, `HEVCPpsInfo`, `HEVCNalUnitHeader`, `HEVCAnnexBInfo`, `HEVCDescriptionInfo`
+  - @voluntas
+
 ## 2026.1.0
 
 **リリース日**:: 2026-01-07

@@ -2,7 +2,7 @@
 
 webcodecs-py は WebCodecs API を Python から扱うためのバインディングであり、リアルタイム処理向けに最適化しています。
 
-- 最終更新: 2025-12-26
+- 最終更新: 2026-01-26
 - 基準仕様: [W3C WebCodecs](https://w3c.github.io/webcodecs/)
   - 日付: 2025-11-19
   - commit: 66a81b2
@@ -24,7 +24,7 @@ webcodecs-py は WebCodecs API にできるだけ準拠しつつ、以下の方�
 | Video クラス | VideoFrame / EncodedVideoChunk / VideoEncoder / VideoDecoder | 全メソッド実装済み | |
 | Audio クラス | AudioData / EncodedAudioChunk / AudioEncoder / AudioDecoder | 全メソッド実装済み | |
 | 補助型と列挙型 | PlaneLayout / DOMRect / VideoColorSpace / CodecState など | 必要項目を実装済み | 列挙値の未実装分はテーブルで明記 |
-| 独自拡張 | HardwareAccelerationEngine / VideoFrame 拡張 / AudioData 拡張 / get_video_codec_capabilities() | planes() とハードウェアアクセラレーション | 仕様逸脱理由を各節で説明 |
+| 独自拡張 | HardwareAccelerationEngine / VideoFrame 拡張 / AudioData 拡張 / get_video_codec_capabilities() / H.264/H.265 ヘッダーパーサー | planes() とハードウェアアクセラレーション、ヘッダーパーサー | 仕様逸脱理由を各節で説明 |
 
 ## WebCodecs API との主な差異
 
@@ -192,6 +192,7 @@ Metadata 系 (出力コールバックで提供):
 
 - `EncodedVideoChunkMetadata` - VideoEncoder の output callback の第 2 引数
 - `EncodedVideoChunkMetadataDecoderConfig` - EncodedVideoChunkMetadata の decoder_config
+- `SvcOutputMetadata` - EncodedVideoChunkMetadata の svc (scalabilityMode 指定時のみ)
 
 Result 系 (メソッドの戻り値):
 
@@ -516,6 +517,95 @@ config_vp9_10bit: VideoEncoderConfig = {
 encoder.configure(config_vp9)
 ```
 
+### VideoEncoder の例 (VP9 SVC - macOS / Ubuntu)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk, metadata=None):
+    if metadata and "svc" in metadata:
+        tid = metadata["svc"]["temporal_layer_id"]
+        print(f"エンコード完了: {chunk.byte_length} bytes, temporal_layer_id={tid}")
+    else:
+        print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# VP9 L1T2 (2 temporal layers)
+# temporal layer パターン: 0, 1, 0, 1, ...
+config_l1t2: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+    "scalability_mode": "L1T2",
+}
+
+# VP9 L1T3 (3 temporal layers)
+# temporal layer パターン: 0, 2, 1, 2, 0, 2, 1, 2, ...
+config_l1t3: VideoEncoderConfig = {
+    "codec": "vp09.00.10.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "latency_mode": LatencyMode.REALTIME,
+    "scalability_mode": "L1T3",
+}
+
+encoder.configure(config_l1t2)
+```
+
+### VideoEncoder の例 (AV1 SVC)
+
+```python
+from webcodecs import LatencyMode, VideoEncoder, VideoEncoderConfig
+
+
+def on_output(chunk, metadata=None):
+    if metadata and "svc" in metadata:
+        tid = metadata["svc"]["temporal_layer_id"]
+        print(f"エンコード完了: {chunk.byte_length} bytes, temporal_layer_id={tid}")
+    else:
+        print(f"エンコード完了: {chunk.byte_length} bytes")
+
+
+def on_error(error):
+    print(f"エラー: {error}")
+
+
+encoder = VideoEncoder(on_output, on_error)
+
+# AV1 L1T2 (2 temporal layers)
+# temporal layer パターン: 0, 1, 0, 1, ...
+# 注: SVC 使用時は自動的に REALTIME モードが適用される
+config_l1t2: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "scalability_mode": "L1T2",
+}
+
+# AV1 L1T3 (3 temporal layers)
+# temporal layer パターン: 0, 2, 1, 2, 0, 2, 1, 2, ...
+config_l1t3: VideoEncoderConfig = {
+    "codec": "av01.0.08M.08",
+    "width": 1280,
+    "height": 720,
+    "bitrate": 1000000,
+    "scalability_mode": "L1T3",
+}
+
+encoder.configure(config_l1t2)
+```
+
 ## 実装済みインターフェース
 
 ### 辞書型インターフェース (Config)
@@ -651,7 +741,7 @@ print(result["capture_time"])  # 1234567890.0
 | `framerate` | o | o | o | |
 | `hardware_acceleration` | x | o | - | **未実装** |
 | `alpha` | o | o | o | AlphaOption enum |
-| `scalability_mode` | x | o | - | **未実装** |
+| `scalability_mode` | o | o | o | VP9 L1T2/L1T3 のみ対応 |
 | `bitrate_mode` | o | o | o | VideoEncoderBitrateMode enum |
 | `latency_mode` | o | o | o | LatencyMode enum |
 | `content_hint` | x | o | - | **未実装** |
@@ -820,6 +910,59 @@ def on_output(chunk, metadata=None):
             # description: bytes (H.264 では avcC、H.265 では hvcC)
             description = decoder_config.get("description")
 ```
+
+**自動スケーリング**: WebCodecs API 仕様に準拠し、`encode()` で渡される VideoFrame の解像度と `configure()` で指定した解像度が異なる場合、自動的にスケーリングが行われます。
+
+```python
+from webcodecs import VideoEncoder, VideoEncoderConfig, VideoFrame, VideoPixelFormat
+import numpy as np
+
+def on_output(chunk, metadata=None):
+    pass
+
+def on_error(error):
+    pass
+
+encoder = VideoEncoder(on_output, on_error)
+
+# configure で 640x360 を指定
+config: VideoEncoderConfig = {
+    "codec": "av01.0.04M.08",
+    "width": 640,
+    "height": 360,
+    "bitrate": 1_000_000,
+}
+encoder.configure(config)
+
+# 1280x720 のフレームを渡すと、自動的に 640x360 にスケーリングされる
+data = np.zeros(1280 * 720 * 3 // 2, dtype=np.uint8)
+frame = VideoFrame(data, {
+    "format": VideoPixelFormat.I420,
+    "coded_width": 1280,
+    "coded_height": 720,
+    "timestamp": 0,
+})
+encoder.encode(frame)  # 640x360 にスケーリングしてエンコード
+frame.close()
+encoder.close()
+```
+
+**スケーリング実装の詳細**:
+
+| エンコーダー | スケーリング方式 | 対応フォーマット |
+|------------|----------------|----------------|
+| Apple Video Toolbox (H.264/HEVC) | VTPixelTransferSession (HWA) | I420, NV12, BGRA |
+| ソフトウェアエンコーダー (AV1/VP8/VP9) | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
+| NVIDIA Video Codec SDK (NVENC) | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
+| Intel VPL | libyuv (各フォーマット対応) | I420, I422, I444, NV12, RGBA, BGRA, RGB, BGR |
+
+**注意事項**:
+
+- スケーリングはダウンスケール、アップスケールの両方に対応
+- アスペクト比は `configure()` で指定した解像度に合わせられる（引き伸ばし）
+- 同じ解像度のフレームはスケーリング処理をスキップ
+- 入力フォーマットに応じた libyuv スケーラーが使用される (I420Scale, I422Scale, I444Scale, NV12Scale, ARGBScale)
+- RGB/BGR フォーマットは I420/NV12 に変換後スケーリング (libyuv に RGBScale がないため)
 
 ## 独自インターフェース
 
@@ -1310,6 +1453,213 @@ WebCodecs の codec format 仕様に準拠した名前を使用しています�
 - 各プラットフォームで実際にサポートされているコーデックのみを返す
 - 未実装のエンジン (NVIDIA、INTEL、AMD) は結果に含まれない
 
+### H.264/H.265 ヘッダーパーサー
+
+**独自拡張関数 - WebCodecs API にはない**
+
+H.264 (AVC) および H.265 (HEVC) のビットストリームヘッダーをパースし、SPS/PPS/VPS および NAL ユニット情報を抽出します。
+
+#### パース関数
+
+**Annex B フォーマット用**:
+
+```python
+def parse_avc_annexb(data: bytes) -> AVCAnnexBInfo: ...
+def parse_hevc_annexb(data: bytes) -> HEVCAnnexBInfo: ...
+```
+
+スタートコード（0x00 0x00 0x01 または 0x00 0x00 0x00 0x01）で区切られた NAL ユニットをパースします。
+
+**Description (avcC/hvcC) フォーマット用**:
+
+```python
+def parse_avc_description(data: bytes) -> AVCDescriptionInfo: ...
+def parse_hevc_description(data: bytes) -> HEVCDescriptionInfo: ...
+```
+
+エンコーダーから出力される description（avcC/hvcC box）をパースします。
+
+**使用例**:
+
+```python
+from webcodecs import parse_avc_annexb, parse_avc_description
+
+# Annex B フォーマットの H.264 ストリーム
+avc_stream = b"\x00\x00\x00\x01\x67..."  # SPS + PPS + ...
+info = parse_avc_annexb(avc_stream)
+
+if info.sps is not None:
+    print(f"Profile: {info.sps.profile_idc}")
+    print(f"Level: {info.sps.level_idc}")
+    print(f"Resolution: {info.sps.width}x{info.sps.height}")
+
+# NAL ユニット情報
+for nal in info.nal_units:
+    print(f"NAL Type: {nal.nal_unit_type}, Key frame: {nal.is_key_frame}")
+
+# エンコーダーから取得した description をパース
+def on_output(chunk, metadata=None):
+    if metadata and "decoder_config" in metadata:
+        description = metadata["decoder_config"].get("description")
+        if description:
+            desc_info = parse_avc_description(description)
+            print(f"Length size: {desc_info.length_size}")
+```
+
+#### 個別パース関数
+
+```python
+def parse_avc_sps(data: bytes) -> AVCSpsInfo: ...
+def parse_avc_pps(data: bytes) -> AVCPpsInfo: ...
+def parse_hevc_vps(data: bytes) -> HEVCVpsInfo: ...
+def parse_hevc_sps(data: bytes) -> HEVCSpsInfo: ...
+def parse_hevc_pps(data: bytes) -> HEVCPpsInfo: ...
+```
+
+個別の NAL ユニットをパースします。入力データには NAL ヘッダーを含めてください。
+
+#### 戻り値の型
+
+**AVCSpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `profile_idc` | int | プロファイル ID (66=Baseline, 77=Main, 100=High など) |
+| `level_idc` | int | レベル ID (30=3.0, 31=3.1, 40=4.0 など) |
+| `constraint_set_flags` | int | 制約フラグ |
+| `width` | int | 解像度（幅） |
+| `height` | int | 解像度（高さ） |
+| `bit_depth_luma` | int | 輝度ビット深度 (通常 8) |
+| `bit_depth_chroma` | int | 色差ビット深度 (通常 8) |
+| `chroma_format_idc` | int | クロマフォーマット (1=4:2:0, 2=4:2:2, 3=4:4:4) |
+| `sps_id` | int | SPS ID |
+| `framerate` | float \| None | フレームレート（VUI から取得、存在する場合） |
+
+**AVCPpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `pps_id` | int | PPS ID |
+| `sps_id` | int | 参照する SPS ID |
+| `entropy_coding_mode_flag` | bool | CABAC 使用フラグ |
+
+**AVCNalUnitHeader**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `nal_unit_type` | int | NAL ユニットタイプ (1=非IDRスライス, 5=IDRスライス, 7=SPS, 8=PPS など) |
+| `nal_ref_idc` | int | 参照指標 (0-3) |
+| `is_idr` | bool | IDR フレームか |
+| `is_key_frame` | bool | キーフレームか |
+
+**AVCAnnexBInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps` | AVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | AVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[AVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+
+**AVCDescriptionInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps` | AVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | AVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[AVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+| `length_size` | int | NAL ユニット長のバイト数 (通常 4) |
+
+**HEVCVpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps_id` | int | VPS ID |
+| `max_layers_minus1` | int | 最大レイヤー数 - 1 |
+| `max_sub_layers_minus1` | int | 最大サブレイヤー数 - 1 |
+
+**HEVCSpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `sps_id` | int | SPS ID |
+| `vps_id` | int | 参照する VPS ID |
+| `width` | int | 解像度（幅） |
+| `height` | int | 解像度（高さ） |
+| `bit_depth_luma` | int | 輝度ビット深度 |
+| `bit_depth_chroma` | int | 色差ビット深度 |
+| `chroma_format_idc` | int | クロマフォーマット |
+| `general_profile_idc` | int | 一般プロファイル ID |
+| `general_level_idc` | int | 一般レベル ID |
+| `general_tier_flag` | int | 一般ティアフラグ |
+| `framerate` | float \| None | フレームレート（VUI から取得、存在する場合） |
+
+**HEVCPpsInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `pps_id` | int | PPS ID |
+| `sps_id` | int | 参照する SPS ID |
+
+**HEVCNalUnitHeader**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `nal_unit_type` | int | NAL ユニットタイプ (32=VPS, 33=SPS, 34=PPS, 19-21=IDR など) |
+| `nuh_layer_id` | int | レイヤー ID |
+| `nuh_temporal_id_plus1` | int | テンポラル ID + 1 |
+| `is_irap` | bool | IRAP (Intra Random Access Point) フレームか |
+| `is_key_frame` | bool | キーフレームか |
+
+**HEVCAnnexBInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps` | HEVCVpsInfo \| None | VPS 情報（存在する場合） |
+| `sps` | HEVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | HEVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[HEVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+
+**HEVCDescriptionInfo**:
+
+| フィールド | 型 | 説明 |
+|-----------|------|------|
+| `vps` | HEVCVpsInfo \| None | VPS 情報（存在する場合） |
+| `sps` | HEVCSpsInfo \| None | SPS 情報（存在する場合） |
+| `pps` | HEVCPpsInfo \| None | PPS 情報（存在する場合） |
+| `nal_units` | list[HEVCNalUnitHeader] | NAL ユニットヘッダーのリスト |
+| `length_size` | int | NAL ユニット長のバイト数 (通常 4) |
+
+#### NAL ユニットタイプ enum
+
+`AVCNalUnitType` と `HEVCNalUnitType` は IntEnum 相当として定義されており、整数値との比較が可能です。
+
+```python
+from webcodecs import AVCNalUnitType, HEVCNalUnitType
+
+# AVC NAL ユニットタイプ
+print(AVCNalUnitType.SPS)       # 7
+print(AVCNalUnitType.PPS)       # 8
+print(AVCNalUnitType.IDR_SLICE) # 5
+
+# HEVC NAL ユニットタイプ
+print(HEVCNalUnitType.VPS)      # 32
+print(HEVCNalUnitType.SPS)      # 33
+print(HEVCNalUnitType.PPS)      # 34
+```
+
+#### エラー処理
+
+不正なデータの場合は `ValueError` を送出します:
+
+```python
+from webcodecs import parse_avc_annexb
+
+try:
+    info = parse_avc_annexb(b"")  # 空データ
+except ValueError as e:
+    print(f"Error: {e}")
+```
+
 ## Image インターフェース
 
 ### 辞書型インターフェース (Image)
@@ -1440,9 +1790,8 @@ decoder.close()
 |--------|------|
 | `VideoColorSpaceInit` | `VideoColorSpace` クラスで代替 |
 | `EncodedAudioChunkMetadata` | メタデータサポート未実装 |
-| `SvcOutputMetadata` | SVC サポート未実装 |
 
-**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。
+**注**: `EncodedVideoChunkMetadata` は VideoEncoder の output callback で dict として提供される (キーフレーム時のみ `decoder_config` を含む)。`scalability_mode` が指定されている場合、全フレームで `svc` フィールド (`temporal_layer_id` を含む) が提供される。
 
 ### 未実装の列挙型
 
@@ -1477,6 +1826,24 @@ decoder.close()
 | 1 | 8-bit | 4:2:2, 4:4:4 | o |
 | 2 | 10/12-bit | 4:2:0 | o |
 | 3 | 10/12-bit | 4:2:2, 4:4:4 | o |
+
+**VP9 scalabilityMode 対応状況**:
+
+| モード | 説明 | 対応状況 |
+|--------|------|---------|
+| L1T2 | 1 spatial layer, 2 temporal layers | o |
+| L1T3 | 1 spatial layer, 3 temporal layers | o |
+| L2T* | 2+ spatial layers | x |
+
+**AV1 scalabilityMode 対応状況**:
+
+| モード | 説明 | 対応状況 |
+|--------|------|---------|
+| L1T2 | 1 spatial layer, 2 temporal layers | o |
+| L1T3 | 1 spatial layer, 3 temporal layers | o |
+| L2T* | 2+ spatial layers | x |
+
+**注**: AV1 で scalabilityMode を使用する場合、libaom の制約により自動的に REALTIME モードが適用されます。
 
 ### Audio コーデック
 

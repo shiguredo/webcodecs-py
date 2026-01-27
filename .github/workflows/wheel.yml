@@ -49,7 +49,7 @@ jobs:
 
       - run: uv build --wheel --out-dir wheelhouse
       - name: Upload Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -126,7 +126,7 @@ jobs:
         run: |
           uvx auditwheel repair dist/*.whl --strip --only-plat
       - name: Upload Repaired Wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -166,7 +166,7 @@ jobs:
       - name: Build wheel
         run: uv build --wheel --out-dir wheelhouse
       - name: Upload Wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -209,7 +209,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/
@@ -227,7 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           path: artifacts/
       - name: Create release files list

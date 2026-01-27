@@ -174,10 +174,12 @@ class VideoEncoder {
   uint64_t next_output_sequence_{0};  // 次に出力すべきシーケンス番号
   std::mutex output_mutex_;           // 出力バッファの同期
 
-  void handle_encoded_frame(const uint8_t* data,
-                            size_t size,
-                            int64_t timestamp,
-                            bool keyframe);
+  void handle_encoded_frame(
+      const uint8_t* data,
+      size_t size,
+      int64_t timestamp,
+      bool keyframe,
+      std::optional<SvcOutputMetadata> svc_metadata = std::nullopt);
 
   void init_aom_encoder();
   void cleanup_aom_encoder();
@@ -199,6 +201,12 @@ class VideoEncoder {
   CFStringRef get_h264_profile_level();
   CFStringRef get_hevc_profile_level();
 #endif
+
+  // SVC (Scalable Video Coding) 関連
+  // AV1 と VP9 の両方で使用するため、全プラットフォームで定義
+  bool svc_enabled_ = false;
+  uint32_t svc_temporal_layers_ = 1;
+  std::atomic<uint64_t> svc_frame_index_{0};
 
 #if defined(__APPLE__) || defined(__linux__)
   // libvpx エンコーダー
@@ -231,6 +239,11 @@ class VideoEncoder {
 
   // プラットフォームのハードウェアアクセラレーション用の不透明ハンドル (Apple では VideoToolbox で使用)
   void* vt_session_ = nullptr;
+
+#if defined(__APPLE__)
+  // VTPixelTransferSession: スケーリング用
+  void* vt_pixel_transfer_session_ = nullptr;
+#endif
 
   // libaom の初期化とエンコードを直列化するためのミューテックス
   std::mutex aom_mutex_;

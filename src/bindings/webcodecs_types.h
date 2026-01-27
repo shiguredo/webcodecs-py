@@ -277,11 +277,21 @@ struct VideoEncoderSupport {
       : supported(supported), config(config) {}
 };
 
+// WebCodecs API の SvcOutputMetadata 構造体
+struct SvcOutputMetadata {
+  uint32_t temporal_layer_id;
+
+  SvcOutputMetadata() : temporal_layer_id(0) {}
+  explicit SvcOutputMetadata(uint32_t tid) : temporal_layer_id(tid) {}
+};
+
 // WebCodecs API の EncodedVideoChunkMetadata 構造体
 struct EncodedVideoChunkMetadata {
   // decoderConfig: キーフレームで提供される VideoDecoderConfig
   // description には avcC/hvcC/av1C などのコーデック固有データが含まれる
   std::optional<VideoDecoderConfig> decoder_config;
+  // svc: SVC エンコード時に提供される SvcOutputMetadata
+  std::optional<SvcOutputMetadata> svc;
 
   EncodedVideoChunkMetadata() = default;
 };
