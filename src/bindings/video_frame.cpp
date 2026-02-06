@@ -1122,7 +1122,7 @@ void init_video_frame(nb::module_& m) {
       .def(
           nb::init<nb::ndarray<nb::numpy>, nb::dict>(), "data"_a, "init"_a,
           nb::sig("def __init__(self, data: numpy.typing.NDArray[numpy.uint8], "
-                  "init: VideoFrameBufferInit, /) -> None"))
+                  "init: webcodecs.VideoFrameBufferInit, /) -> None"))
       .def(nb::init<nb::capsule, nb::dict>(), "native_buffer"_a, "init"_a)
       .def_prop_ro("format", &VideoFrame::format,
                    nb::sig("def format(self, /) -> VideoPixelFormat"))

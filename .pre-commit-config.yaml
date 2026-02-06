@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: clang-format-check
+        name: clang-format check
+        language: system
+        entry: clang-format --dry-run --Werror
+        files: '\.(cpp|h)$'
+        # _deps/ や _build/ 配下は対象外
+        exclude: '^(_deps|_build)/'
+        types_or: [c, c++]
+
+      - id: ty-check
+        name: ty check
+        language: system
+        entry: uv run ty check
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-format-check
+        name: ruff format check
+        language: system
+        entry: uv run ruff format --check
+        files: '\.py$'

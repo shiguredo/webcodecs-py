@@ -276,7 +276,6 @@ class AudioDataInit(TypedDict):
     number_of_channels: int
     # マイクロ秒
     timestamp: int
-    # type: ignore[name-defined]
     data: "numpy.typing.NDArray"
 
 

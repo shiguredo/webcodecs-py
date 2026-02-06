@@ -604,9 +604,9 @@ def test_concurrent_encoder_decoder_callback_mixed():
 # GIL ビルドでも実行されるテスト（Free-Threading 環境の検出テスト）
 def test_free_threading_detection():
     """Free-Threading 環境の検出機能をテスト"""
-    has_gil_check = hasattr(sys, "_is_gil_enabled")
-    if has_gil_check:
-        gil_enabled = sys._is_gil_enabled()
+    is_gil_enabled = getattr(sys, "_is_gil_enabled", None)
+    if is_gil_enabled is not None:
+        gil_enabled = is_gil_enabled()
         # Python 3.13+ では _is_gil_enabled が存在する
         assert isinstance(gil_enabled, bool)
     # Python 3.12 以下では _is_gil_enabled が存在しない

@@ -203,10 +203,10 @@ def create_shapes(width: int, height: int, num_shapes: int) -> list[MovingShape]
         if random.random() < 0.5:
             w = random.randint(40, 120)
             h = random.randint(40, 120)
-            shapes.append(MovingRect(x, y, w, h, vx, vy, *color, alpha))
+            shapes.append(MovingRect(x, y, w, h, vx, vy, color[0], color[1], color[2], alpha))
         else:
             r = random.randint(20, 60)
-            shapes.append(MovingCircle(x, y, r, vx, vy, *color, alpha))
+            shapes.append(MovingCircle(x, y, r, vx, vy, color[0], color[1], color[2], alpha))
 
     return shapes
 

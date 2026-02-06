@@ -92,6 +92,24 @@ python_functions = ["test_*", "prop_*"]
 # python_files = ["test_*.py", "bench_*.py"]
 # addopts = "--benchmark-disable"
 
+# ty の制限による誤検知を抑制する設定
+# hypothesis の @composite が返す SearchStrategy の ParamSpec を
+# ty が正しく解釈できない問題への対処
+[[tool.ty.overrides]]
+include = ["tests/prop_*.py"]
+
+[tool.ty.overrides.rules]
+missing-argument = "ignore"
+
+# examples/ と tests/ で VideoFrame のオーバーロード解決に失敗する問題
+# ty が TypedDict を dict のサブタイプとして認識できない、
+# np.random.randint の戻り値型を正しく推論できないことが原因
+[[tool.ty.overrides]]
+include = ["examples/**/*.py", "tests/**/*.py"]
+
+[tool.ty.overrides.rules]
+no-matching-overload = "ignore"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
