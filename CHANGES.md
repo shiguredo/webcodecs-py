@@ -11,7 +11,13 @@
 
 ## develop
 
-- [UPDATE] nanobind の最小バージョンを 2.11.0 にする
+- [UPDATE] libvpx を v1.16.0 にアップデートする
+  - @voluntas
+- [UPDATE] libaom を v3.13.2 にアップデートする
+  - @voluntas
+- [UPDATE] nanobind の最小バージョンを 2.12.0 にする
+  - @voluntas
+- [UPDATE] scikit-build-core の minimum-version を 0.12.2 にする
   - @voluntas
 - [FIX] VideoEncoder / AudioEncoder / VideoDecoder / AudioDecoder の close() / reset() で GIL 保持時にデッドロックする問題を修正する
   - 原因: バインディング層で `nb::call_guard<nb::gil_scoped_release>()` が付与されておらず、 メインスレッド (GIL 保持) と worker_thread の callback (`nb::gil_scoped_acquire`) で相互待ちが成立する

@@ -8,11 +8,11 @@
     "url": "https://github.com/xiph/flac"
   },
   "libvpx": {
-    "tag": "v1.15.2",
+    "tag": "v1.16.0",
     "url": "https://chromium.googlesource.com/webm/libvpx"
   },
   "libaom": {
-    "tag": "v3.13.1",
+    "tag": "v3.13.2",
     "url": "https://aomedia.googlesource.com/aom"
   },
   "libdav1d": {
