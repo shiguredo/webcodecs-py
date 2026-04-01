@@ -11,6 +11,8 @@
 
 ## develop
 
+- [CHANGE] .pre-commit-config.yaml を prek.toml に移行する
+  - @voluntas
 - [UPDATE] libvpx を v1.16.0 にアップデートする
   - @voluntas
 - [UPDATE] libaom を v3.13.2 にアップデートする
