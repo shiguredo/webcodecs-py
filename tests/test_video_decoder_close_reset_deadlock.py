@@ -95,7 +95,8 @@ def _run_close_or_reset(action: str):
         closer.join(timeout=3)
         assert not closer.is_alive(), f"{action}() がデッドロックした"
         if action == "reset":
-            # VideoDecoder の reset は state を変えない (CONFIGURED のまま)
+            # 現実装では VideoDecoder の reset は state を変えない (CONFIGURED のまま)。
+            # WebCodecs 仕様では UNCONFIGURED に遷移すべきで、 仕様準拠は issue 0005 で対応する。
             assert decoder.state == CodecState.CONFIGURED, (
                 f"reset 後の state が CONFIGURED でない: {decoder.state}"
             )
