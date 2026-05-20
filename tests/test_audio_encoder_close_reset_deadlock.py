@@ -17,7 +17,8 @@ from webcodecs import (
 def create_test_audio_data(timestamp: int) -> AudioData:
     sample_rate = 48000
     number_of_channels = 2
-    number_of_frames = 960  # 48 kHz で 20 ms
+    # 48 kHz で 20 ms 相当
+    number_of_frames = 960
     data = np.zeros((number_of_frames, number_of_channels), dtype=np.float32)
     init: AudioDataInit = {
         "format": AudioSampleFormat.F32,

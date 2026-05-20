@@ -18,7 +18,8 @@ from webcodecs import (
 
 _SAMPLE_RATE = 48000
 _CHANNELS = 2
-_FRAMES_PER_BUFFER = 960  # 20 ms at 48 kHz
+# 48 kHz で 20 ms 相当
+_FRAMES_PER_BUFFER = 960
 
 
 def create_test_audio_data(timestamp: int) -> AudioData:
