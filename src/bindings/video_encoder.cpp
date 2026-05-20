@@ -937,8 +937,12 @@ void init_video_encoder(nb::module_& m) {
       .def("flush", &VideoEncoder::flush,
            nb::call_guard<nb::gil_scoped_release>(),
            nb::sig("def flush(self, /) -> None"))
-      .def("reset", &VideoEncoder::reset, nb::sig("def reset(self, /) -> None"))
-      .def("close", &VideoEncoder::close, nb::sig("def close(self, /) -> None"))
+      .def("reset", &VideoEncoder::reset,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def reset(self, /) -> None"))
+      .def("close", &VideoEncoder::close,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def close(self, /) -> None"))
       .def_prop_ro("state", &VideoEncoder::state,
                    nb::sig("def state(self, /) -> CodecState"))
       .def_prop_ro("encode_queue_size", &VideoEncoder::encode_queue_size,
