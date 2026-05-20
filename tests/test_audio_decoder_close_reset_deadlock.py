@@ -21,6 +21,12 @@ _CHANNELS = 2
 # 48 kHz で 20 ms 相当
 _FRAMES_PER_BUFFER = 960
 
+_DECODER_CONFIG: AudioDecoderConfig = {
+    "codec": "opus",
+    "sample_rate": _SAMPLE_RATE,
+    "number_of_channels": _CHANNELS,
+}
+
 
 def create_test_audio_data(timestamp: int) -> AudioData:
     data = np.zeros((_FRAMES_PER_BUFFER, _CHANNELS), dtype=np.float32)
@@ -35,8 +41,7 @@ def create_test_audio_data(timestamp: int) -> AudioData:
     return AudioData(init)
 
 
-def _encode_one_chunk():
-    """事前準備として AudioEncoder で 1 つの EncodedAudioChunk を生成する"""
+def encode_one_chunk():
     encoded_chunks = []
 
     def on_output(chunk, metadata=None):
@@ -62,8 +67,8 @@ def _encode_one_chunk():
     return encoded_chunks[0]
 
 
-def _run_close_or_reset(action: str):
-    chunk = _encode_one_chunk()
+def test_close_does_not_deadlock_when_callback_in_flight():
+    chunk = encode_one_chunk()
 
     started = threading.Event()
     release = threading.Event()
@@ -77,37 +82,50 @@ def _run_close_or_reset(action: str):
         pass
 
     decoder = AudioDecoder(on_output, on_error)
-    dec_config: AudioDecoderConfig = {
-        "codec": "opus",
-        "sample_rate": _SAMPLE_RATE,
-        "number_of_channels": _CHANNELS,
-    }
-    decoder.configure(dec_config)
+    decoder.configure(_DECODER_CONFIG)
     decoder.decode(chunk)
 
     assert started.wait(timeout=3), "デコーダーの出力コールバックが呼ばれなかった"
 
-    target = decoder.close if action == "close" else decoder.reset
-    closer = threading.Thread(target=target)
+    closer = threading.Thread(target=decoder.close)
     closer.start()
     try:
         closer.join(timeout=3)
-        assert not closer.is_alive(), f"{action}() がデッドロックした"
-        if action == "reset":
-            # AudioDecoder の reset 後は state が UNCONFIGURED に戻る
-            assert decoder.state == CodecState.UNCONFIGURED, (
-                f"reset 後の state が UNCONFIGURED でない: {decoder.state}"
-            )
+        assert not closer.is_alive(), "close() がデッドロックした"
     finally:
         release.set()
         closer.join(timeout=3)
-        if action == "reset":
-            decoder.close()
-
-
-def test_close_does_not_deadlock_when_callback_in_flight():
-    _run_close_or_reset("close")
 
 
 def test_reset_does_not_deadlock_when_callback_in_flight():
-    _run_close_or_reset("reset")
+    chunk = encode_one_chunk()
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def on_output(audio_data):
+        started.set()
+        release.wait(timeout=1)
+        audio_data.close()
+
+    def on_error(error):
+        pass
+
+    decoder = AudioDecoder(on_output, on_error)
+    decoder.configure(_DECODER_CONFIG)
+    decoder.decode(chunk)
+
+    assert started.wait(timeout=3), "デコーダーの出力コールバックが呼ばれなかった"
+
+    resetter = threading.Thread(target=decoder.reset)
+    resetter.start()
+    try:
+        resetter.join(timeout=3)
+        assert not resetter.is_alive(), "reset() がデッドロックした"
+        assert decoder.state == CodecState.UNCONFIGURED, (
+            f"reset 後の state が UNCONFIGURED でない: {decoder.state}"
+        )
+    finally:
+        release.set()
+        resetter.join(timeout=3)
+        decoder.close()

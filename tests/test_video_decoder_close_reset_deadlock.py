@@ -21,6 +21,12 @@ _WIDTH = 320
 _HEIGHT = 240
 _CODEC = "av01.0.04M.08"
 
+_DECODER_CONFIG: VideoDecoderConfig = {
+    "codec": _CODEC,
+    "coded_width": _WIDTH,
+    "coded_height": _HEIGHT,
+}
+
 
 def create_test_frame(timestamp: int) -> VideoFrame:
     y_plane = np.full((_HEIGHT, _WIDTH), 128, dtype=np.uint8)
@@ -36,8 +42,7 @@ def create_test_frame(timestamp: int) -> VideoFrame:
     return VideoFrame(data, init)
 
 
-def _encode_one_chunk():
-    """事前準備として VideoEncoder で 1 つの EncodedVideoChunk を生成する"""
+def encode_one_chunk():
     encoded_chunks = []
 
     def on_output(chunk, metadata=None):
@@ -56,15 +61,17 @@ def _encode_one_chunk():
         "latency_mode": LatencyMode.REALTIME,
     }
     encoder.configure(enc_config)
-    encoder.encode(create_test_frame(0), {"key_frame": True})
+    frame = create_test_frame(0)
+    encoder.encode(frame, {"key_frame": True})
+    frame.close()
     encoder.flush()
     encoder.close()
     assert encoded_chunks, "エンコーダーがチャンクを出力しなかった"
     return encoded_chunks[0]
 
 
-def _run_close_or_reset(action: str):
-    chunk = _encode_one_chunk()
+def test_close_does_not_deadlock_when_callback_in_flight():
+    chunk = encode_one_chunk()
 
     started = threading.Event()
     release = threading.Event()
@@ -78,38 +85,52 @@ def _run_close_or_reset(action: str):
         pass
 
     decoder = VideoDecoder(on_output, on_error)
-    dec_config: VideoDecoderConfig = {
-        "codec": _CODEC,
-        "coded_width": _WIDTH,
-        "coded_height": _HEIGHT,
-    }
-    decoder.configure(dec_config)
+    decoder.configure(_DECODER_CONFIG)
     decoder.decode(chunk)
 
     assert started.wait(timeout=3), "デコーダーの出力コールバックが呼ばれなかった"
 
-    target = decoder.close if action == "close" else decoder.reset
-    closer = threading.Thread(target=target)
+    closer = threading.Thread(target=decoder.close)
     closer.start()
     try:
         closer.join(timeout=3)
-        assert not closer.is_alive(), f"{action}() がデッドロックした"
-        if action == "reset":
-            # 現実装では VideoDecoder の reset は state を変えない (CONFIGURED のまま)。
-            # WebCodecs 仕様では UNCONFIGURED に遷移すべきで、 仕様準拠は issue 0005 で対応する。
-            assert decoder.state == CodecState.CONFIGURED, (
-                f"reset 後の state が CONFIGURED でない: {decoder.state}"
-            )
+        assert not closer.is_alive(), "close() がデッドロックした"
     finally:
         release.set()
         closer.join(timeout=3)
-        if action == "reset":
-            decoder.close()
-
-
-def test_close_does_not_deadlock_when_callback_in_flight():
-    _run_close_or_reset("close")
 
 
 def test_reset_does_not_deadlock_when_callback_in_flight():
-    _run_close_or_reset("reset")
+    chunk = encode_one_chunk()
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def on_output(frame):
+        started.set()
+        release.wait(timeout=1)
+        frame.close()
+
+    def on_error(error):
+        pass
+
+    decoder = VideoDecoder(on_output, on_error)
+    decoder.configure(_DECODER_CONFIG)
+    decoder.decode(chunk)
+
+    assert started.wait(timeout=3), "デコーダーの出力コールバックが呼ばれなかった"
+
+    resetter = threading.Thread(target=decoder.reset)
+    resetter.start()
+    try:
+        resetter.join(timeout=3)
+        assert not resetter.is_alive(), "reset() がデッドロックした"
+        # 現実装では VideoDecoder の reset は state を変えない (CONFIGURED のまま)。
+        # WebCodecs 仕様では UNCONFIGURED に遷移すべきで、 仕様準拠は issue 0005 で対応する。
+        assert decoder.state == CodecState.CONFIGURED, (
+            f"reset 後の state が CONFIGURED でない: {decoder.state}"
+        )
+    finally:
+        release.set()
+        resetter.join(timeout=3)
+        decoder.close()
