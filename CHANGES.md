@@ -16,7 +16,6 @@
 - [FIX] VideoEncoder / AudioEncoder / VideoDecoder / AudioDecoder の close() / reset() で GIL 保持時にデッドロックする不具合を修正する
   - @sile
 
-
 ## 2026.2.0
 
 **リリース日**:: 2026-01-27
