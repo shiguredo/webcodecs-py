@@ -172,8 +172,10 @@ def test_close_does_not_deadlock_when_callback_in_flight():
     # VideoEncoder の出力コールバックは (chunk, metadata) の 2 引数で呼ばれる
     def on_output(chunk, metadata=None):
         started.set()
-        # closer.join (timeout=3) が先に切れる必要があるので長めに待つ
-        release.wait(timeout=10)
+        # 短時間待機して closer の close() がデッドロックする race window を作る。
+        # 修正後はワーカーがこの wait から戻る際に GIL を取れて callback を完了でき、
+        # close() が正常終了する。 wait の timeout は closer.join の timeout より短く取る。
+        release.wait(timeout=1)
 
     def on_error(error):
         pass
@@ -222,13 +224,13 @@ Decoder 用テストの事前準備は以下の順:
 2. `encoder.flush()` で出力コールバックが呼ばれるまで待つ (collect 用コールバックでチャンクを `list` に蓄積し、`threading.Event` でシグナルする)。
 3. `encoder.close()` で encoder を片付ける。
 4. Decoder を組み立て、上記 chunk を `decoder.decode(chunk)` に渡す。
-5. Decoder 側の `on_output` で `release.wait(timeout=10)` を入れて待機させ、別スレッドから `decoder.close()` を呼ぶ。
+5. Decoder 側の `on_output` で `release.wait(timeout=1)` を入れて待機させ、別スレッドから `decoder.close()` を呼ぶ。
 
 `AudioDecoder` も同型。AAC (`mp4a.*`) は macOS の AudioConverter 経由でワーカースレッドが起動するためテスト対象にできるが、本テストでは全プラットフォーム (Linux / macOS / Windows) で動く `opus` を採用する。
 
 #### クリーンアップの限界
 
-`try/finally` で `release.set()` を必ず呼ぶが、修正前のデッドロック発生時は closer が GIL を保持したまま `worker_thread_.join()` でブロックしているため、 `release.set()` を呼んでもワーカーは GIL を取り直せず `Event.wait` から戻れない。 結果としてワーカーはプロセス終了まで残る。 アサーション (`closer.join(timeout=3)` 後の `is_alive` チェック) で fail 判定されるため pytest は次のテストへ進めるが、 残存ワーカーがその後の pytest プロセスを応答不能にする可能性に備え、 CI ランナー側で `pytest --timeout-method=signal` (POSIX のみ) を併用することを推奨する (本テストファイル自体には組み込まない)。 修正後は GIL 解放によりワーカーが復帰できるため、 `finally` のクリーンアップが意図通りに機能する。
+`try/finally` で `release.set()` を必ず呼ぶが、修正前のデッドロック発生時は closer が GIL を保持したまま `worker_thread_.join()` でブロックしているため、 `release.set()` を呼んでもワーカーは GIL を取り直せず `Event.wait` から戻れない。 結果としてワーカーはプロセス終了まで残り、 さらに `finally` 内の `release.set()` を実行するメインスレッドも GIL を取得できないため、 pytest プロセス全体が応答不能になる。 `pytest --timeout-method=signal` (POSIX のみ) でも、 SIGALRM の Python ハンドラ実行に GIL が必要なため、 closer が GIL を保持している間は救えない。 修正前のテスト実行で hang した場合は手動で SIGKILL するしかない (実装時に VideoEncoder で実際に確認した挙動)。 修正後は GIL 解放によりワーカーが復帰できるため、 `finally` のクリーンアップが意図通りに機能する。
 
 ## 完了条件
 
