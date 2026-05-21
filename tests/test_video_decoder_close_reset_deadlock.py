@@ -99,6 +99,9 @@ def test_close_does_not_deadlock_when_callback_in_flight():
     try:
         closer.join(timeout=3)
         assert not closer.is_alive(), "close() がデッドロックした"
+        assert decoder.state == CodecState.CLOSED, (
+            f"close 後の state が CLOSED でない: {decoder.state}"
+        )
     finally:
         release.set()
         closer.join(timeout=3)
