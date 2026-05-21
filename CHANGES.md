@@ -13,7 +13,14 @@
 
 - [UPDATE] nanobind の最小バージョンを 2.11.0 にする
   - @voluntas
-- [FIX] VideoEncoder / AudioEncoder / VideoDecoder / AudioDecoder の close() / reset() で GIL 保持時にデッドロックする不具合を修正する
+- [FIX] VideoEncoder / AudioEncoder / VideoDecoder / AudioDecoder の close() / reset() で GIL 保持時にデッドロックする問題を修正する
+  - 原因: バインディング層で `nb::call_guard<nb::gil_scoped_release>()` が付与されておらず、 メインスレッド (GIL 保持) と worker_thread の callback (`nb::gil_scoped_acquire`) で相互待ちが成立する
+  - 対処: 各コーデックの close() / reset() バインディングに `nb::call_guard<nb::gil_scoped_release>()` を付与する
+  - 未対応:
+    - デストラクタ + VideoDecoder::configure 経由のデッドロック (issue 0004)
+    - VideoDecoder::reset() の state 遷移仕様準拠 (issue 0005)
+    - state_ の data race (issue 0006)
+    - 並行 close()/reset() による二重 join UB (issue 0007)
   - @sile
 
 ## 2026.2.0
