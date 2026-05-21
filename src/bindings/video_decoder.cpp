@@ -803,8 +803,12 @@ void init_video_decoder(nb::module_& m) {
       .def("flush", &VideoDecoder::flush,
            nb::call_guard<nb::gil_scoped_release>(),
            nb::sig("def flush(self, /) -> None"))
-      .def("reset", &VideoDecoder::reset, nb::sig("def reset(self, /) -> None"))
-      .def("close", &VideoDecoder::close, nb::sig("def close(self, /) -> None"))
+      .def("reset", &VideoDecoder::reset,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def reset(self, /) -> None"))
+      .def("close", &VideoDecoder::close,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def close(self, /) -> None"))
       .def_prop_ro("state", &VideoDecoder::state,
                    nb::sig("def state(self, /) -> CodecState"))
       .def_prop_ro("decode_queue_size", &VideoDecoder::decode_queue_size,

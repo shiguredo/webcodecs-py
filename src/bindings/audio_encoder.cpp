@@ -457,8 +457,12 @@ void init_audio_encoder(nb::module_& m) {
       .def("flush", &AudioEncoder::flush,
            nb::call_guard<nb::gil_scoped_release>(),
            nb::sig("def flush(self, /) -> None"))
-      .def("reset", &AudioEncoder::reset, nb::sig("def reset(self, /) -> None"))
-      .def("close", &AudioEncoder::close, nb::sig("def close(self, /) -> None"))
+      .def("reset", &AudioEncoder::reset,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def reset(self, /) -> None"))
+      .def("close", &AudioEncoder::close,
+           nb::call_guard<nb::gil_scoped_release>(),
+           nb::sig("def close(self, /) -> None"))
       .def_prop_ro("state", &AudioEncoder::state,
                    nb::sig("def state(self, /) -> CodecState"))
       .def_prop_ro("encode_queue_size", &AudioEncoder::encode_queue_size,
