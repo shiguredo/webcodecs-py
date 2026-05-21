@@ -50,7 +50,6 @@ def test_close_does_not_deadlock_when_callback_in_flight():
     started = threading.Event()
     release = threading.Event()
 
-    # VideoEncoder の出力コールバックは (chunk, metadata) の 2 引数で呼ばれる
     def on_output(chunk, metadata=None):
         started.set()
         release.wait(timeout=1)
