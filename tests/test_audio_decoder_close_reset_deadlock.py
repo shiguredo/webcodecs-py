@@ -1,4 +1,8 @@
-"""AudioDecoder の close() / reset() で GIL 保持デッドロックが発生しないことを検証する regression テスト"""
+"""AudioDecoder の close() / reset() で GIL 保持デッドロックが発生しないことを検証する regression テスト
+
+出力コールバック内で release.wait() を呼んで短時間待機する間に別スレッドから close() / reset() を呼び、
+修正前は GIL が取れずデッドロックすること、 修正後はワーカーが GIL を取り戻して正常完了することを確認する。
+"""
 
 import threading
 

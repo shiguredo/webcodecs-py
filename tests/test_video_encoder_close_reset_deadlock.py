@@ -1,4 +1,8 @@
-"""VideoEncoder の close() / reset() で GIL 保持デッドロックが発生しないことを検証する regression テスト"""
+"""VideoEncoder の close() / reset() で GIL 保持デッドロックが発生しないことを検証する regression テスト
+
+出力コールバック内で release.wait() を呼んで短時間待機する間に別スレッドから close() / reset() を呼び、
+修正前は GIL が取れずデッドロックすること、 修正後はワーカーが GIL を取り戻して正常完了することを確認する。
+"""
 
 import threading
 
@@ -49,9 +53,6 @@ def test_close_does_not_deadlock_when_callback_in_flight():
     # VideoEncoder の出力コールバックは (chunk, metadata) の 2 引数で呼ばれる
     def on_output(chunk, metadata=None):
         started.set()
-        # 短時間待機して closer の close() がデッドロックする race window を作る。
-        # 修正後はワーカーがこの wait から戻る際に GIL を取れて callback を完了でき、
-        # close() が正常終了する。 修正前は GIL が取れずデッドロックが顕現する。
         release.wait(timeout=1)
 
     def on_error(error):
