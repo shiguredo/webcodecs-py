@@ -90,7 +90,7 @@ def test_duration_is_readonly():
     # Trying to set duration should raise an error
 
     with pytest.raises(AttributeError):
-        audio.duration = 1234  # type: ignore[misc]
+        audio.duration = 1234  # type: ignore
 
 
 def test_duration_preserved_on_clone():

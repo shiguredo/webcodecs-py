@@ -96,7 +96,7 @@ def encode_key_frame(
         "hardware_acceleration_engine": engine,
     }
     if codec_config:
-        config.update(codec_config)
+        config.update(codec_config)  # type: ignore
 
     encoder.configure(config)
 

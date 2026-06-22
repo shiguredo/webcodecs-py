@@ -41,7 +41,7 @@ from .webcodecs_ext import (
     # Codec capabilities
     HardwareAccelerationEngine,
     # stubgen はプライベート関数をスキップするため type: ignore が必要
-    _get_video_codec_capabilities_impl,  # type: ignore[attr-defined]
+    _get_video_codec_capabilities_impl,  # type: ignore
     # Header parser (独自拡張)
     AVCNalUnitType,
     HEVCNalUnitType,

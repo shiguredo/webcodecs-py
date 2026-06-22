@@ -159,7 +159,7 @@ def test_audio_data_init_dict_missing_required_field():
     # format が欠けている
     with pytest.raises(ValueError):
         AudioData(
-            {  # type: ignore[typeddict-item]
+            {  # type: ignore
                 "sample_rate": 48000,
                 "number_of_frames": 960,
                 "number_of_channels": 2,
@@ -171,7 +171,7 @@ def test_audio_data_init_dict_missing_required_field():
     # data が欠けている
     with pytest.raises(ValueError):
         AudioData(
-            {  # type: ignore[typeddict-item]
+            {  # type: ignore
                 "format": AudioSampleFormat.F32,
                 "sample_rate": 48000,
                 "number_of_frames": 960,
@@ -411,7 +411,7 @@ def test_audio_data_allocation_size_requires_options():
 
     # options なしで呼び出すとエラー
     with pytest.raises(TypeError):
-        audio.allocation_size()  # type: ignore[call-arg]
+        audio.allocation_size()  # type: ignore
 
     audio.close()
 
