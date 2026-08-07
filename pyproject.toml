@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core", "nanobind>=2.12.0", "meson>=1.9"]
+requires = ["scikit-build-core", "nanobind>=2.14.0", "meson>=1.9"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -49,7 +49,7 @@ lint = ["ruff", "ty"]
 example = ["uvc-py", "portaudio-py", "raw-player", "blend2d-py", "mp4-py"]
 
 [tool.scikit-build]
-minimum-version = "0.12.2"
+minimum-version = "1.0.3"
 sdist.include = ["VERSION"]
 build-dir = "_build/{wheel_tag}"
 
@@ -73,8 +73,9 @@ version = ">=1.13"
 packages = ["src/webcodecs"]
 expand-macos-universal-tags = true
 
-[tool.scikit-build.metadata.version]
+[[tool.dynamic-metadata]]
 provider = "scikit_build_core.metadata.regex"
+field = "version"
 input = "VERSION"
 regex = "^(?P<value>.+)$"
 

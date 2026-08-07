@@ -12,19 +12,19 @@
     "url": "https://chromium.googlesource.com/webm/libvpx"
   },
   "libaom": {
-    "tag": "v3.13.2",
+    "tag": "v3.14.1",
     "url": "https://aomedia.googlesource.com/aom"
   },
   "libdav1d": {
-    "tag": "1.5.3",
+    "tag": "1.5.4",
     "url": "https://github.com/videolan/dav1d"
   },
   "libvpl": {
-    "tag": "v2.16.0",
+    "tag": "v2.17.0",
     "url": "https://github.com/intel/libvpl"
   },
   "libyuv": {
-    "ref": "022efdb0b771f7353741dbe360b8bef4e0a874eb",
+    "ref": "149568401fc794586da2303b6fa711ee02c49978",
     "url": "https://chromium.googlesource.com/libyuv/libyuv"
   }
 }

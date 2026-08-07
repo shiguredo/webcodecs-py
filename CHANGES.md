@@ -15,11 +15,17 @@
   - @voluntas
 - [UPDATE] libvpx を v1.16.0 にアップデートする
   - @voluntas
-- [UPDATE] libaom を v3.13.2 にアップデートする
+- [UPDATE] libaom を v3.14.1 にアップデートする
   - @voluntas
-- [UPDATE] nanobind の最小バージョンを 2.12.0 にする
+- [UPDATE] libdav1d を 1.5.4 にアップデートする
   - @voluntas
-- [UPDATE] scikit-build-core の minimum-version を 0.12.2 にする
+- [UPDATE] libvpl を v2.17.0 にアップデートする
+  - @voluntas
+- [UPDATE] libyuv を最新コミットにアップデートする
+  - @voluntas
+- [UPDATE] nanobind の最小バージョンを 2.14.0 にする
+  - @voluntas
+- [UPDATE] scikit-build-core の minimum-version を 1.0.3 にする
   - @voluntas
 - [FIX] VideoEncoder / AudioEncoder / VideoDecoder / AudioDecoder の close() / reset() で GIL 保持時にデッドロックする問題を修正する
   - 原因: バインディング層で `nb::call_guard<nb::gil_scoped_release>()` が付与されておらず、 メインスレッド (GIL 保持) と worker_thread の callback (`nb::gil_scoped_acquire`) で相互待ちが成立する
@@ -30,6 +36,12 @@
     - state_ の data race (issue 0006)
     - 並行 close()/reset() による二重 join UB (issue 0007)
   - @sile
+
+### misc
+
+- [CHANGE] バージョン取得を [[tool.dynamic-metadata]] に移行する
+  - scikit-build-core 1.0 で deprecated になる tool.scikit-build.metadata からの移行
+  - @voluntas
 
 ## 2026.2.0
 
