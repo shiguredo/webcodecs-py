@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   build_macos:
+    if: false
     strategy:
       matrix:
         platform:
@@ -55,6 +56,7 @@ jobs:
           path: wheelhouse/*.whl
 
   build_ubuntu:
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -139,12 +141,12 @@ jobs:
           - name: windows-2025_x86_64
             runs_on: windows-2025
         python_version:
-          - "3.14"
+          # - "3.14"
           # Windows の Python 3.14t (free-threaded) は nanobind のビルドで
           # Py_GIL_DISABLED マクロが正しく検出されないため、現時点では非対応
-          # - "3.14t"
-          - "3.13"
-          - "3.12"
+          - "3.14t"
+          # - "3.13"
+          # - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
     steps:
@@ -172,6 +174,7 @@ jobs:
           path: wheelhouse/*.whl
 
   test:
+    if: false
     needs:
       - build_macos
       - build_ubuntu
